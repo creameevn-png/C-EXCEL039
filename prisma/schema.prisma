@@ -1,0 +1,402 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum VaiTro {
+  Admin
+  CSKH
+  GDV
+  KeToan
+  MuaHang
+  KhoTQ
+  KhoVN
+  Customer
+}
+
+enum TrangThaiUser {
+  HoatDong
+  TamKhoa
+}
+
+enum TrangThaiDon {
+  DonMoiTao
+  DatCoc
+  DaMuaHang
+  NccGiaoHang
+  KhoTqNhan
+  DangVanChuyen
+  KhoVnNhan
+  ChoThanhToan
+  GiaoHang
+  HoanThanh
+  Huy
+  KHTuDat
+}
+
+enum Tuyen {
+  HaNoi
+  HCM
+}
+
+enum LineVC {
+  LineNhanh
+  LineThuong
+  LineRe
+}
+
+enum TrangThaiKN {
+  ChoXuLy
+  DangXuLy
+  DangDuyetCap1
+  DangDuyetCap2
+  DuyetDoiTra
+  DuyetHoanTien
+  DuyetGiamGia
+  TuChoi
+  DaXuLy
+}
+
+enum LoaiKN {
+  HangLoi
+  ThieuHang
+  GiaoSai
+  KhongNhan
+  Khac
+}
+
+enum LoaiViTxn {
+  Nap
+  Tru
+}
+
+enum LoaiThuChi {
+  Thu
+  Chi
+}
+
+enum LoaiChungTu {
+  HoaDon
+  PhieuThu
+  PhieuChi
+  HopDong
+  Khac
+}
+
+enum TrangThaiYC {
+  ChoXuLy
+  DaLienHe
+  DaTaoDon
+  TuChoi
+}
+
+model NhanVien {
+  id           Int           @id @default(autoincrement())
+  email        String        @unique
+  passwordHash String        @map("password_hash")
+  hoTen        String        @map("ho_ten")
+  vaiTro       VaiTro        @map("vai_tro")
+  trangThai    TrangThaiUser @default(HoatDong) @map("trang_thai")
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  ordersCreated DonHang[]    @relation("DonHang_NV")
+  walletTxns    GiaoDichVi[]
+  payments      ThanhToan[]
+
+  @@index([email])
+  @@map("nhan_vien")
+}
+
+model KhachHang {
+  id         Int      @id @default(autoincrement())
+  maKH       String   @unique @map("ma_kh")
+  tenKH      String   @map("ten_kh")
+  sdt        String?
+  email      String?
+  diaChi     String?  @map("dia_chi")
+  tuyen      Tuyen    @default(HaNoi)
+  pctCoc     Float    @default(70) @map("pct_coc")
+  soDuVi     Float    @default(0) @map("so_du_vi")
+  congNo     Float    @default(0) @map("cong_no")
+  tongDon    Int      @default(0) @map("tong_don")
+  doanhThu   Float    @default(0) @map("doanh_thu")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  orders     DonHang[]
+  walletTxns GiaoDichVi[]
+  khieuNai   KhieuNai[]
+  chungTu    ChungTu[]
+
+  @@index([maKH])
+  @@index([sdt])
+  @@map("khach_hang")
+}
+
+model SanPham {
+  id          Int      @id @default(autoincrement())
+  maSP        String   @unique @map("ma_sp")
+  tenSP       String   @map("ten_sp")
+  danhMuc     String?  @map("danh_muc")
+  webNguon    String?  @map("web_nguon")
+  kgGoiY      Float    @default(0) @map("kg_goi_y")
+  m3GoiY      Float    @default(0) @map("m3_goi_y")
+  giaThamKhao Float    @default(0) @map("gia_tham_khao")
+  linkTaobao  String?  @map("link_taobao") @db.Text
+  ghiChu      String?  @map("ghi_chu") @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("san_pham")
+}
+
+model NCC {
+  id        Int      @id @default(autoincrement())
+  maNCC     String?  @unique @map("ma_ncc")
+  tenNCC    String   @map("ten_ncc")
+  wechat    String?
+  ghiChu    String?  @map("ghi_chu") @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("ncc")
+}
+
+model DonHang {
+  id          Int          @id @default(autoincrement())
+  maDH        String       @unique @map("ma_dh")
+  ngayTao     DateTime     @default(now()) @map("ngay_tao")
+  maKH        String       @map("ma_kh")
+  nvTao       String?      @map("nv_tao")
+  nvId        Int?         @map("nv_id")
+  tuyen       Tuyen        @default(HaNoi)
+
+  maGD        String?      @map("ma_gd")
+  maVD        String?      @map("ma_vd")
+
+  tongKg      Float        @default(0) @map("tong_kg")
+  tongM3      Float        @default(0) @map("tong_m3")
+  tongGiaHang Float        @default(0) @map("tong_gia_hang")
+  phiMua      Float        @default(0) @map("phi_mua")
+  phiBH       Float        @default(0) @map("phi_bh")
+  phiVC       Float        @default(0) @map("phi_vc")
+  shipND      Float        @default(0) @map("ship_nd")
+  dongGo      Float        @default(0) @map("dong_go")
+  phuThu      Float        @default(0) @map("phu_thu")
+  tongTien    Float        @default(0) @map("tong_tien")
+  tienCoc     Float        @default(0) @map("tien_coc")
+  daTra       Float        @default(0) @map("da_tra")
+  conLai      Float        @default(0) @map("con_lai")
+
+  trangThai   TrangThaiDon @default(DonMoiTao) @map("trang_thai")
+  lineVC      LineVC       @default(LineThuong) @map("line_vc")
+  loaiHang    String       @default("Thường") @map("loai_hang")
+  pctCoc      Float        @default(70) @map("pct_coc")
+
+  anhKhoTQ    String?      @map("anh_kho_tq") @db.Text
+  anhRoiTQ    String?      @map("anh_roi_tq") @db.Text
+  anhKhoVN    String?      @map("anh_kho_vn") @db.Text
+  anhGiaoKH   String?      @map("anh_giao_kh") @db.Text
+
+  ghiChu      String?      @map("ghi_chu") @db.Text
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  khachHang KhachHang   @relation(fields: [maKH], references: [maKH])
+  nv        NhanVien?   @relation("DonHang_NV", fields: [nvId], references: [id])
+  chiTiet   ChiTietDon[]
+  payments  ThanhToan[]
+  khieuNai  KhieuNai[]
+  chungTu   ChungTu[]
+
+  @@index([maKH, ngayTao(sort: Desc)])
+  @@index([trangThai, ngayTao(sort: Desc)])
+  @@index([ngayTao(sort: Desc)])
+  @@map("don_hang")
+}
+
+model ChiTietDon {
+  id         Int      @id @default(autoincrement())
+  maDH       String   @map("ma_dh")
+  stt        Int
+  tenSP      String   @map("ten_sp") @db.Text
+  soLuong    Int      @default(1) @map("so_luong")
+  donGiaNDT  Float    @default(0) @map("don_gia_ndt")
+  tyGia      Float    @default(3650) @map("ty_gia")
+  donGiaVND  Float    @default(0) @map("don_gia_vnd")
+  thanhTien  Float    @default(0) @map("thanh_tien")
+  kg         Float    @default(0)
+  m3         Float    @default(0)
+  webNguon   String?  @map("web_nguon")
+  linkTaobao String?  @map("link_taobao") @db.Text
+  ghiChu     String?  @map("ghi_chu") @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  donHang DonHang @relation(fields: [maDH], references: [maDH], onDelete: Cascade)
+
+  @@index([maDH, stt])
+  @@map("chi_tiet_don")
+}
+
+model GiaoDichVi {
+  id        Int        @id @default(autoincrement())
+  ngay      DateTime   @default(now())
+  maKH      String     @map("ma_kh")
+  loai      LoaiViTxn
+  soTien    Float      @map("so_tien")
+  soDuSau   Float      @default(0) @map("so_du_sau")
+  ghiChu    String?    @map("ghi_chu") @db.Text
+  nv        String?
+  nvId      Int?       @map("nv_id")
+
+  khachHang KhachHang @relation(fields: [maKH], references: [maKH])
+  nhanVien  NhanVien? @relation(fields: [nvId], references: [id])
+
+  @@index([maKH, ngay(sort: Desc)])
+  @@map("lich_su_vi")
+}
+
+model ThanhToan {
+  id        Int        @id @default(autoincrement())
+  ngay      DateTime   @default(now())
+  maDH      String     @map("ma_dh")
+  loai      LoaiThuChi @default(Thu)
+  soTien    Float      @map("so_tien")
+  ghiChu    String?    @map("ghi_chu") @db.Text
+  nv        String?
+  nvId      Int?       @map("nv_id")
+
+  donHang DonHang  @relation(fields: [maDH], references: [maDH])
+  nhanVien NhanVien? @relation(fields: [nvId], references: [id])
+
+  @@index([maDH])
+  @@map("thu_chi")
+}
+
+model CaiDat {
+  id     Int     @id @default(autoincrement())
+  ten    String  @unique
+  giaTri String? @map("gia_tri") @db.Text
+  ghiChu String? @map("ghi_chu") @db.Text
+
+  @@map("cai_dat")
+}
+
+model HoatDong {
+  id        Int      @id @default(autoincrement())
+  ngay      DateTime @default(now())
+  email     String?
+  hanhDong  String   @map("hanh_dong")
+  doiTuong  String?  @map("doi_tuong")
+  chiTiet   String?  @map("chi_tiet") @db.Text
+
+  @@index([ngay(sort: Desc)])
+  @@map("hoat_dong")
+}
+
+model KhieuNai {
+  id            Int          @id @default(autoincrement())
+  maKN          String       @unique @map("ma_kn")
+  ngayTao       DateTime     @default(now()) @map("ngay_tao")
+  maDH          String?      @map("ma_dh")
+  maKH          String?      @map("ma_kh")
+  nguoiTao      String?      @map("nguoi_tao")
+  loai          LoaiKN
+  moTa          String       @map("mo_ta") @db.Text
+  anhBangChung  String?      @map("anh_bang_chung") @db.Text
+  trangThai     TrangThaiKN  @default(ChoXuLy) @map("trang_thai")
+  phuongAn      String?      @map("phuong_an")
+  soTienHoan    Float        @default(0) @map("so_tien_hoan")
+  ghiChuXuLy    String?      @map("ghi_chu_xu_ly") @db.Text
+  duyetCap1By   String?      @map("duyet_cap1_by")
+  duyetCap1At   DateTime?    @map("duyet_cap1_at")
+  duyetCap1Note String?      @map("duyet_cap1_note") @db.Text
+  duyetCap2By   String?      @map("duyet_cap2_by")
+  duyetCap2At   DateTime?    @map("duyet_cap2_at")
+  duyetCap2Note String?      @map("duyet_cap2_note") @db.Text
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  donHang   DonHang?   @relation(fields: [maDH], references: [maDH])
+  khachHang KhachHang? @relation(fields: [maKH], references: [maKH])
+
+  @@index([maDH])
+  @@index([trangThai])
+  @@index([ngayTao(sort: Desc)])
+  @@map("khieu_nai")
+}
+
+model BangGia {
+  id              Int      @id @default(autoincrement())
+  line            LineVC
+  loaiHang        String   @map("loai_hang")
+  giaKgDuoi5      Float    @default(0) @map("gia_kg_duoi_5")
+  giaKg5To20      Float    @default(0) @map("gia_kg_5_20")
+  giaKgTren20     Float    @default(0) @map("gia_kg_tren_20")
+  giaM3           Float    @default(0) @map("gia_m3")
+  phiPhuPct       Float    @default(0) @map("phi_phu_pct")
+  thoiGianDuKien  String?  @map("thoi_gian_du_kien")
+  hoatDong        Boolean  @default(true) @map("hoat_dong")
+  ghiChu          String?  @map("ghi_chu") @db.Text
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([line, loaiHang], name: "uq_bang_gia_line_loai")
+  @@map("bang_gia")
+}
+
+model NguonHang {
+  id           Int      @id @default(autoincrement())
+  tenSP        String   @map("ten_sp")
+  tenNCC       String?  @map("ten_ncc")
+  linkTaobao   String?  @map("link_taobao") @db.Text
+  giaNDT       Float?   @map("gia_ndt")
+  moq          Int      @default(1)
+  thoiGianGiao String?  @map("thoi_gian_giao")
+  chatLuong    Int?     @map("chat_luong")
+  ghiChu       String?  @map("ghi_chu") @db.Text
+  nguoiThem    String?  @map("nguoi_them")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("nguon_hang")
+}
+
+model YeuCauMua {
+  id        Int         @id @default(autoincrement())
+  maYC      String      @unique @map("ma_yc")
+  ngayTao   DateTime    @default(now()) @map("ngay_tao")
+  hoTen     String      @map("ho_ten")
+  sdt       String
+  email     String?
+  maKH      String?     @map("ma_kh")
+  tuyen     Tuyen       @default(HaNoi)
+  sanPham   String      @map("san_pham") @db.Text
+  ghiChu    String?     @map("ghi_chu") @db.Text
+  trangThai TrangThaiYC @default(ChoXuLy) @map("trang_thai")
+  nvXuLy    String?     @map("nv_xu_ly")
+  ghiChuXuLy String?    @map("ghi_chu_xu_ly") @db.Text
+  maDH      String?     @map("ma_dh")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+
+  @@index([trangThai])
+  @@index([ngayTao(sort: Desc)])
+  @@map("yeu_cau_mua")
+}
+
+model ChungTu {
+  id        Int          @id @default(autoincrement())
+  maCT      String       @unique @map("ma_ct")
+  ngay      DateTime     @default(now())
+  loai      LoaiChungTu
+  maDH      String?      @map("ma_dh")
+  maKH      String?      @map("ma_kh")
+  tieuDe    String       @map("tieu_de")
+  noiDung   String?      @map("noi_dung") @db.Text
+  fileUrl   String?      @map("file_url") @db.Text
+  nguoiTao  String?      @map("nguoi_tao")
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  donHang   DonHang?   @relation(fields: [maDH], references: [maDH])
+  khachHang KhachHang? @relation(fields: [maKH], references: [maKH])
+
+  @@map("chung_tu")
+}

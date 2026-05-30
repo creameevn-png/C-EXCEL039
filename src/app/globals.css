@@ -767,6 +767,42 @@ svg { flex-shrink: 0; }
   display: flex; align-items: center; gap: 8px; font-weight: 600;
 }
 
+/* ====================== YÊU CẦU MUA (1 sản phẩm / 1 hàng) ====================== */
+.yc-rows { display: flex; flex-direction: column; gap: 8px; }
+.yc-row-head,
+.yc-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 2.2fr) minmax(0, 2fr) 66px minmax(0, 1.6fr) 40px;
+  gap: 8px;
+  align-items: center;
+}
+.yc-row-head {
+  font-size: 11px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.3px; padding: 0 2px 2px;
+}
+.yc-row {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 8px;
+}
+.yc-row .stt { font-size: 12px; font-weight: 700; color: var(--text-muted); text-align: center; }
+.yc-row input { width: 100%; }
+.yc-row .yc-src {
+  font-size: 10px; font-weight: 700; color: var(--primary);
+  margin-top: 3px; display: inline-block;
+}
+.yc-cell-rm { display: flex; justify-content: center; }
+@media (max-width: 760px) {
+  .yc-row-head { display: none; }
+  .yc-row { grid-template-columns: 64px 1fr 40px; }
+  .yc-cell-stt { display: none; }
+  .yc-cell-link, .yc-cell-ten { grid-column: 1 / -1; }
+  .yc-cell-sl { grid-column: 1 / 2; }
+  .yc-cell-note { grid-column: 2 / 3; }
+  .yc-cell-rm { grid-column: 3 / 4; }
+}
+
 /* ====================== UTILITIES ====================== */
 .text-success { color: var(--success-dark); }
 .text-danger { color: var(--danger-dark); }

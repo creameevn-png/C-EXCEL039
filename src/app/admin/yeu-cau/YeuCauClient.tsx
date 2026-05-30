@@ -52,6 +52,17 @@ export default function YeuCauClient({ list }: { list: YC[] }) {
     else showToast(r?.message || 'Lỗi', 'error');
   }
 
+  // Chuyển yêu cầu sang form Tạo đơn (CSKH) với dữ liệu điền sẵn
+  function convertToOrder(y: YC) {
+    try {
+      sessionStorage.setItem('yc_to_order', JSON.stringify({
+        maYC: y.maYC, hoTen: y.hoTen, sdt: y.sdt, email: y.email,
+        maKH: y.maKH, tuyen: y.tuyen, ghiChu: y.ghiChu, sanPham: y.sanPham
+      }));
+    } catch {}
+    window.location.href = '/cskh?fromYC=' + encodeURIComponent(y.maYC);
+  }
+
   return (
     <div className="form-section">
       <div className="section-title"><FiShoppingCart /> Yêu cầu mua hàng ({filtered.length}/{list.length})</div>
@@ -82,6 +93,14 @@ export default function YeuCauClient({ list }: { list: YC[] }) {
           <div className="ac-meta icon-inline"><FiUser /> {y.hoTen} · <FiPhone /> {y.sdt}{y.maKH && <> · KH: <b>{y.maKH}</b></>} · {y.tuyen === 'HCM' ? 'HCM' : 'Hà Nội'}</div>
           <div className="ac-meta" style={{ marginTop: 6 }}>{formatDateTime(y.ngayTao)} · <b>{y.sanPham.length} sản phẩm</b>{y.maDH && <> · Đơn: <b>{y.maDH}</b></>}</div>
           {y.ghiChu && <div className="ac-meta icon-inline" style={{ marginTop: 4, color: '#334155' }}><FiFileText /> {y.ghiChu.slice(0, 160)}</div>}
+          <div className="ac-actions">
+            <button className="btn btn-primary btn-sm" onClick={(e) => { e.stopPropagation(); convertToOrder(y); }}>
+              <FiArrowRight /> Chuyển thành đơn
+            </button>
+            <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); open(y); }}>
+              Xem / xử lý
+            </button>
+          </div>
         </div>
       ))}
 
@@ -92,7 +111,7 @@ export default function YeuCauClient({ list }: { list: YC[] }) {
             {editing && (
               <>
                 <div style={{ background: 'var(--surface-2)', padding: 12, borderRadius: 8, marginBottom: 12, fontSize: 13 }}>
-                  <div className="icon-inline"><FiUser /> <b>{editing.hoTen}</b> · <FiPhone /> {editing.sdt}{editing.email && <> · {editing.email}</>}</div>
+                  <div className="icon-inline"><FiUser /> <b>{editing.hoTen}</b> · <FiPhone /> <a href={`tel:${editing.sdt}`} style={{ color: 'var(--primary)', fontWeight: 600 }}>{editing.sdt}</a>{editing.email && <> · {editing.email}</>}</div>
                   <div style={{ marginTop: 4, color: 'var(--text-muted)' }}>
                     {editing.maKH && <>Mã KH: <b>{editing.maKH}</b> · </>}
                     Tuyến: <b>{editing.tuyen === 'HCM' ? 'HCM' : 'Hà Nội'}</b> · {formatDateTime(editing.ngayTao)}
@@ -141,7 +160,7 @@ export default function YeuCauClient({ list }: { list: YC[] }) {
                 </div>
 
                 <div style={{ marginTop: 12, padding: 10, background: 'var(--primary-soft)', borderRadius: 8, fontSize: 12.5 }} className="icon-inline">
-                  <FiArrowRight /> Vào trang <a href="/cskh" style={{ color: 'var(--primary)', fontWeight: 600 }}>CSKH → Tạo đơn</a> để lên đơn chính thức, rồi dán mã đơn vào đây và đổi trạng thái thành "Đã tạo đơn".
+                  <FiArrowRight /> Bấm <b>Chuyển thành đơn hàng</b> để mở form Tạo đơn đã điền sẵn KH, tuyến & sản phẩm — chỉ cần nhập giá và thông tin còn thiếu. Đơn tạo xong sẽ tự gắn mã & đổi trạng thái thành "Đã tạo đơn".
                 </div>
               </>
             )}
@@ -149,6 +168,11 @@ export default function YeuCauClient({ list }: { list: YC[] }) {
           <div className="btn-row">
             <button className="btn btn-secondary" onClick={() => setEditing(null)}>Đóng</button>
             <button className="btn btn-success" onClick={save} disabled={busy}><FiSave /> Lưu</button>
+            {editing && (
+              <button className="btn btn-primary" onClick={() => convertToOrder(editing)}>
+                <FiArrowRight /> Chuyển thành đơn hàng
+              </button>
+            )}
           </div>
         </div>
       </div>

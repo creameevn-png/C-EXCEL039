@@ -1,11 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   FiPlusCircle, FiPlus, FiX, FiPackage, FiDollarSign, FiUsers, FiUserPlus,
-  FiInbox, FiClipboard, FiCheckCircle, FiClock, FiLock, FiCheck, FiEdit3
+  FiInbox, FiClipboard, FiCheckCircle, FiClock, FiLock, FiCheck, FiEdit3, FiShoppingCart
 } from 'react-icons/fi';
 import type { SessionUser } from '@/lib/auth';
+import { detectWeb } from '@/lib/source';
 import AppShell from '@/components/AppShell';
 import Tabs from '@/components/Tabs';
 import OrderDetailModalHost from '@/components/OrderDetailModal';
@@ -74,6 +75,58 @@ export default function CskhClient({ initial }: Props) {
   const [submitting, setSubmitting] = useState(false);
 
   const [items, setItems] = useState<LineItem[]>([mkLine({}, tyGia)]);
+
+  // ===== Tạo đơn từ "Yêu cầu mua hàng" (điền sẵn) =====
+  const [fromYC, setFromYC] = useState('');
+  const [ycInfo, setYcInfo] = useState<{ hoTen: string; sdt: string; email: string } | null>(null);
+
+  useEffect(() => {
+    let raw: string | null = null;
+    try { raw = sessionStorage.getItem('yc_to_order'); } catch {}
+    if (!raw) return;
+    let yc: any;
+    try { yc = JSON.parse(raw); } catch { return; }
+    try { sessionStorage.removeItem('yc_to_order'); } catch {}
+    try { window.history.replaceState(null, '', '/cskh'); } catch {}
+
+    setFromYC(yc.maYC || '');
+    setYcInfo({ hoTen: yc.hoTen || '', sdt: yc.sdt || '', email: yc.email || '' });
+
+    const t: 'HaNoi' | 'HCM' = yc.tuyen === 'HCM' ? 'HCM' : 'HaNoi';
+    setTuyen(t);
+    if (yc.ghiChu) setGhiChu(yc.ghiChu);
+
+    const sp: any[] = Array.isArray(yc.sanPham) ? yc.sanPham : [];
+    if (sp.length) {
+      setItems(sp.map((s) => mkLine({
+        spId: '__custom__',
+        tenSP: String(s.ten || s.link || '').trim(),
+        soLuong: Number(s.soLuong) || 1,
+        linkTaobao: String(s.link || '').trim(),
+        webNguon: detectWeb(String(s.link || ''))
+      }, tyGia)));
+    }
+
+    // Tự khớp khách hàng theo mã KH, hoặc theo SĐT
+    let matched: Customer | undefined;
+    if (yc.maKH) matched = customers.find((c) => c.maKH === String(yc.maKH).toUpperCase());
+    if (!matched && yc.sdt) {
+      const digits = String(yc.sdt).replace(/\D/g, '');
+      if (digits) {
+        const cands = customers.filter((c) => (c.sdt || '').replace(/\D/g, '') === digits);
+        if (cands.length === 1) matched = cands[0];
+      }
+    }
+    if (matched) {
+      setMaKH(matched.maKH);
+      setPctCoc(matched.pctCoc);
+      setHintCoc(`Đã khớp KH ${matched.maKH} từ yêu cầu · cọc ${matched.pctCoc}%`);
+    } else {
+      // Điền sẵn modal "Thêm KH" để tạo nhanh từ thông tin yêu cầu
+      setAddKh({ tenKH: yc.hoTen || '', sdt: yc.sdt || '', tuyen: t, diaChi: '', email: yc.email || '', pctCoc: 70 });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ===== Topup modal =====
   const [topupOpen, setTopupOpen] = useState(false);
@@ -162,11 +215,21 @@ export default function CskhClient({ initial }: Props) {
         webNguon: it.webNguon, linkTaobao: it.linkTaobao
       }))
     });
-    setSubmitting(false);
     if (r?.success) {
       showToast('Đã tạo đơn ' + r.maDH, 'success');
+      if (fromYC) {
+        await callServer('updateYeuCauMua', fromYC, {
+          trangThai: 'DaTaoDon',
+          maDH: r.maDH,
+          ghiChuXuLy: `Đã tạo đơn ${r.maDH} từ yêu cầu (CSKH: ${user.email})`
+        });
+      }
+      setSubmitting(false);
       reload();
-    } else showToast(r?.message || 'Có lỗi xảy ra', 'error');
+    } else {
+      setSubmitting(false);
+      showToast(r?.message || 'Có lỗi xảy ra', 'error');
+    }
   }
 
   async function confirmDepositOrder(maDH: string) {
@@ -240,6 +303,23 @@ export default function CskhClient({ initial }: Props) {
   const tabCreate = (
     <div className="form-section">
       <div className="section-title"><FiPlusCircle /> Tạo đơn hàng mới (đa sản phẩm)</div>
+
+      {fromYC && (
+        <div className="alert alert-info" style={{ marginBottom: 14 }}>
+          <FiShoppingCart />
+          <div>
+            <div>Đang tạo đơn từ <b>yêu cầu {fromYC}</b>{ycInfo && <> · KH: <b>{ycInfo.hoTen}</b> · {ycInfo.sdt}{ycInfo.email ? ` · ${ycInfo.email}` : ''}</>}.</div>
+            <div style={{ marginTop: 4, fontSize: 12 }}>
+              Đã điền sẵn sản phẩm & tuyến. Chỉ cần {maKH ? 'nhập' : 'chọn/tạo KH rồi nhập'} giá NDT, kg/m³ còn thiếu rồi bấm <b>Tạo đơn</b>. Yêu cầu sẽ tự chuyển sang "Đã tạo đơn" & gắn mã đơn.
+            </div>
+            {!maKH && ycInfo && (
+              <button type="button" className="btn btn-success btn-sm" style={{ marginTop: 8 }} onClick={() => setAddKhOpen(true)}>
+                <FiUserPlus /> Tạo KH từ yêu cầu
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="form-grid">
         <div className="form-field">

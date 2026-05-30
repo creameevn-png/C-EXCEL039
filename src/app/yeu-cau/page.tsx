@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  FiShoppingCart, FiCheckCircle, FiSend, FiClock, FiArrowLeft, FiAlertCircle, FiPlus, FiX
+  FiShoppingCart, FiCheckCircle, FiSend, FiClock, FiArrowLeft, FiAlertCircle, FiPlus, FiX, FiClipboard
 } from 'react-icons/fi';
 import { callServer } from '@/lib/client';
+import { detectWeb } from '@/lib/source';
 
 type Item = { tempId: number; link: string; ten: string; soLuong: number; ghiChu: string };
 let SEQ = 1;
-const mk = (): Item => ({ tempId: SEQ++, link: '', ten: '', soLuong: 1, ghiChu: '' });
+const mk = (link = ''): Item => ({ tempId: SEQ++, link, ten: '', soLuong: 1, ghiChu: '' });
 
 export default function YeuCauMuaPage() {
   const [hoTen, setHoTen] = useState('');
@@ -22,6 +23,10 @@ export default function YeuCauMuaPage() {
   const [done, setDone] = useState<string | null>(null);
   const [err, setErr] = useState('');
 
+  // Dán nhiều link cùng lúc
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+
   useEffect(() => {
     const url = new URL(window.location.href);
     const m = url.searchParams.get('ma'); if (m) setMaKH(m);
@@ -31,9 +36,35 @@ export default function YeuCauMuaPage() {
   function add() { setItems((p) => [...p, mk()]); }
   function rm(id: number) { setItems((p) => p.length > 1 ? p.filter((x) => x.tempId !== id) : p); }
 
+  // Enter ở dòng cuối => thêm dòng mới (và chặn submit nhầm)
+  function onRowKey(idx: number) {
+    return (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (idx === items.length - 1) add();
+      }
+    };
+  }
+
+  const bulkLinks = useMemo(
+    () => bulkText.split('\n').map((s) => s.trim()).filter(Boolean),
+    [bulkText]
+  );
+  function applyBulk() {
+    if (!bulkLinks.length) { setBulkOpen(false); return; }
+    setItems((prev) => {
+      const base = (prev.length === 1 && !prev[0].link.trim() && !prev[0].ten.trim()) ? [] : prev;
+      return [...base, ...bulkLinks.map((l) => mk(l))];
+    });
+    setBulkText(''); setBulkOpen(false);
+  }
+
+  const filledItems = items.filter((it) => it.link.trim() || it.ten.trim());
+  const totalQty = filledItems.reduce((s, it) => s + (Number(it.soLuong) || 0), 0);
+
   const valid = useMemo(
-    () => hoTen.trim() && sdt.trim() && items.some((it) => it.link.trim() || it.ten.trim()),
-    [hoTen, sdt, items]
+    () => hoTen.trim() && sdt.trim() && filledItems.length > 0,
+    [hoTen, sdt, filledItems.length]
   );
 
   async function submit(e: React.FormEvent) {
@@ -41,7 +72,7 @@ export default function YeuCauMuaPage() {
     setErr('');
     if (!hoTen.trim()) return setErr('Vui lòng nhập họ tên');
     if (!sdt.trim()) return setErr('Vui lòng nhập số điện thoại');
-    if (!items.some((it) => it.link.trim() || it.ten.trim())) return setErr('Nhập ít nhất 1 sản phẩm (link hoặc tên)');
+    if (filledItems.length === 0) return setErr('Nhập ít nhất 1 sản phẩm (link hoặc tên)');
     setSending(true);
     const r = await callServer('createYeuCauMua', {
       hoTen, sdt, email, maKH, tuyen, ghiChu,
@@ -68,7 +99,7 @@ export default function YeuCauMuaPage() {
 
   return (
     <div className="auth-shell" style={{ alignItems: 'flex-start', padding: '40px 20px' }}>
-      <div style={{ maxWidth: 640, width: '100%', margin: '0 auto' }}>
+      <div style={{ maxWidth: 980, width: '100%', margin: '0 auto' }}>
         <div style={{ textAlign: 'center', color: 'white', marginBottom: 22 }}>
           <div className="auth-logo"><FiShoppingCart /></div>
           <h1 style={{ fontSize: 26, marginBottom: 4, fontWeight: 800 }}>Yêu cầu mua hàng</h1>
@@ -97,35 +128,63 @@ export default function YeuCauMuaPage() {
             </div>
 
             <div style={{ marginTop: 18 }}>
-              <div className="flex-between" style={{ marginBottom: 8 }}>
-                <b className="icon-inline"><FiShoppingCart /> Sản phẩm muốn mua ({items.length})</b>
-                <button type="button" className="btn btn-success btn-sm" onClick={add}><FiPlus /> Thêm SP</button>
+              <div className="flex-between" style={{ marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
+                <b className="icon-inline"><FiShoppingCart /> Sản phẩm muốn mua ({filledItems.length}{totalQty > 0 ? ` · ${totalQty} món` : ''})</b>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setBulkOpen((v) => !v)}><FiClipboard /> Dán nhiều link</button>
+                  <button type="button" className="btn btn-success btn-sm" onClick={add}><FiPlus /> Thêm SP</button>
+                </div>
               </div>
-              {items.map((it, idx) => (
-                <div key={it.tempId} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 12, marginBottom: 8, background: 'var(--surface-2)' }}>
-                  <div className="flex-between" style={{ marginBottom: 6 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>SP #{idx + 1}</span>
-                    {items.length > 1 && <button type="button" className="btn btn-danger btn-sm" onClick={() => rm(it.tempId)}><FiX /></button>}
-                  </div>
-                  <div className="form-field">
-                    <label>Link sản phẩm (Taobao / 1688 / Tmall...)</label>
-                    <input value={it.link} onChange={(e) => patch(it.tempId, { link: e.target.value })} placeholder="https://..." />
-                  </div>
-                  <div className="form-grid" style={{ marginTop: 8 }}>
-                    <div className="form-field"><label>Tên / mô tả sản phẩm</label>
-                      <input value={it.ten} onChange={(e) => patch(it.tempId, { ten: e.target.value })} placeholder="VD: Áo khoác nam, màu đen, size L" /></div>
-                    <div className="form-field"><label>Số lượng</label>
-                      <input type="number" min={1} value={it.soLuong} onChange={(e) => patch(it.tempId, { soLuong: parseInt(e.target.value) || 1 })} /></div>
-                  </div>
-                  <div className="form-field" style={{ marginTop: 8 }}>
-                    <label>Ghi chú (màu sắc, kích cỡ, yêu cầu riêng...)</label>
-                    <input value={it.ghiChu} onChange={(e) => patch(it.tempId, { ghiChu: e.target.value })} />
+
+              {bulkOpen && (
+                <div style={{ border: '1px dashed var(--border-strong)', borderRadius: 10, padding: 12, marginBottom: 10, background: 'var(--surface-2)' }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>Dán mỗi dòng 1 link — hệ thống tự tách thành từng sản phẩm</label>
+                  <textarea
+                    rows={4}
+                    value={bulkText}
+                    onChange={(e) => setBulkText(e.target.value)}
+                    placeholder={'https://item.taobao.com/...\nhttps://detail.1688.com/...\nhttps://detail.tmall.com/...'}
+                    style={{ marginTop: 6 }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setBulkText(''); setBulkOpen(false); }}>Đóng</button>
+                    <button type="button" className="btn btn-primary btn-sm" disabled={!bulkLinks.length} onClick={applyBulk}><FiPlus /> Thêm {bulkLinks.length} dòng</button>
                   </div>
                 </div>
-              ))}
+              )}
+
+              <div className="yc-rows">
+                <div className="yc-row-head">
+                  <div>#</div><div>Link sản phẩm</div><div>Tên / mô tả</div><div>SL</div><div>Ghi chú</div><div></div>
+                </div>
+                {items.map((it, idx) => {
+                  const src = detectWeb(it.link);
+                  return (
+                    <div key={it.tempId} className="yc-row">
+                      <div className="yc-cell-stt stt">{idx + 1}</div>
+                      <div className="yc-cell-link">
+                        <input value={it.link} onChange={(e) => patch(it.tempId, { link: e.target.value })} onKeyDown={onRowKey(idx)} placeholder="Link Taobao / 1688 / Tmall..." />
+                        {src && <span className="yc-src">● {src}</span>}
+                      </div>
+                      <div className="yc-cell-ten">
+                        <input value={it.ten} onChange={(e) => patch(it.tempId, { ten: e.target.value })} onKeyDown={onRowKey(idx)} placeholder="VD: Áo khoác nam, đen, size L" />
+                      </div>
+                      <div className="yc-cell-sl">
+                        <input type="number" min={1} aria-label="Số lượng" title="Số lượng" value={it.soLuong} onChange={(e) => patch(it.tempId, { soLuong: parseInt(e.target.value) || 1 })} />
+                      </div>
+                      <div className="yc-cell-note">
+                        <input value={it.ghiChu} onChange={(e) => patch(it.tempId, { ghiChu: e.target.value })} onKeyDown={onRowKey(idx)} placeholder="Màu/size/yêu cầu riêng" />
+                      </div>
+                      <div className="yc-cell-rm">
+                        {items.length > 1 && <button type="button" className="btn btn-danger btn-sm" title="Xóa dòng" onClick={() => rm(it.tempId)}><FiX /></button>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
-            <div className="form-field" style={{ marginTop: 12 }}>
+            <div className="form-field" style={{ marginTop: 14 }}>
               <label>Yêu cầu / ghi chú chung</label>
               <textarea rows={3} value={ghiChu} onChange={(e) => setGhiChu(e.target.value)} placeholder="VD: Cần hàng trước Tết, ưu tiên line nhanh..." />
             </div>

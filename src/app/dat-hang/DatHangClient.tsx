@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useMemo, useEffect, type ReactNode } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
-  FiCheckCircle, FiArrowLeft, FiSend, FiClock, FiPlus, FiMinus, FiX,
+  FiCheckCircle, FiArrowLeft, FiSend, FiClock, FiPlus, FiX,
   FiFileText, FiUser, FiShoppingCart, FiDollarSign, FiEdit3, FiBox, FiRefreshCw
 } from 'react-icons/fi';
 import { callServer } from '@/lib/client';
 import { showToast } from '@/components/Toast';
+import ErpSection from '@/components/ErpSection';
 import { fmtVND, formatNDT } from '@/lib/format';
 import { calcPhiVCPanama } from '@/lib/shipping-fee';
 
@@ -18,23 +19,6 @@ type Item = {
 
 let SEQ = 1;
 const mk = (): Item => ({ tempId: SEQ++, tenSP: '', soLuong: 1, donGiaNDT: 0, tyGia: 3650, kg: 0, m3: 0, webNguon: '', linkTaobao: '' });
-
-function Section({ icon, title, right, defaultOpen = true, children }: {
-  icon: ReactNode; title: string; right?: ReactNode; defaultOpen?: boolean; children: ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className="erp-sec">
-      <div className="erp-sec-head" onClick={() => setOpen((o) => !o)}>
-        <span className="erp-sec-toggle">{open ? <FiMinus /> : <FiPlus />}</span>
-        <span className="erp-sec-ic">{icon}</span>
-        <span className="erp-sec-title">{title}</span>
-        {right && <div className="erp-sec-right" onClick={(e) => e.stopPropagation()}>{right}</div>}
-      </div>
-      {open && <div className="erp-sec-body">{children}</div>}
-    </div>
-  );
-}
 
 export default function DatHangClient({ kh }: { kh: { maKH: string; tenKH: string; pctCoc: number; tuyen: string } | null }) {
   const [items, setItems] = useState<Item[]>([mk()]);
@@ -122,40 +106,35 @@ export default function DatHangClient({ kh }: { kh: { maKH: string; tenKH: strin
 
       <div className="erp-layout">
         <div className="erp-main">
-          {/* HEADER */}
-          <Section icon={<FiFileText />} title="Thông tin đơn">
+          {/* THÔNG TIN ĐƠN & KHÁCH HÀNG */}
+          <ErpSection icon={<FiFileText />} title="Thông tin đơn & khách hàng">
             <div className="erp-fields">
-              <div className="erp-field locked"><label>Số đơn</label><input readOnly value="Tự động" /></div>
-              <div className="erp-field locked"><label>Ngày tạo</label><input readOnly value={today} /></div>
-              <div className="erp-field">
+              <div className="erp-field locked w-md"><label>Số đơn</label><input readOnly value="Tự động" /></div>
+              <div className="erp-field locked w-md"><label>Ngày tạo</label><input readOnly value={today} /></div>
+              <div className="erp-field w-md">
                 <label>Tuyến</label>
                 <select value={tuyen} onChange={(e) => setTuyen(e.target.value as any)}>
                   <option value="HaNoi">Hà Nội</option><option value="HCM">HCM</option>
                 </select>
               </div>
-              <div className="erp-field">
+              <div className="erp-field w-sm">
                 <label>% Cọc</label>
                 <input type="number" min={0} max={100} value={pctCoc} onChange={(e) => setPctCoc(parseFloat(e.target.value) || 70)} />
               </div>
+              {kh && <>
+                <div className="erp-field locked w-md"><label>Mã KH</label><input readOnly value={kh.maKH} /></div>
+                <div className="erp-field locked w-lg"><label>Tên khách hàng</label><input readOnly value={kh.tenKH} /></div>
+              </>}
             </div>
-          </Section>
-
-          {/* CUSTOMER */}
-          <Section icon={<FiUser />} title="Khách hàng">
-            {kh ? (
-              <div className="erp-fields">
-                <div className="erp-field locked"><label>Mã khách hàng</label><input readOnly value={kh.maKH} /></div>
-                <div className="erp-field locked" style={{ flex: '2 1 240px' }}><label>Tên khách hàng</label><input readOnly value={kh.tenKH} /></div>
-              </div>
-            ) : (
-              <div className="alert alert-info" style={{ marginBottom: 0 }}>
+            {!kh && (
+              <div className="alert alert-info" style={{ marginTop: 8, marginBottom: 0 }}>
                 <FiUser /> Đơn khách tự đặt — CSKH sẽ xác nhận và gán mã khách hàng.
               </div>
             )}
-          </Section>
+          </ErpSection>
 
           {/* ITEMS */}
-          <Section
+          <ErpSection
             icon={<FiBox />}
             title={`Sản phẩm (${items.length})`}
             right={<button type="button" className="btn btn-sm btn-success" onClick={add}><FiPlus /> Thêm dòng</button>}
@@ -252,24 +231,24 @@ export default function DatHangClient({ kh }: { kh: { maKH: string; tenKH: strin
                 </tfoot>
               </table>
             </div>
-          </Section>
+          </ErpSection>
 
           {/* FEES */}
-          <Section icon={<FiDollarSign />} title="Chi phí & thanh toán">
+          <ErpSection icon={<FiDollarSign />} title="Chi phí & thanh toán">
             <div className="erp-fee-row"><span className="lbl">Tiền hàng</span><span className="v">{fmtVND(tot.giaHang)}đ</span></div>
             <div className="erp-fee-row"><span className="lbl">Phí mua hàng (2%)</span><span className="v">{fmtVND(tot.phiMua)}đ</span></div>
             <div className="erp-fee-row"><span className="lbl">Phí bảo hiểm (1%)</span><span className="v">{fmtVND(tot.phiBH)}đ</span></div>
             <div className="erp-fee-row"><span className="lbl">Phí vận chuyển ({tot.kg.toFixed(2)} kg / {tot.m3.toFixed(4)} m³)</span><span className="v">{fmtVND(tot.phiVC)}đ</span></div>
             <div className="erp-fee-row total"><span className="lbl">Tổng tiền (ước tính)</span><span className="v">{fmtVND(tot.tong)}đ</span></div>
             <div className="erp-fee-row coc"><span className="lbl">Cọc ({pctCoc}%)</span><span className="v">{fmtVND(tot.coc)}đ</span></div>
-          </Section>
+          </ErpSection>
 
           {/* NOTE */}
-          <Section icon={<FiEdit3 />} title="Ghi chú">
+          <ErpSection icon={<FiEdit3 />} title="Ghi chú">
             <div className="form-field">
               <textarea value={ghiChu} onChange={(e) => setGhiChu(e.target.value)} placeholder="Ghi chú thêm cho đơn (nếu có)…" />
             </div>
-          </Section>
+          </ErpSection>
         </div>
 
         {/* THANH TÁC VỤ */}

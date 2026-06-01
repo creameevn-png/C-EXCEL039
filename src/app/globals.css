@@ -926,7 +926,8 @@ svg { flex-shrink: 0; }
 .erp-items thead th.grp { text-align: center; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
 .erp-items tbody td { border-bottom: 1px solid var(--border); padding: 0; vertical-align: middle; }
 .erp-items tbody td.num { text-align: right; }
-.erp-items tbody tr:hover { background: #fafbff; }
+.erp-items tbody tr:nth-child(even) { background: #f6f8fc; }
+.erp-items tbody tr:hover { background: var(--primary-soft); }
 
 .erp-rownum { display: inline-flex; align-items: center; gap: 4px; justify-content: center; padding: 0 8px; height: 30px; color: var(--primary); font-weight: 800; font-size: 12px; }
 .erp-rownum svg { font-size: 14px; opacity: 0.8; }
@@ -943,6 +944,15 @@ svg { flex-shrink: 0; }
 .erp-amt-sub { font-size: 11px; color: var(--text-faint); margin-top: 1px; }
 .erp-rm { width: 28px; height: 28px; margin: 0 auto; border-radius: 7px; border: 1px solid transparent; background: transparent; color: var(--text-faint); display: flex; align-items: center; justify-content: center; font-size: 15px; transition: all 0.12s; }
 .erp-rm:hover { background: #fef2f2; color: var(--danger-dark); border-color: #fecaca; }
+
+/* Ô thao tác trong bảng items (lưu DB + xoá) */
+.erp-actcell { display: flex; flex-direction: column; gap: 4px; align-items: center; justify-content: center; padding: 5px 4px; }
+.erp-iconbtn { width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface); color: var(--text-faint); display: flex; align-items: center; justify-content: center; font-size: 14px; transition: all 0.12s; }
+.erp-iconbtn:hover { color: var(--text); border-color: var(--border-strong); }
+.erp-iconbtn.db:hover { background: #ecfdf5; color: var(--success-dark); border-color: #a7f3d0; }
+.erp-iconbtn.rm:hover { background: #fef2f2; color: var(--danger-dark); border-color: #fecaca; }
+/* select DB-picker trong ô mô tả: gợi ý đây là dropdown chọn từ DB */
+.erp-items td > select.erp-cell:first-child { font-size: 12px; color: var(--text-muted); font-weight: 600; }
 
 .erp-items tfoot td { background: var(--surface-2); border-top: 2px solid var(--border-strong); padding: 8px 10px; font-size: 12px; font-weight: 700; color: #334155; }
 .erp-items tfoot td.num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -979,3 +989,116 @@ svg { flex-shrink: 0; }
 .muted { color: var(--text-muted); }
 .flex-between { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .icon-inline { display: inline-flex; align-items: center; gap: 5px; vertical-align: middle; }
+
+/* ============================================================
+   COMPACT DENSITY — nén toàn bộ giao diện cho gọn (áp cả app)
+   Đặt cuối file để override metric của các component dùng chung.
+   ============================================================ */
+html, body { font-size: 13.5px; }
+
+/* Khung trang & thẻ */
+.page { padding: 14px 18px 32px; }
+.form-section { padding: 13px 15px; margin-bottom: 11px; }
+.section-title { font-size: 13px; margin-bottom: 11px; padding-bottom: 9px; }
+.section-title svg { font-size: 16px; }
+
+/* Lưới & field cơ bản */
+.form-grid, .form-grid-3 { gap: 10px; }
+.form-field label { font-size: 11.5px; margin-bottom: 3px; }
+.form-field input, .form-field select, .form-field textarea { padding: 6px 9px; font-size: 13px; }
+.form-field textarea { min-height: 58px; }
+.hint { font-size: 10.5px; margin-top: 3px; }
+
+/* KPI */
+.kpi-row { gap: 10px; margin-bottom: 12px; }
+.kpi { padding: 11px 13px; }
+.kpi-label { font-size: 10px; margin-bottom: 4px; }
+.kpi-value { font-size: 20px; }
+
+/* Tabs / alert / nút / bảng */
+.tabs { margin-bottom: 11px; }
+.tab { padding: 8px 13px; font-size: 12.5px; }
+.alert { padding: 9px 12px; margin-bottom: 11px; font-size: 12.5px; }
+.btn { padding: 7px 13px; font-size: 12.5px; }
+.btn-sm { padding: 4px 9px; }
+.data-table th, .data-table td { padding: 7px 10px; }
+.fee-summary { padding: 11px 14px; margin-top: 11px; }
+.fee-row { padding: 5px 0; }
+.action-card, .order-card { padding: 12px 14px; margin-bottom: 9px; }
+
+/* ===== ERPAG document — nén ===== */
+.erp-doc { gap: 10px; }
+.erp-bar { padding: 8px 14px; }
+.erp-bar-title { font-size: 15px; }
+.erp-bar-title svg { font-size: 18px; }
+.erp-chip { padding: 5px 12px; min-width: 118px; }
+.erp-chip .v { font-size: 15px; }
+.erp-layout { gap: 10px; }
+.erp-main { gap: 10px; }
+.erp-sec-head { padding: 8px 13px; }
+.erp-sec-body { padding: 11px 13px; }
+.erp-sec-toggle { width: 20px; height: 20px; font-size: 12px; }
+
+/* Field floating-label: mặc định co theo nội dung + biến thể độ rộng */
+.erp-fields { gap: 9px; }
+.erp-field { flex: 1 1 150px; padding: 12px 10px 5px; }
+.erp-field > label { font-size: 9.5px; top: -7px; }
+.erp-field input, .erp-field select { font-size: 13px; }
+.erp-field.w-sm { flex: 0 1 96px; min-width: 84px; }     /* số ngắn: % cọc, SL */
+.erp-field.w-md { flex: 0 1 158px; min-width: 130px; }   /* tuyến, loại hàng, ngày */
+.erp-field.w-lg { flex: 3 1 260px; }                     /* tên KH, mô tả dài */
+
+/* Bảng items — nén */
+.erp-items thead th { padding: 6px 8px; font-size: 10px; }
+.erp-cell { padding: 6px 8px; }
+.erp-cell-sub { padding-bottom: 6px; }
+.erp-rownum { height: 26px; }
+.erp-amt { padding: 6px 9px; }
+.erp-items tfoot td { padding: 6px 8px; }
+
+/* Bảng chi phí ERPAG — nén */
+.erp-fee-row { padding: 6px 2px; }
+.erp-fee-row.total { padding-top: 9px; }
+.erp-fee-row.total .v { font-size: 16px; }
+
+/* Thanh tác vụ phải — gọn hơn */
+.erp-rail { width: 80px; top: 76px; gap: 7px; }
+.erp-rail-btn { padding: 10px 5px; font-size: 10.5px; }
+.erp-rail-btn svg { font-size: 19px; }
+
+@media (max-width: 860px) {
+  .erp-rail { width: 100%; top: auto; }
+}
+
+/* ============================================================
+   COMBOBOX — dropdown gõ-để-lọc (autocomplete) cho danh sách lớn
+   ============================================================ */
+.cbx { position: relative; width: 100%; }
+.cbx-control { display: flex; align-items: center; gap: 6px; width: 100%; cursor: pointer; min-width: 0; }
+.cbx-control[aria-disabled="true"] { cursor: not-allowed; opacity: 0.6; }
+.cbx-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; color: var(--text); }
+.cbx-value.placeholder { color: var(--text-faint); font-weight: 400; }
+.cbx-input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; font-family: inherit; font-size: 13px; font-weight: 600; color: var(--text); padding: 0; }
+.cbx-arrow { flex-shrink: 0; color: var(--text-faint); font-size: 15px; }
+
+/* Trong ô bảng (in-cell): trông như erp-cell, có viền khi hover */
+.cbx.in-cell .cbx-control { padding: 6px 8px; border: 1px solid transparent; }
+.cbx.in-cell:hover .cbx-control { border-color: var(--border); }
+.cbx.in-cell .cbx-value, .cbx.in-cell .cbx-input { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+.cbx.in-cell .cbx-value.placeholder { color: var(--text-faint); font-weight: 600; }
+
+/* Popup danh sách (render qua portal, position: fixed) */
+.cbx-pop {
+  position: fixed; z-index: 3000; max-height: 300px; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: 9px; box-shadow: var(--shadow-lg); padding: 4px;
+}
+.cbx-pop-hint { font-size: 10.5px; color: var(--text-faint); padding: 4px 8px 6px; display: flex; align-items: center; gap: 5px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+.cbx-opt { display: flex; align-items: baseline; gap: 8px; padding: 7px 9px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.cbx-opt-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.cbx-opt-sub { font-size: 11px; color: var(--text-faint); flex-shrink: 0; }
+.cbx-opt.active { background: var(--primary-soft); }
+.cbx-opt.sel { font-weight: 700; }
+.cbx-opt.sel .cbx-opt-label { color: var(--primary-700); }
+.cbx-empty { padding: 12px 10px; font-size: 12.5px; color: var(--text-faint); text-align: center; }
+.cbx-more { padding: 7px 9px; font-size: 11px; color: var(--text-faint); text-align: center; border-top: 1px dashed var(--border); margin-top: 4px; }

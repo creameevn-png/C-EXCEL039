@@ -3,12 +3,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   FiPlusCircle, FiPlus, FiX, FiPackage, FiDollarSign, FiUsers, FiUserPlus,
-  FiInbox, FiClipboard, FiCheckCircle, FiClock, FiLock, FiCheck, FiEdit3, FiShoppingCart
+  FiInbox, FiClipboard, FiCheckCircle, FiClock, FiLock, FiCheck, FiEdit3, FiShoppingCart,
+  FiUser, FiBox, FiSend, FiRefreshCw, FiDatabase
 } from 'react-icons/fi';
 import type { SessionUser } from '@/lib/auth';
 import { detectWeb } from '@/lib/source';
 import AppShell from '@/components/AppShell';
 import Tabs from '@/components/Tabs';
+import ErpSection from '@/components/ErpSection';
+import Combobox from '@/components/Combobox';
 import OrderDetailModalHost from '@/components/OrderDetailModal';
 import ImageUploadModalHost from '@/components/ImageUploadModal';
 import { showToast } from '@/components/Toast';
@@ -179,6 +182,7 @@ export default function CskhClient({ initial }: Props) {
   const totals = useMemo(() => {
     const tongGiaHang = items.reduce((s, it) =>
       s + (Number(it.donGiaNDT) || 0) * (Number(it.tyGia) || 0) * (Number(it.soLuong) || 0), 0);
+    const tongSL = items.reduce((s, it) => s + (Number(it.soLuong) || 0), 0);
     const totalKg = items.reduce((s, it) => s + (Number(it.kg) || 0) * (Number(it.soLuong) || 0), 0);
     const totalM3 = items.reduce((s, it) => s + (Number(it.m3) || 0) * (Number(it.soLuong) || 0), 0);
     const phiMua = Math.round((tongGiaHang * 0.02) / 1000) * 1000;
@@ -186,7 +190,7 @@ export default function CskhClient({ initial }: Props) {
     const phiVC = calcPhiVCPanama(totalKg, totalM3, tuyen);
     const tong = tongGiaHang + phiMua + phiBH + phiVC + (Number(shipND) || 0) + (Number(dongGoi) || 0) + (Number(phuThu) || 0);
     const coc = Math.round((tong * pctCoc) / 100 / 1000) * 1000;
-    return { tongGiaHang, totalKg, totalM3, phiMua, phiBH, phiVC, tong, coc };
+    return { tongGiaHang, tongSL, totalKg, totalM3, phiMua, phiBH, phiVC, tong, coc };
   }, [items, tuyen, shipND, dongGoi, phuThu, pctCoc]);
 
   function resetCreateForm() {
@@ -300,162 +304,242 @@ export default function CskhClient({ initial }: Props) {
   }
 
   // ============== RENDER ==============
+  const selectedKH = customers.find((c) => c.maKH === maKH);
   const tabCreate = (
-    <div className="form-section">
-      <div className="section-title"><FiPlusCircle /> Tạo đơn hàng mới (đa sản phẩm)</div>
-
-      {fromYC && (
-        <div className="alert alert-info" style={{ marginBottom: 14 }}>
+    <div className="erp-doc">
+      {/* Thanh trên cùng: tiêu đề + chip tổng tiền */}
+      <div className="erp-bar">
+        <div className="erp-bar-title">
           <FiShoppingCart />
           <div>
-            <div>Đang tạo đơn từ <b>yêu cầu {fromYC}</b>{ycInfo && <> · KH: <b>{ycInfo.hoTen}</b> · {ycInfo.sdt}{ycInfo.email ? ` · ${ycInfo.email}` : ''}</>}.</div>
-            <div style={{ marginTop: 4, fontSize: 12 }}>
-              Đã điền sẵn sản phẩm & tuyến. Chỉ cần {maKH ? 'nhập' : 'chọn/tạo KH rồi nhập'} giá NDT, kg/m³ còn thiếu rồi bấm <b>Tạo đơn</b>. Yêu cầu sẽ tự chuyển sang "Đã tạo đơn" & gắn mã đơn.
-            </div>
-            {!maKH && ycInfo && (
-              <button type="button" className="btn btn-success btn-sm" style={{ marginTop: 8 }} onClick={() => setAddKhOpen(true)}>
-                <FiUserPlus /> Tạo KH từ yêu cầu
-              </button>
-            )}
+            Tạo đơn hàng mới
+            <div className="sub">{selectedKH ? `${selectedKH.maKH} · ${selectedKH.tenKH}` : 'Chưa chọn khách hàng'}</div>
           </div>
         </div>
-      )}
-
-      <div className="form-grid">
-        <div className="form-field">
-          <label className="required">Khách hàng</label>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <select value={maKH} onChange={(e) => onCustomerChange(e.target.value)} style={{ flex: 1 }}>
-              <option value="">-- Chọn khách hàng --</option>
-              {customers.map((c) => (
-                <option key={c.maKH} value={c.maKH}>
-                  {c.maKH} - {c.tenKH} (Ví: {fmtVND(c.soDuVi)}đ)
-                </option>
-              ))}
-            </select>
-            <button type="button" className="btn btn-success btn-sm" onClick={openAddCustomerModal}><FiUserPlus /> Thêm KH</button>
-          </div>
-          <div className="hint">{hintCoc}</div>
-        </div>
-        <div className="form-field">
-          <label className="required">Tuyến</label>
-          <select value={tuyen} onChange={(e) => setTuyen(e.target.value as any)}>
-            <option value="HaNoi">Hà Nội</option><option value="HCM">HCM</option>
-          </select>
+        <div className="erp-chips">
+          <div className="erp-chip accent"><span className="k">Σ Tổng tiền</span><span className="v">{fmtVND(totals.tong)}đ</span></div>
+          <div className="erp-chip warn"><span className="k">Σ Cọc ({pctCoc}%)</span><span className="v">{fmtVND(totals.coc)}đ</span></div>
         </div>
       </div>
 
-      <div className="form-grid-3" style={{ marginTop: 12 }}>
-        <div className="form-field">
-          <label>Line vận chuyển</label>
-          <select value={lineVC} onChange={(e) => setLineVC(e.target.value as any)}>
-            <option value="LineNhanh">Nhanh (3-5 ngày)</option>
-            <option value="LineThuong">Thường (7-10 ngày)</option>
-            <option value="LineRe">Tiết kiệm (15-20 ngày)</option>
-          </select>
-        </div>
-        <div className="form-field">
-          <label>Loại hàng</label>
-          <select value={loaiHang} onChange={(e) => setLoaiHang(e.target.value)}>
-            <option value="Thường">Thường</option>
-            <option value="Hàng dễ vỡ">Hàng dễ vỡ</option>
-            <option value="Mỹ phẩm">Mỹ phẩm</option>
-          </select>
-        </div>
-        <div className="form-field">
-          <label>% Cọc</label>
-          <input type="number" min={0} max={100} value={pctCoc} onChange={(e) => setPctCoc(parseFloat(e.target.value) || 0)} />
-        </div>
-      </div>
-
-      <div style={{ marginTop: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <div className="icon-inline" style={{ fontWeight: 700, fontSize: 13 }}><FiPackage /> Chi tiết sản phẩm ({items.length})</div>
-          <button type="button" className="btn btn-success btn-sm" onClick={addItem}><FiPlus /> Thêm dòng</button>
-        </div>
-        {items.map((it) => (
-          <div key={it.tempId} style={{ border: '1px solid #E2E8F0', borderRadius: 8, padding: 10, marginBottom: 8, background: '#F8FAFC' }}>
-            <div className="form-grid" style={{ alignItems: 'end' }}>
-              <div className="form-field" style={{ gridColumn: 'span 2' }}>
-                <label className="required">SP từ DB / Tự nhập</label>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <select value={it.spId} onChange={(e) => onPickProduct(it.tempId, e.target.value)} style={{ flex: 1 }}>
-                    <option value="">-- Chọn từ DB --</option>
-                    {products.map((p) => (<option key={p.maSP} value={p.maSP}>{p.maSP} - {p.tenSP}</option>))}
-                    <option value="__custom__">Tự nhập (không lưu DB)</option>
-                  </select>
-                  <button type="button" className="btn btn-success btn-sm" onClick={() => openAddProductModal(it.tempId)}><FiPlus /> DB</button>
-                  {items.length > 1 && (
-                    <button type="button" className="btn btn-danger btn-sm" onClick={() => removeItem(it.tempId)}><FiX /></button>
-                  )}
+      <div className="erp-layout">
+        <div className="erp-main">
+          {fromYC && (
+            <div className="alert alert-info" style={{ marginBottom: 0 }}>
+              <FiShoppingCart />
+              <div>
+                <div>Đang tạo đơn từ <b>yêu cầu {fromYC}</b>{ycInfo && <> · KH: <b>{ycInfo.hoTen}</b> · {ycInfo.sdt}{ycInfo.email ? ` · ${ycInfo.email}` : ''}</>}.</div>
+                <div style={{ marginTop: 4, fontSize: 12 }}>
+                  Đã điền sẵn sản phẩm & tuyến. Chỉ cần {maKH ? 'nhập' : 'chọn/tạo KH rồi nhập'} giá NDT, kg/m³ còn thiếu rồi bấm <b>Tạo đơn</b>. Yêu cầu sẽ tự chuyển sang "Đã tạo đơn" & gắn mã đơn.
                 </div>
+                {!maKH && ycInfo && (
+                  <button type="button" className="btn btn-success btn-sm" style={{ marginTop: 8 }} onClick={() => setAddKhOpen(true)}>
+                    <FiUserPlus /> Tạo KH từ yêu cầu
+                  </button>
+                )}
               </div>
             </div>
-            <div className="form-field" style={{ marginTop: 8 }}>
-              <input type="text" value={it.tenSP} onChange={(e) => updateItem(it.tempId, { tenSP: e.target.value })} placeholder="Tên hàng ghi vào đơn" />
+          )}
+
+          {/* KHÁCH HÀNG & VẬN CHUYỂN */}
+          <ErpSection
+            icon={<FiUser />}
+            title="Khách hàng & vận chuyển"
+            right={<button type="button" className="btn btn-sm btn-success" onClick={openAddCustomerModal}><FiUserPlus /> Thêm KH</button>}
+          >
+            <div className="erp-fields">
+              <div className="erp-field w-lg">
+                <label>Khách hàng <span style={{ color: 'var(--danger-dark)' }}>*</span></label>
+                <Combobox
+                  value={maKH}
+                  onChange={onCustomerChange}
+                  placeholder="Gõ tên / mã KH / SĐT…"
+                  options={customers.map((c) => ({ value: c.maKH, label: `${c.maKH} - ${c.tenKH}`, sub: `Ví ${fmtVND(c.soDuVi)}đ`, keywords: c.sdt }))}
+                />
+              </div>
+              <div className="erp-field w-md">
+                <label>Tuyến</label>
+                <select value={tuyen} onChange={(e) => setTuyen(e.target.value as any)}>
+                  <option value="HaNoi">Hà Nội</option><option value="HCM">HCM</option>
+                </select>
+              </div>
+              <div className="erp-field">
+                <label>Line vận chuyển</label>
+                <select value={lineVC} onChange={(e) => setLineVC(e.target.value as any)}>
+                  <option value="LineNhanh">Nhanh (3-5 ngày)</option>
+                  <option value="LineThuong">Thường (7-10 ngày)</option>
+                  <option value="LineRe">Tiết kiệm (15-20 ngày)</option>
+                </select>
+              </div>
+              <div className="erp-field w-md">
+                <label>Loại hàng</label>
+                <select value={loaiHang} onChange={(e) => setLoaiHang(e.target.value)}>
+                  <option value="Thường">Thường</option>
+                  <option value="Hàng dễ vỡ">Hàng dễ vỡ</option>
+                  <option value="Mỹ phẩm">Mỹ phẩm</option>
+                </select>
+              </div>
+              <div className="erp-field w-sm">
+                <label>% Cọc</label>
+                <input type="number" min={0} max={100} value={pctCoc} onChange={(e) => setPctCoc(parseFloat(e.target.value) || 0)} />
+              </div>
             </div>
-            <div className="line-grid" style={{ marginTop: 8 }}>
-              <div className="form-field"><label>SL</label>
-                <input type="number" min={1} value={it.soLuong} onChange={(e) => updateItem(it.tempId, { soLuong: parseInt(e.target.value) || 1 })} /></div>
-              <div className="form-field"><label>¥ Đơn giá</label>
-                <input type="number" step="0.01" value={it.donGiaNDT} onChange={(e) => updateItem(it.tempId, { donGiaNDT: parseFloat(e.target.value) || 0 })} /></div>
-              <div className="form-field"><label>Tỷ giá</label>
-                <input type="number" value={it.tyGia} onChange={(e) => updateItem(it.tempId, { tyGia: parseFloat(e.target.value) || 0 })} /></div>
-              <div className="form-field"><label>Kg/sp</label>
-                <input type="number" step="0.01" value={it.kg} onChange={(e) => updateItem(it.tempId, { kg: parseFloat(e.target.value) || 0 })} /></div>
-              <div className="form-field"><label>m³/sp</label>
-                <input type="number" step="0.0001" value={it.m3} onChange={(e) => updateItem(it.tempId, { m3: parseFloat(e.target.value) || 0 })} /></div>
-              <div className="form-field"><label>Nguồn</label>
-                <select value={it.webNguon} onChange={(e) => updateItem(it.tempId, { webNguon: e.target.value })}>
-                  <option value="">--</option>
-                  <option value="Taobao">Taobao</option>
-                  <option value="1688">1688</option>
-                  <option value="Tmall">Tmall</option>
+            <div className="hint" style={{ marginTop: 6 }}>{hintCoc}</div>
+          </ErpSection>
+
+          {/* SẢN PHẨM */}
+          <ErpSection
+            icon={<FiBox />}
+            title={`Sản phẩm (${items.length})`}
+            right={<button type="button" className="btn btn-sm btn-success" onClick={addItem}><FiPlus /> Thêm dòng</button>}
+          >
+            <div className="erp-items-wrap">
+              <table className="erp-items" style={{ minWidth: 960 }}>
+                <thead>
+                  <tr>
+                    <th rowSpan={2} style={{ width: 46 }}>#</th>
+                    <th rowSpan={2}>Sản phẩm</th>
+                    <th rowSpan={2} className="num" style={{ width: 70 }}>SL</th>
+                    <th rowSpan={2} style={{ width: 52 }}>ĐVT</th>
+                    <th colSpan={2} className="grp">Đơn giá nhập</th>
+                    <th colSpan={2} className="grp">TL / sản phẩm</th>
+                    <th rowSpan={2} style={{ width: 100 }}>Nguồn</th>
+                    <th rowSpan={2} className="num" style={{ width: 124 }}>Thành tiền (đ)</th>
+                    <th rowSpan={2} style={{ width: 52 }}></th>
+                  </tr>
+                  <tr>
+                    <th className="num" style={{ width: 92 }}>¥ / sp</th>
+                    <th className="num" style={{ width: 86 }}>Tỷ giá</th>
+                    <th className="num" style={{ width: 70 }}>Kg</th>
+                    <th className="num" style={{ width: 78 }}>M³</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((it, i) => {
+                    const tt = Math.round((Number(it.donGiaNDT) || 0) * (Number(it.tyGia) || 0) * (Number(it.soLuong) || 0));
+                    return (
+                      <tr key={it.tempId}>
+                        <td><span className="erp-rownum"><FiBox />{i + 1}</span></td>
+                        <td>
+                          <Combobox
+                            className="in-cell"
+                            value={it.spId}
+                            onChange={(v) => onPickProduct(it.tempId, v)}
+                            placeholder="— Chọn SP từ DB / gõ để tìm —"
+                            options={[
+                              ...products.map((p) => ({ value: p.maSP, label: `${p.maSP} - ${p.tenSP}` })),
+                              { value: '__custom__', label: 'Tự nhập (không lưu DB)' },
+                            ]}
+                          />
+                          <input className="erp-cell" value={it.tenSP} placeholder="Tên hàng ghi vào đơn"
+                            onChange={(e) => updateItem(it.tempId, { tenSP: e.target.value })} />
+                          <input className="erp-cell erp-cell-sub" value={it.linkTaobao} placeholder="Link Taobao / 1688 (nếu có)"
+                            onChange={(e) => updateItem(it.tempId, { linkTaobao: e.target.value })} />
+                        </td>
+                        <td className="num">
+                          <input className="erp-cell num" type="number" min={1} value={it.soLuong}
+                            onChange={(e) => updateItem(it.tempId, { soLuong: parseInt(e.target.value) || 1 })} />
+                        </td>
+                        <td><span className="erp-uom">cái</span></td>
+                        <td className="num">
+                          <input className="erp-cell num" type="number" step="0.01" inputMode="decimal" value={it.donGiaNDT}
+                            onChange={(e) => updateItem(it.tempId, { donGiaNDT: parseFloat(e.target.value) || 0 })} />
+                        </td>
+                        <td className="num">
+                          <input className="erp-cell num" type="number" inputMode="decimal" value={it.tyGia}
+                            onChange={(e) => updateItem(it.tempId, { tyGia: parseFloat(e.target.value) || 0 })} />
+                        </td>
+                        <td className="num">
+                          <input className="erp-cell num" type="number" step="0.01" inputMode="decimal" value={it.kg}
+                            onChange={(e) => updateItem(it.tempId, { kg: parseFloat(e.target.value) || 0 })} />
+                        </td>
+                        <td className="num">
+                          <input className="erp-cell num" type="number" step="0.0001" inputMode="decimal" value={it.m3}
+                            onChange={(e) => updateItem(it.tempId, { m3: parseFloat(e.target.value) || 0 })} />
+                        </td>
+                        <td>
+                          <select className="erp-cell" value={it.webNguon} onChange={(e) => updateItem(it.tempId, { webNguon: e.target.value })}>
+                            <option value="">—</option><option value="Taobao">Taobao</option>
+                            <option value="1688">1688</option><option value="Tmall">Tmall</option>
+                          </select>
+                        </td>
+                        <td className="num">
+                          <div className="erp-amt">
+                            <b>{fmtVND(tt)}</b>
+                            <div className="erp-amt-sub">{formatNDT(it.donGiaNDT * it.soLuong)}</div>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="erp-actcell">
+                            <button type="button" className="erp-iconbtn db" title="Lưu sản phẩm này vào DB" onClick={() => openAddProductModal(it.tempId)}><FiDatabase /></button>
+                            {items.length > 1 && (
+                              <button type="button" className="erp-iconbtn rm" title="Xoá dòng" onClick={() => removeItem(it.tempId)}><FiX /></button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td><button type="button" className="erp-add" onClick={addItem} title="Thêm dòng"><FiPlus /></button></td>
+                    <td className="erp-foot-lbl"># {items.length} dòng</td>
+                    <td className="num">Σ {totals.tongSL}</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td className="num">Σ {totals.totalKg.toFixed(2)}</td>
+                    <td className="num">Σ {totals.totalM3.toFixed(4)}</td>
+                    <td></td>
+                    <td className="num"><b>Σ {fmtVND(totals.tongGiaHang)}</b></td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </ErpSection>
+
+          {/* CHI PHÍ & THANH TOÁN */}
+          <ErpSection icon={<FiDollarSign />} title="Chi phí & thanh toán">
+            <div className="erp-fields">
+              <div className="erp-field"><label>Phí ship VN (VNĐ)</label>
+                <input type="number" value={shipND} onChange={(e) => setShipND(parseFloat(e.target.value) || 0)} /></div>
+              <div className="erp-field"><label>Phí đóng gỗ / bọt khí</label>
+                <select value={dongGoi} onChange={(e) => setDongGoi(parseFloat(e.target.value) || 0)}>
+                  <option value={0}>Không</option><option value={5000}>5.000đ</option><option value={10000}>10.000đ</option>
                 </select></div>
+              <div className="erp-field"><label>Phí phụ thu khác (VNĐ)</label>
+                <input type="number" value={phuThu} onChange={(e) => setPhuThu(parseFloat(e.target.value) || 0)} /></div>
             </div>
-            <div className="form-field" style={{ marginTop: 8 }}>
-              <label>Link Taobao/1688</label>
-              <input type="text" value={it.linkTaobao} onChange={(e) => updateItem(it.tempId, { linkTaobao: e.target.value })} placeholder="https://..." />
+            <div style={{ marginTop: 14 }}>
+              <div className="erp-fee-row"><span className="lbl">Tổng giá hàng</span><span className="v">{fmtVND(totals.tongGiaHang)}đ</span></div>
+              <div className="erp-fee-row"><span className="lbl">Tổng KG / M³</span><span className="v">{totals.totalKg.toFixed(2)} kg / {totals.totalM3.toFixed(4)} m³</span></div>
+              <div className="erp-fee-row"><span className="lbl">Phí mua (2%)</span><span className="v">{fmtVND(totals.phiMua)}đ</span></div>
+              <div className="erp-fee-row"><span className="lbl">Phí bảo hiểm (1%)</span><span className="v">{fmtVND(totals.phiBH)}đ</span></div>
+              <div className="erp-fee-row"><span className="lbl">Phí vận chuyển (Panama)</span><span className="v">{fmtVND(totals.phiVC)}đ</span></div>
+              <div className="erp-fee-row total"><span className="lbl">Tổng tiền</span><span className="v">{fmtVND(totals.tong)}đ</span></div>
+              <div className="erp-fee-row coc"><span className="lbl">Cọc ({pctCoc}%)</span><span className="v">{fmtVND(totals.coc)}đ</span></div>
             </div>
-            <div style={{ marginTop: 6, fontSize: 12, color: '#475569', textAlign: 'right' }}>
-              Thành tiền: <b>{fmtVND(Math.round(it.donGiaNDT * it.tyGia * it.soLuong))}đ</b>
-              <span style={{ color: '#94A3B8' }}> ({formatNDT(it.donGiaNDT * it.soLuong)})</span>
+          </ErpSection>
+
+          {/* GHI CHÚ */}
+          <ErpSection icon={<FiEdit3 />} title="Ghi chú đơn">
+            <div className="form-field">
+              <textarea value={ghiChu} onChange={(e) => setGhiChu(e.target.value)} placeholder="Ghi chú thêm cho đơn (nếu có)…" />
             </div>
-          </div>
-        ))}
-      </div>
+          </ErpSection>
+        </div>
 
-      <div className="form-grid-3" style={{ marginTop: 12 }}>
-        <div className="form-field"><label>Phí ship VN (VNĐ)</label>
-          <input type="number" value={shipND} onChange={(e) => setShipND(parseFloat(e.target.value) || 0)} /></div>
-        <div className="form-field"><label>Phí đóng gỗ/bọt khí</label>
-          <select value={dongGoi} onChange={(e) => setDongGoi(parseFloat(e.target.value) || 0)}>
-            <option value={0}>Không</option><option value={5000}>5.000đ</option><option value={10000}>10.000đ</option>
-          </select></div>
-        <div className="form-field"><label>Phí phụ thu khác (VNĐ)</label>
-          <input type="number" value={phuThu} onChange={(e) => setPhuThu(parseFloat(e.target.value) || 0)} /></div>
-      </div>
-
-      <div className="form-field" style={{ marginTop: 12 }}>
-        <label>Ghi chú đơn</label>
-        <input type="text" value={ghiChu} onChange={(e) => setGhiChu(e.target.value)} placeholder="Ghi chú thêm cho đơn" />
-      </div>
-
-      <div className="fee-summary">
-        <div className="fee-row"><span>Tổng giá hàng</span><span className="fee-value">{fmtVND(totals.tongGiaHang)}đ</span></div>
-        <div className="fee-row"><span>Tổng KG / M³</span><span className="fee-value">{totals.totalKg.toFixed(2)}kg / {totals.totalM3.toFixed(4)}m³</span></div>
-        <div className="fee-row"><span>Phí mua (2%)</span><span className="fee-value">{fmtVND(totals.phiMua)}đ</span></div>
-        <div className="fee-row"><span>Phí BH (1%)</span><span className="fee-value">{fmtVND(totals.phiBH)}đ</span></div>
-        <div className="fee-row"><span>Phí VC (Panama)</span><span className="fee-value">{fmtVND(totals.phiVC)}đ</span></div>
-        <div className="fee-row"><span><b>Tổng tiền</b></span><span className="fee-value" style={{ color: 'var(--primary)' }}>{fmtVND(totals.tong)}đ</span></div>
-        <div className="fee-row"><span>Cọc ({pctCoc}%)</span><span className="fee-value" style={{ color: '#92400E' }}>{fmtVND(totals.coc)}đ</span></div>
-      </div>
-
-      <div className="btn-row">
-        <button className="btn btn-secondary" onClick={resetCreateForm}>Hủy</button>
-        <button className="btn btn-primary" onClick={submitCreateOrder} disabled={submitting}>
-          {submitting ? <><FiClock /> Đang tạo...</> : <><FiPlus /> Tạo đơn</>}
-        </button>
+        {/* THANH TÁC VỤ */}
+        <aside className="erp-rail">
+          <button type="button" className="erp-rail-btn primary" onClick={submitCreateOrder} disabled={submitting}>
+            {submitting ? <FiClock /> : <FiSend />}
+            {submitting ? 'Đang tạo…' : 'Tạo đơn'}
+          </button>
+          <button type="button" className="erp-rail-btn" onClick={addItem}><FiPlus /> Thêm dòng</button>
+          <button type="button" className="erp-rail-btn danger" onClick={resetCreateForm}><FiRefreshCw /> Làm mới</button>
+        </aside>
       </div>
     </div>
   );

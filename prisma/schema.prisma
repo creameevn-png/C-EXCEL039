@@ -246,6 +246,7 @@ model GiaoDichVi {
   loai      LoaiViTxn
   soTien    Float      @map("so_tien")
   soDuSau   Float      @default(0) @map("so_du_sau")
+  quy       String?    @map("quy")
   ghiChu    String?    @map("ghi_chu") @db.Text
   nv        String?
   nvId      Int?       @map("nv_id")
@@ -347,6 +348,7 @@ model BangGia {
 model NguonHang {
   id           Int      @id @default(autoincrement())
   tenSP        String   @map("ten_sp")
+  danhMuc      String?  @map("danh_muc")
   tenNCC       String?  @map("ten_ncc")
   linkTaobao   String?  @map("link_taobao") @db.Text
   giaNDT       Float?   @map("gia_ndt")

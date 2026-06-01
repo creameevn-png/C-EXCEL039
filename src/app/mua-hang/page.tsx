@@ -32,7 +32,7 @@ export default async function MuaHangPage() {
 
       <MuaHangClient
         nguonHang={nguonHang.map((n) => ({
-          id: n.id, tenSP: n.tenSP, tenNCC: n.tenNCC || '', linkTaobao: n.linkTaobao || '',
+          id: n.id, tenSP: n.tenSP, danhMuc: n.danhMuc || '', tenNCC: n.tenNCC || '', linkTaobao: n.linkTaobao || '',
           giaNDT: n.giaNDT, moq: n.moq, thoiGianGiao: n.thoiGianGiao || '',
           chatLuong: n.chatLuong || 0, createdAt: n.createdAt.toISOString()
         }))}

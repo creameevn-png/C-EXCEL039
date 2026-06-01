@@ -61,6 +61,16 @@ export async function nextMaYC(): Promise<string> {
   return prefix + String(n).padStart(3, '0');
 }
 
+export async function nextMaNCC(): Promise<string> {
+  const last = await prisma.nCC.findFirst({
+    where: { maNCC: { startsWith: 'NCC' } },
+    orderBy: { maNCC: 'desc' },
+    select: { maNCC: true }
+  });
+  const n = last?.maNCC ? parseInt(last.maNCC.slice(3), 10) + 1 : 1;
+  return 'NCC' + String(n).padStart(3, '0');
+}
+
 export async function nextMaCT(): Promise<string> {
   const prefix = 'CT-' + yymmdd() + '-';
   const last = await prisma.chungTu.findFirst({

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { computeOrderTotals } from '@/lib/shipping-fee';
-import { nextMaDH, nextMaKH, nextMaSP, nextMaKN, nextMaYC } from '@/lib/codes';
+import { nextMaDH, nextMaKH, nextMaSP, nextMaKN, nextMaYC, nextMaNCC } from '@/lib/codes';
 import { logActivity } from '@/lib/audit';
 import { getNumber } from '@/lib/settings';
 import type { VaiTro, TrangThaiDon, Tuyen, LineVC, LoaiKN, TrangThaiKN, TrangThaiYC } from '@prisma/client';
@@ -382,7 +382,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
   },
 
   async updateKhieuNai(args, user) {
-    if (!allow(user.vaiTro, ['CSKH', 'KeToan'])) return err('Không có quyền');
+    if (!allow(user.vaiTro, ['CSKH', 'KeToan', 'GDV'])) return err('Không có quyền');
     const [maKN, patch] = args;
     if (!maKN) return err('Thiếu mã KN');
     const data: any = {};
@@ -595,6 +595,160 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         })) : []
       }
     });
+  },
+
+  // ============== MUA HANG: NGUON HANG / NCC ==============
+  async addNguonHang(args, user) {
+    if (!allow(user.vaiTro, ['MuaHang'])) return err('Không có quyền');
+    const d = args[0] || {};
+    if (!d.tenSP || !String(d.tenSP).trim()) return err('Vui lòng nhập tên sản phẩm');
+    const n = await prisma.nguonHang.create({
+      data: {
+        tenSP: String(d.tenSP).trim(),
+        danhMuc: d.danhMuc || null,
+        tenNCC: d.tenNCC || null,
+        linkTaobao: d.linkTaobao || null,
+        giaNDT: d.giaNDT === '' || d.giaNDT == null ? null : Number(d.giaNDT),
+        moq: Number(d.moq) || 1,
+        thoiGianGiao: d.thoiGianGiao || null,
+        chatLuong: d.chatLuong === '' || d.chatLuong == null ? null : Number(d.chatLuong),
+        ghiChu: d.ghiChu || null,
+        nguoiThem: user.email
+      }
+    });
+    await logActivity(user.email, 'CREATE_NGUON_HANG', String(n.id), { tenSP: d.tenSP });
+    return ok({ id: n.id });
+  },
+
+  async updateNguonHang(args, user) {
+    if (!allow(user.vaiTro, ['MuaHang'])) return err('Không có quyền');
+    const [id, patch] = args;
+    if (!id) return err('Thiếu id');
+    const data: any = {};
+    if (patch?.tenSP !== undefined) data.tenSP = String(patch.tenSP).trim();
+    if (patch?.danhMuc !== undefined) data.danhMuc = patch.danhMuc || null;
+    if (patch?.tenNCC !== undefined) data.tenNCC = patch.tenNCC || null;
+    if (patch?.linkTaobao !== undefined) data.linkTaobao = patch.linkTaobao || null;
+    if (patch?.giaNDT !== undefined) data.giaNDT = patch.giaNDT === '' || patch.giaNDT == null ? null : Number(patch.giaNDT);
+    if (patch?.moq !== undefined) data.moq = Number(patch.moq) || 1;
+    if (patch?.thoiGianGiao !== undefined) data.thoiGianGiao = patch.thoiGianGiao || null;
+    if (patch?.chatLuong !== undefined) data.chatLuong = patch.chatLuong === '' || patch.chatLuong == null ? null : Number(patch.chatLuong);
+    if (patch?.ghiChu !== undefined) data.ghiChu = patch.ghiChu || null;
+    await prisma.nguonHang.update({ where: { id: Number(id) }, data });
+    await logActivity(user.email, 'UPDATE_NGUON_HANG', String(id), patch);
+    return ok();
+  },
+
+  async deleteNguonHang(args, user) {
+    if (!allow(user.vaiTro, ['MuaHang'])) return err('Không có quyền');
+    const [id] = args;
+    if (!id) return err('Thiếu id');
+    await prisma.nguonHang.delete({ where: { id: Number(id) } });
+    await logActivity(user.email, 'DELETE_NGUON_HANG', String(id));
+    return ok();
+  },
+
+  async addNcc(args, user) {
+    if (!allow(user.vaiTro, ['MuaHang'])) return err('Không có quyền');
+    const d = args[0] || {};
+    if (!d.tenNCC || !String(d.tenNCC).trim()) return err('Vui lòng nhập tên NCC');
+    const maNCC = await nextMaNCC();
+    const n = await prisma.nCC.create({
+      data: { maNCC, tenNCC: String(d.tenNCC).trim(), wechat: d.wechat || null, ghiChu: d.ghiChu || null }
+    });
+    await logActivity(user.email, 'CREATE_NCC', maNCC, { tenNCC: d.tenNCC });
+    return ok({ id: n.id, maNCC });
+  },
+
+  async updateNcc(args, user) {
+    if (!allow(user.vaiTro, ['MuaHang'])) return err('Không có quyền');
+    const [id, patch] = args;
+    if (!id) return err('Thiếu id');
+    const data: any = {};
+    if (patch?.tenNCC !== undefined) data.tenNCC = String(patch.tenNCC).trim();
+    if (patch?.wechat !== undefined) data.wechat = patch.wechat || null;
+    if (patch?.ghiChu !== undefined) data.ghiChu = patch.ghiChu || null;
+    await prisma.nCC.update({ where: { id: Number(id) }, data });
+    await logActivity(user.email, 'UPDATE_NCC', String(id), patch);
+    return ok();
+  },
+
+  async deleteNcc(args, user) {
+    if (!allow(user.vaiTro, ['MuaHang'])) return err('Không có quyền');
+    const [id] = args;
+    if (!id) return err('Thiếu id');
+    await prisma.nCC.delete({ where: { id: Number(id) } });
+    await logActivity(user.email, 'DELETE_NCC', String(id));
+    return ok();
+  },
+
+  // ============== KE TOAN: VI / DINH KHOAN QUY ==============
+  async walletTxn(args, user) {
+    if (!allow(user.vaiTro, ['KeToan'])) return err('Không có quyền');
+    const d = args[0] || {};
+    const maKH = d.maKH;
+    const amt = Number(d.soTien) || 0;
+    const loai: 'Nap' | 'Tru' = d.loai === 'Tru' ? 'Tru' : 'Nap';
+    if (!maKH) return err('Thiếu mã KH');
+    if (amt <= 0) return err('Số tiền không hợp lệ');
+    const kh = await prisma.khachHang.findUnique({ where: { maKH } });
+    if (!kh) return err('KH không tồn tại');
+    if (loai === 'Tru' && amt > kh.soDuVi + 0.5) return err('Số dư ví không đủ để trừ');
+    const newDu = loai === 'Nap' ? kh.soDuVi + amt : kh.soDuVi - amt;
+    await prisma.$transaction([
+      prisma.khachHang.update({ where: { maKH }, data: { soDuVi: newDu } }),
+      prisma.giaoDichVi.create({
+        data: {
+          maKH, loai, soTien: amt, soDuSau: newDu,
+          quy: d.quy || null,
+          ghiChu: d.ghiChu || (loai === 'Nap' ? 'Nạp ví' : 'Rút/trừ ví'),
+          nv: user.email, nvId: user.id
+        }
+      })
+    ]);
+    await logActivity(user.email, loai === 'Nap' ? 'WALLET_NAP' : 'WALLET_TRU', maKH, { amt, quy: d.quy });
+    return ok({ soDuVi: newDu });
+  },
+
+  // ============== KHO: SUA KG/M3 CO LICH SU ==============
+  async updateChiTietKg(args, user) {
+    if (!allow(user.vaiTro, ['KhoVN', 'KhoTQ'])) return err('Không có quyền');
+    const [maDH, stt, patch] = args;
+    if (!maDH || !stt) return err('Thiếu thông tin dòng hàng');
+    const line = await prisma.chiTietDon.findFirst({ where: { maDH, stt: Number(stt) } });
+    if (!line) return err('Không tìm thấy dòng hàng');
+    const data: any = {};
+    const changes: any = {};
+    if (patch?.kg !== undefined) { const v = Number(patch.kg) || 0; if (v !== line.kg) { changes.kg = `${line.kg}→${v}`; data.kg = v; } }
+    if (patch?.m3 !== undefined) { const v = Number(patch.m3) || 0; if (v !== line.m3) { changes.m3 = `${line.m3}→${v}`; data.m3 = v; } }
+    if (Object.keys(data).length === 0) return ok();
+    await prisma.chiTietDon.update({ where: { id: line.id }, data });
+    await recomputeDonHang(maDH);
+    await logActivity(user.email, 'SUA_KG', maDH, { stt, ...changes });
+    return ok();
+  },
+
+  // ============== ADMIN: SUA DON (kể cả khi đã hoàn thành/nhập kho) ==============
+  async updateOrderFields(args, user) {
+    if (user.vaiTro !== 'Admin') return err('Chỉ Admin được sửa đơn');
+    const [maDH, patch] = args;
+    if (!maDH) return err('Thiếu mã đơn');
+    const o = await prisma.donHang.findUnique({ where: { maDH } });
+    if (!o) return err('Đơn không tồn tại');
+    const data: any = {};
+    const changes: any = {};
+    if (patch?.tuyen !== undefined) { data.tuyen = normTuyen(patch.tuyen); changes.tuyen = `${o.tuyen}→${data.tuyen}`; }
+    if (patch?.lineVC !== undefined) { data.lineVC = patch.lineVC as LineVC; changes.lineVC = `${o.lineVC}→${patch.lineVC}`; }
+    if (patch?.loaiHang !== undefined) { data.loaiHang = patch.loaiHang; changes.loaiHang = patch.loaiHang; }
+    if (patch?.pctCoc !== undefined) { data.pctCoc = Number(patch.pctCoc) || o.pctCoc; changes.pctCoc = data.pctCoc; }
+    if (patch?.shipND !== undefined) { data.shipND = Number(patch.shipND) || 0; changes.shipND = data.shipND; }
+    if (patch?.dongGo !== undefined) { data.dongGo = Number(patch.dongGo) || 0; changes.dongGo = data.dongGo; }
+    if (patch?.phuThu !== undefined) { data.phuThu = Number(patch.phuThu) || 0; changes.phuThu = data.phuThu; }
+    if (patch?.ghiChu !== undefined) { data.ghiChu = patch.ghiChu || null; changes.ghiChu = 'updated'; }
+    if (Object.keys(data).length) await prisma.donHang.update({ where: { maDH }, data });
+    await recomputeDonHang(maDH);
+    await logActivity(user.email, 'SUA_DON', maDH, changes);
+    return ok();
   },
 
   // ============== TRA CUU PUBLIC ==============

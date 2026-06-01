@@ -52,7 +52,7 @@ export default function DonHangTable({ orders }: { orders: Row[] }) {
                 <td className="number" style={{ color: o.conLai > 0 ? 'var(--danger-dark)' : 'var(--success-dark)', fontWeight: o.conLai > 0 ? 600 : 400 }}>
                   {formatCurrency(o.conLai)}
                 </td>
-                <td><span className={`status-badge ${statusToClass(o.trangThai)}`}>{statusToLabel(o.trangThai)}</span></td>
+                <td><span className={`status-badge ${statusToClass(o.trangThai)}`}>{statusToLabel(o.trangThai, o.ngayTao)}</span></td>
                 <td style={{ fontSize: 11 }}>{o.nvTao || '-'}</td>
                 <td style={{ fontSize: 11 }}>
                   {o.maGD && <div>GD: {o.maGD}</div>}

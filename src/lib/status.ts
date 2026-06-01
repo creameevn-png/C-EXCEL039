@@ -82,8 +82,22 @@ export function statusToClass(s: TrangThaiDon | string | null | undefined): stri
   return 's-new';
 }
 
-export function statusToLabel(s: TrangThaiDon | string | null | undefined): string {
-  if (!s) return '';
-  if (s in TRANG_THAI_LABEL) return TRANG_THAI_LABEL[s as TrangThaiDon];
-  return String(s);
+export function statusToLabel(
+  s: TrangThaiDon | string | null | undefined,
+  date?: Date | string | null
+): string {
+  let base = '';
+  if (!s) base = '';
+  else if (s in TRANG_THAI_LABEL) base = TRANG_THAI_LABEL[s as TrangThaiDon];
+  else base = String(s);
+
+  if (date) {
+    const d = date instanceof Date ? date : new Date(date);
+    if (!isNaN(d.getTime())) {
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      return `${base} (${dd}.${mm})`;
+    }
+  }
+  return base;
 }

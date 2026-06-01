@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import {
-  FiInfo, FiEdit3, FiClock, FiTruck, FiPackage, FiSave, FiLock, FiFileText
+  FiInfo, FiEdit3, FiClock, FiTruck, FiPackage, FiSave, FiLock, FiFileText,
+  FiAlertTriangle, FiMessageSquare, FiExternalLink, FiInbox
 } from 'react-icons/fi';
 import type { SessionUser } from '@/lib/auth';
 import AppShell from '@/components/AppShell';
@@ -10,15 +11,26 @@ import Tabs from '@/components/Tabs';
 import OrderDetailModalHost from '@/components/OrderDetailModal';
 import { showToast } from '@/components/Toast';
 import { callServer, reload } from '@/lib/client';
-import { fmtVND } from '@/lib/format';
+import { fmtVND, fmtDateDDMM } from '@/lib/format';
+import { KN_LABEL } from '@/lib/status';
 
 type Pending = {
   maDH: string; tenKH: string; web: string; tongKg: number; tuyen: string;
   tongTien: number; daTra: number; tenHang: string;
   maGD: string; maVD: string; trangThai: string;
 };
+type KhieuNai = {
+  maKN: string; ngayTao: string; maDH: string; maKH: string; tenKH: string;
+  loai: string; moTa: string; trangThai: string; phuongAn: string; ghiChuXuLy: string; anhBangChung: string;
+};
 
-export default function GdvClient({ user, pendingOrders }: { user: SessionUser; pendingOrders: Pending[] }) {
+const KN_LOAI: Record<string, string> = {
+  HangLoi: 'Hàng lỗi / dập vỡ', ThieuHang: 'Thiếu hàng', GiaoSai: 'Giao sai', KhongNhan: 'Không nhận', Khac: 'Khác'
+};
+const PHUONG_AN = ['Hoàn tiền', 'Đổi/trả hàng', 'Bồi thường', 'Giảm giá đơn sau', 'Hỗ trợ trao đổi NCC', 'Từ chối'];
+const KN_STATUS = ['ChoXuLy', 'DangXuLy', 'DaXuLy', 'TuChoi'];
+
+export default function GdvClient({ user, pendingOrders, khieuNai }: { user: SessionUser; pendingOrders: Pending[]; khieuNai: KhieuNai[] }) {
   const ordersDeposit = pendingOrders.filter((o) => o.trangThai === 'DatCoc');
   const ordersBought = pendingOrders.filter((o) => o.trangThai === 'DaMuaHang');
 
@@ -47,6 +59,24 @@ export default function GdvClient({ user, pendingOrders }: { user: SessionUser; 
     const r = await callServer('updateMaVD', maDH, maVD);
     setBusy((p) => ({ ...p, [maDH]: false }));
     if (r?.success) { showToast(`Đã lưu mã VĐ cho ${maDH}`, 'success'); reload(); }
+    else showToast(r?.message || 'Lỗi', 'error');
+  }
+
+  // ===== Khiếu nại =====
+  const [knStatus, setKnStatus] = useState<Record<string, string>>(() =>
+    Object.fromEntries(khieuNai.map((k) => [k.maKN, k.trangThai])));
+  const [knPa, setKnPa] = useState<Record<string, string>>(() =>
+    Object.fromEntries(khieuNai.map((k) => [k.maKN, k.phuongAn])));
+  const [knNote, setKnNote] = useState<Record<string, string>>(() =>
+    Object.fromEntries(khieuNai.map((k) => [k.maKN, k.ghiChuXuLy])));
+
+  async function submitKN(maKN: string) {
+    setBusy((p) => ({ ...p, [maKN]: true }));
+    const r = await callServer('updateKhieuNai', maKN, {
+      trangThai: knStatus[maKN], phuongAn: knPa[maKN], ghiChuXuLy: knNote[maKN]
+    });
+    setBusy((p) => ({ ...p, [maKN]: false }));
+    if (r?.success) { showToast(`Đã cập nhật ${maKN}`, 'success'); reload(); }
     else showToast(r?.message || 'Lỗi', 'error');
   }
 
@@ -120,10 +150,63 @@ export default function GdvClient({ user, pendingOrders }: { user: SessionUser; 
     </div>
   );
 
+  const tabKhieuNai = (
+    <div className="form-section">
+      <div className="section-title"><FiAlertTriangle /> Khiếu nại cần xử lý với NCC ({khieuNai.length})</div>
+      {khieuNai.length === 0 ? (
+        <div className="empty-state"><FiInbox /><p>Không có khiếu nại nào đang mở.</p></div>
+      ) : khieuNai.map((k) => (
+        <div key={k.maKN} className="action-card" style={{ opacity: busy[k.maKN] ? 0.5 : 1 }}>
+          <div className="ac-header">
+            <div className="ac-title">{k.maKN}</div>
+            <span className={`status-badge ${k.trangThai === 'TuChoi' ? 's-cancel' : 's-deposit'}`}>
+              {(KN_LABEL as Record<string, string>)[k.trangThai] || k.trangThai}
+            </span>
+          </div>
+          <div className="ac-meta">
+            Loại: <b>{KN_LOAI[k.loai] || k.loai}</b> · Đơn: <b>{k.maDH || '-'}</b> · KH: <b>{k.tenKH || k.maKH || '-'}</b> · {fmtDateDDMM(k.ngayTao)}
+            {k.maDH && <> · <span style={{ cursor: 'pointer', color: 'var(--primary)', textDecoration: 'underline' }} onClick={() => (window as any).openOrderDetail?.(k.maDH)}>Xem đơn</span></>}
+          </div>
+          <div style={{ background: 'var(--surface-2)', padding: 10, borderRadius: 8, margin: '10px 0', fontSize: 13 }}>
+            <b>Khách phản ánh:</b> {k.moTa}
+            {k.anhBangChung && <> · <a href={k.anhBangChung} target="_blank" className="icon-inline" style={{ color: 'var(--primary)' }}><FiExternalLink /> ảnh</a></>}
+          </div>
+          <div className="form-grid-3">
+            <div className="form-field">
+              <label>Trạng thái</label>
+              <select value={knStatus[k.maKN] ?? k.trangThai} onChange={(e) => setKnStatus((p) => ({ ...p, [k.maKN]: e.target.value }))} disabled={busy[k.maKN]}>
+                {KN_STATUS.map((s) => <option key={s} value={s}>{(KN_LABEL as Record<string, string>)[s]}</option>)}
+              </select>
+            </div>
+            <div className="form-field">
+              <label>Phương án hỗ trợ</label>
+              <select value={knPa[k.maKN] ?? ''} onChange={(e) => setKnPa((p) => ({ ...p, [k.maKN]: e.target.value }))} disabled={busy[k.maKN]}>
+                <option value="">-- Chọn --</option>
+                {PHUONG_AN.map((pa) => <option key={pa} value={pa}>{pa}</option>)}
+              </select>
+            </div>
+            <div className="form-field">
+              <label>Phản hồi khách / ghi chú xử lý</label>
+              <input value={knNote[k.maKN] ?? ''} onChange={(e) => setKnNote((p) => ({ ...p, [k.maKN]: e.target.value }))} placeholder="Đã trao đổi NCC, phương án..." disabled={busy[k.maKN]} />
+            </div>
+          </div>
+          <div className="ac-actions">
+            <button className="btn btn-primary" onClick={() => submitKN(k.maKN)} disabled={busy[k.maKN]}>
+              <FiMessageSquare /> Lưu phản hồi
+            </button>
+          </div>
+        </div>
+      ))}
+      <div className="alert alert-info" style={{ marginTop: 12 }}>
+        <FiInfo /><span>GDV xử lý với NCC & phản hồi khách. Hoàn tiền cho khách cần lệnh riêng gửi Kế toán duyệt (đang phát triển).</span>
+      </div>
+    </div>
+  );
+
   return (
     <AppShell user={user}>
       <div className="alert alert-info">
-        <FiInfo /><span>Bạn là <b>GDV</b>. Chỉ được sửa <b>Mã GD</b> và <b>Mã VĐ</b>.</span>
+        <FiInfo /><span>Bạn là <b>GDV</b>. Sửa <b>Mã GD</b>, <b>Mã VĐ</b> và xử lý <b>khiếu nại</b> với NCC.</span>
       </div>
 
       <div className="kpi-row">
@@ -149,7 +232,8 @@ export default function GdvClient({ user, pendingOrders }: { user: SessionUser; 
 
       <Tabs tabs={[
         { id: 'tab-deposit', label: <><FiEdit3 /> Đơn cần mua ({ordersDeposit.length})</>, content: tabDeposit },
-        { id: 'tab-bought', label: <><FiClock /> Chờ mã VĐ ({ordersBought.length})</>, content: tabBought }
+        { id: 'tab-bought', label: <><FiClock /> Chờ mã VĐ ({ordersBought.length})</>, content: tabBought },
+        { id: 'tab-kn', label: <><FiAlertTriangle /> Khiếu nại ({khieuNai.length})</>, content: tabKhieuNai }
       ]} />
 
       <div className="alert alert-lock">

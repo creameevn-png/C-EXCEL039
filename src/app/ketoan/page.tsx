@@ -7,13 +7,17 @@ export const dynamic = 'force-dynamic';
 export default async function KeToanPage() {
   const user = await requireRole(['KeToan']);
 
-  const orders = await prisma.donHang.findMany({
-    where: {
-      trangThai: { in: ['DaMuaHang', 'NccGiaoHang', 'KhoTqNhan', 'DangVanChuyen', 'KhoVnNhan', 'ChoThanhToan'] }
-    },
-    include: { khachHang: true, nv: true },
-    orderBy: { ngayTao: 'desc' }
-  });
+  const [orders, customers, walletTxns] = await Promise.all([
+    prisma.donHang.findMany({
+      where: {
+        trangThai: { in: ['DaMuaHang', 'NccGiaoHang', 'KhoTqNhan', 'DangVanChuyen', 'KhoVnNhan', 'ChoThanhToan'] }
+      },
+      include: { khachHang: true, nv: true },
+      orderBy: { ngayTao: 'desc' }
+    }),
+    prisma.khachHang.findMany({ orderBy: { maKH: 'asc' }, select: { maKH: true, tenKH: true, sdt: true, soDuVi: true } }),
+    prisma.giaoDichVi.findMany({ orderBy: { ngay: 'desc' }, take: 120, include: { khachHang: true } })
+  ]);
 
   const pending = orders
     .map((o) => ({
@@ -28,5 +32,16 @@ export default async function KeToanPage() {
     }))
     .filter((o) => o.conLai > 0.5);
 
-  return <KeToanClient user={user} pendingPayments={pending} />;
+  return (
+    <KeToanClient
+      user={user}
+      pendingPayments={pending}
+      customers={customers.map((c) => ({ maKH: c.maKH, tenKH: c.tenKH, sdt: c.sdt || '', soDuVi: c.soDuVi }))}
+      walletTxns={walletTxns.map((t) => ({
+        id: t.id, ngay: t.ngay.toISOString(), maKH: t.maKH,
+        tenKH: t.khachHang?.tenKH || t.maKH, loai: t.loai,
+        soTien: t.soTien, soDuSau: t.soDuSau, quy: t.quy || '', ghiChu: t.ghiChu || '', nv: t.nv || ''
+      }))}
+    />
+  );
 }

@@ -6,17 +6,34 @@ export const dynamic = 'force-dynamic';
 
 export default async function GdvPage() {
   const user = await requireRole(['GDV']);
-  const pending = await prisma.donHang.findMany({
-    where: { trangThai: { in: ['DatCoc', 'DaMuaHang'] } },
-    include: { khachHang: true, chiTiet: { take: 3, orderBy: { stt: 'asc' } } },
-    orderBy: { ngayTao: 'desc' }
-  });
-  return <GdvClient user={user} pendingOrders={pending.map((o) => ({
-    maDH: o.maDH, tenKH: o.khachHang?.tenKH || '',
-    web: o.chiTiet[0]?.webNguon || '',
-    tongKg: o.tongKg, tuyen: o.tuyen,
-    tongTien: o.tongTien, daTra: o.daTra,
-    tenHang: o.chiTiet.map((c) => `${c.tenSP} (x${c.soLuong})`).join(' · '),
-    maGD: o.maGD || '', maVD: o.maVD || '', trangThai: o.trangThai
-  }))} />;
+  const [pending, khieuNai] = await Promise.all([
+    prisma.donHang.findMany({
+      where: { trangThai: { in: ['DatCoc', 'DaMuaHang'] } },
+      include: { khachHang: true, chiTiet: { take: 3, orderBy: { stt: 'asc' } } },
+      orderBy: { ngayTao: 'desc' }
+    }),
+    prisma.khieuNai.findMany({
+      where: { trangThai: { notIn: ['DaXuLy', 'TuChoi'] } },
+      include: { khachHang: true },
+      orderBy: { ngayTao: 'desc' },
+      take: 100
+    })
+  ]);
+  return <GdvClient
+    user={user}
+    pendingOrders={pending.map((o) => ({
+      maDH: o.maDH, tenKH: o.khachHang?.tenKH || '',
+      web: o.chiTiet[0]?.webNguon || '',
+      tongKg: o.tongKg, tuyen: o.tuyen,
+      tongTien: o.tongTien, daTra: o.daTra,
+      tenHang: o.chiTiet.map((c) => `${c.tenSP} (x${c.soLuong})`).join(' · '),
+      maGD: o.maGD || '', maVD: o.maVD || '', trangThai: o.trangThai
+    }))}
+    khieuNai={khieuNai.map((k) => ({
+      maKN: k.maKN, ngayTao: k.ngayTao.toISOString(), maDH: k.maDH || '', maKH: k.maKH || '',
+      tenKH: k.khachHang?.tenKH || '', loai: k.loai, moTa: k.moTa,
+      trangThai: k.trangThai, phuongAn: k.phuongAn || '', ghiChuXuLy: k.ghiChuXuLy || '',
+      anhBangChung: k.anhBangChung || ''
+    }))}
+  />;
 }

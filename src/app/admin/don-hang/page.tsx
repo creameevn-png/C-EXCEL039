@@ -38,7 +38,9 @@ export default async function AdminDonHangPage({ searchParams }: { searchParams:
           maDH: o.maDH, ngayTao: o.ngayTao.toISOString(),
           tenKH: o.khachHang?.tenKH || '', maKH: o.maKH,
           tongTien: o.tongTien, conLai: o.conLai, trangThai: o.trangThai,
-          nvTao: o.nvTao || '', maGD: o.maGD || '', maVD: o.maVD || ''
+          nvTao: o.nvTao || '', maGD: o.maGD || '', maVD: o.maVD || '',
+          tuyen: o.tuyen, lineVC: o.lineVC, loaiHang: o.loaiHang, pctCoc: o.pctCoc,
+          shipND: o.shipND, dongGo: o.dongGo, phuThu: o.phuThu, ghiChu: o.ghiChu || ''
         }))} />
       </div>
       <OrderDetailModalHost canSeeMoney={true} />

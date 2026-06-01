@@ -3,7 +3,7 @@ import type { IconType } from 'react-icons';
 import {
   FiGrid, FiShoppingBag, FiUsers, FiBox, FiUserCheck, FiAlertTriangle,
   FiDollarSign, FiSettings, FiFileText, FiBriefcase, FiTrendingUp,
-  FiShoppingCart, FiPackage, FiTruck, FiUser, FiPlusCircle, FiTag, FiSearch, FiInbox
+  FiShoppingCart, FiPackage, FiTruck, FiUser, FiPlusCircle, FiTag, FiSearch, FiInbox, FiBarChart2
 } from 'react-icons/fi';
 
 export type NavItem = { href: string; label: string; Icon: IconType };
@@ -21,6 +21,7 @@ export const PAGE_META: Record<string, { label: string; subtitle: string; Icon: 
   '/admin/bang-gia': { label: 'Bảng giá', subtitle: '3 line vận chuyển × loại hàng', Icon: FiDollarSign },
   '/admin/cai-dat': { label: 'Cài đặt', subtitle: 'Tỷ giá · phí · thông tin DN', Icon: FiSettings },
   '/admin/audit-log': { label: 'Audit log', subtitle: 'Lịch sử hoạt động hệ thống', Icon: FiFileText },
+  '/bao-cao': { label: 'Báo cáo', subtitle: 'Sản lượng · doanh thu · KQKD theo tháng/quý', Icon: FiBarChart2 },
   '/cskh': { label: 'Chăm sóc khách hàng', subtitle: 'Tạo đơn · khách hàng · ví', Icon: FiBriefcase },
   '/gdv': { label: 'Giao dịch viên', subtitle: 'Mã giao dịch · mã vận đơn', Icon: FiTrendingUp },
   '/ketoan': { label: 'Kế toán', subtitle: 'Xác nhận thanh toán · sổ thu chi', Icon: FiDollarSign },
@@ -41,7 +42,7 @@ function item(href: string): NavItem {
 const ADMIN_MAIN: NavItem[] = [
   item('/admin'), item('/admin/don-hang'), item('/admin/yeu-cau'), item('/admin/khach-hang'),
   item('/admin/san-pham'), item('/admin/users'), item('/admin/khieu-nai'),
-  item('/admin/bang-gia'), item('/admin/cai-dat'), item('/admin/audit-log')
+  item('/admin/bang-gia'), item('/bao-cao'), item('/admin/cai-dat'), item('/admin/audit-log')
 ];
 
 const ADMIN_OPS: NavItem[] = [
@@ -67,7 +68,7 @@ export function navForRole(role: VaiTro): NavGroup[] {
     case 'GDV':
       return [{ items: [item('/gdv')] }];
     case 'KeToan':
-      return [{ items: [item('/ketoan'), item('/admin/khach-hang'), item('/admin/khieu-nai')] }];
+      return [{ items: [item('/ketoan'), item('/bao-cao'), item('/admin/khach-hang'), item('/admin/khieu-nai')] }];
     case 'MuaHang':
       return [{ items: [item('/mua-hang'), item('/admin/san-pham')] }];
     case 'KhoTQ':

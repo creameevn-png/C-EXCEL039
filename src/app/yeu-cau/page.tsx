@@ -108,23 +108,19 @@ export default function YeuCauMuaPage() {
 
         <div style={{ background: 'white', borderRadius: 16, padding: 24, boxShadow: 'var(--shadow-lg)' }}>
           <form onSubmit={submit}>
-            <div className="form-grid">
+            <div className="yc-contact">
               <div className="form-field"><label className="required">Họ tên</label>
                 <input value={hoTen} onChange={(e) => setHoTen(e.target.value)} placeholder="VD: Nguyễn Văn A" autoFocus /></div>
               <div className="form-field"><label className="required">Số điện thoại</label>
                 <input value={sdt} onChange={(e) => setSdt(e.target.value)} placeholder="0901234567" /></div>
-            </div>
-            <div className="form-grid" style={{ marginTop: 12 }}>
               <div className="form-field"><label>Email (nếu có)</label>
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@gmail.com" /></div>
-              <div className="form-field"><label>Mã KH (nếu là khách cũ)</label>
-                <input value={maKH} onChange={(e) => setMaKH(e.target.value)} placeholder="VD: KH001" style={{ textTransform: 'uppercase' }} /></div>
-            </div>
-            <div className="form-field" style={{ marginTop: 12 }}>
-              <label>Tuyến nhận hàng</label>
-              <select value={tuyen} onChange={(e) => setTuyen(e.target.value as any)}>
-                <option value="HaNoi">Hà Nội</option><option value="HCM">HCM</option>
-              </select>
+              <div className="form-field"><label>Mã KH</label>
+                <input value={maKH} onChange={(e) => setMaKH(e.target.value)} placeholder="KH001" style={{ textTransform: 'uppercase' }} /></div>
+              <div className="form-field"><label>Tuyến</label>
+                <select value={tuyen} onChange={(e) => setTuyen(e.target.value as any)}>
+                  <option value="HaNoi">Hà Nội</option><option value="HCM">HCM</option>
+                </select></div>
             </div>
 
             <div style={{ marginTop: 18 }}>

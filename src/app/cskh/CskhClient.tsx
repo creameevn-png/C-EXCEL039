@@ -394,20 +394,18 @@ export default function CskhClient({ initial }: Props) {
             <div className="form-field" style={{ marginTop: 8 }}>
               <input type="text" value={it.tenSP} onChange={(e) => updateItem(it.tempId, { tenSP: e.target.value })} placeholder="Tên hàng ghi vào đơn" />
             </div>
-            <div className="form-grid-3" style={{ marginTop: 8 }}>
-              <div className="form-field"><label>Số lượng</label>
+            <div className="line-grid" style={{ marginTop: 8 }}>
+              <div className="form-field"><label>SL</label>
                 <input type="number" min={1} value={it.soLuong} onChange={(e) => updateItem(it.tempId, { soLuong: parseInt(e.target.value) || 1 })} /></div>
-              <div className="form-field"><label>Đơn giá (¥ NDT)</label>
+              <div className="form-field"><label>¥ Đơn giá</label>
                 <input type="number" step="0.01" value={it.donGiaNDT} onChange={(e) => updateItem(it.tempId, { donGiaNDT: parseFloat(e.target.value) || 0 })} /></div>
               <div className="form-field"><label>Tỷ giá</label>
                 <input type="number" value={it.tyGia} onChange={(e) => updateItem(it.tempId, { tyGia: parseFloat(e.target.value) || 0 })} /></div>
-            </div>
-            <div className="form-grid-3" style={{ marginTop: 8 }}>
               <div className="form-field"><label>Kg/sp</label>
                 <input type="number" step="0.01" value={it.kg} onChange={(e) => updateItem(it.tempId, { kg: parseFloat(e.target.value) || 0 })} /></div>
               <div className="form-field"><label>m³/sp</label>
                 <input type="number" step="0.0001" value={it.m3} onChange={(e) => updateItem(it.tempId, { m3: parseFloat(e.target.value) || 0 })} /></div>
-              <div className="form-field"><label>Web nguồn</label>
+              <div className="form-field"><label>Nguồn</label>
                 <select value={it.webNguon} onChange={(e) => updateItem(it.tempId, { webNguon: e.target.value })}>
                   <option value="">--</option>
                   <option value="Taobao">Taobao</option>

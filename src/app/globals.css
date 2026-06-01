@@ -836,6 +836,142 @@ svg { flex-shrink: 0; }
 @media (max-width: 860px) { .yc-contact { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 480px) { .yc-contact { grid-template-columns: 1fr; } }
 
+/* ============================================================
+   ĐẶT HÀNG — Document layout kiểu ERPAG (sales order)
+   ============================================================ */
+.erp-doc { display: flex; flex-direction: column; gap: 14px; }
+
+/* Thanh trên cùng: tiêu đề + chip tổng tiền */
+.erp-bar {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 12px 18px; box-shadow: var(--shadow-sm);
+}
+.erp-bar-title { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 800; letter-spacing: -0.3px; }
+.erp-bar-title svg { font-size: 20px; color: var(--primary); }
+.erp-bar-title .sub { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+.erp-chips { margin-left: auto; display: flex; gap: 10px; flex-wrap: wrap; }
+.erp-chip {
+  display: flex; flex-direction: column; gap: 1px; align-items: flex-end;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 7px 14px; min-width: 132px;
+}
+.erp-chip .k { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; display: flex; align-items: center; gap: 5px; }
+.erp-chip .v { font-size: 17px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+.erp-chip.accent { background: var(--primary-soft); border-color: #c7d2fe; }
+.erp-chip.accent .v { color: var(--primary-700); }
+.erp-chip.warn { background: #fffbeb; border-color: #fde68a; }
+.erp-chip.warn .v { color: var(--warning-dark); }
+
+/* Layout: nội dung + thanh tác vụ dọc bên phải */
+.erp-layout { display: flex; gap: 14px; align-items: flex-start; }
+.erp-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+
+.erp-rail { width: 94px; flex-shrink: 0; position: sticky; top: 84px; display: flex; flex-direction: column; gap: 8px; }
+.erp-rail-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 13px 6px; border-radius: 12px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text-muted);
+  font-size: 11px; font-weight: 700; box-shadow: var(--shadow-sm);
+  transition: transform 0.1s, box-shadow 0.15s, background 0.15s, color 0.15s, border-color 0.15s;
+  text-align: center; line-height: 1.2; width: 100%;
+}
+.erp-rail-btn svg { font-size: 21px; }
+.erp-rail-btn:hover { transform: translateY(-1px); box-shadow: var(--shadow); border-color: var(--border-strong); color: var(--text); }
+.erp-rail-btn:active { transform: translateY(0); }
+.erp-rail-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.erp-rail-btn.primary { background: var(--primary); color: #fff; border-color: transparent; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.32); }
+.erp-rail-btn.primary:hover { background: var(--primary-600); color: #fff; }
+.erp-rail-btn.danger:hover { color: var(--danger-dark); border-color: #fecaca; background: #fef2f2; }
+
+/* Section card (gập được) */
+.erp-sec { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); overflow: hidden; }
+.erp-sec-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; cursor: pointer; user-select: none; transition: background 0.12s; }
+.erp-sec-head:hover { background: var(--surface-2); }
+.erp-sec-toggle { width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-muted); display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
+.erp-sec-ic { color: var(--primary); display: flex; font-size: 17px; }
+.erp-sec-title { font-size: 12px; font-weight: 800; letter-spacing: 0.7px; text-transform: uppercase; color: #334155; }
+.erp-sec-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.erp-sec-body { padding: 16px; border-top: 1px solid var(--border); }
+
+/* Ô nhập floating-label (nhãn nằm trên viền) */
+.erp-fields { display: flex; gap: 12px; flex-wrap: wrap; }
+.erp-field {
+  position: relative; flex: 1 1 160px; min-width: 140px;
+  border: 1.5px solid var(--border-strong); border-radius: 9px;
+  background: var(--surface); padding: 15px 12px 7px; transition: border-color 0.15s, box-shadow 0.15s;
+}
+.erp-field > label {
+  position: absolute; top: -8px; left: 9px; background: var(--surface); padding: 0 6px;
+  font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px;
+}
+.erp-field input, .erp-field select {
+  border: none; outline: none; background: transparent; width: 100%;
+  font-size: 14px; font-weight: 600; color: var(--text); font-family: inherit; padding: 0;
+}
+.erp-field:focus-within { border-color: var(--primary); box-shadow: var(--ring); }
+.erp-field.locked { background: var(--surface-2); }
+.erp-field.locked > label { background: var(--surface-2); }
+.erp-field.locked input { color: #475569; }
+
+/* Bảng items dạng spreadsheet */
+.erp-items-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+.erp-items { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 880px; }
+.erp-items thead th {
+  background: var(--surface-2); color: var(--text-muted); font-size: 10.5px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.4px; padding: 8px 10px; text-align: left;
+  border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+.erp-items thead th.num { text-align: right; }
+.erp-items thead th.grp { text-align: center; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+.erp-items tbody td { border-bottom: 1px solid var(--border); padding: 0; vertical-align: middle; }
+.erp-items tbody td.num { text-align: right; }
+.erp-items tbody tr:hover { background: #fafbff; }
+
+.erp-rownum { display: inline-flex; align-items: center; gap: 4px; justify-content: center; padding: 0 8px; height: 30px; color: var(--primary); font-weight: 800; font-size: 12px; }
+.erp-rownum svg { font-size: 14px; opacity: 0.8; }
+
+.erp-cell { display: block; width: 100%; border: 1px solid transparent; background: transparent; padding: 9px 10px; font-size: 13px; font-family: inherit; color: var(--text); }
+.erp-cell:hover { border-color: var(--border); }
+.erp-cell:focus { outline: none; border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); background: #fff; position: relative; z-index: 1; }
+.erp-cell.num { text-align: right; font-variant-numeric: tabular-nums; }
+.erp-cell-sub { font-size: 11px; color: var(--text-muted); padding-top: 0; padding-bottom: 8px; }
+.erp-cell-sub::placeholder { color: var(--text-faint); }
+.erp-uom { display: block; text-align: center; font-size: 12px; color: var(--text-muted); font-weight: 600; }
+.erp-amt { padding: 9px 12px; }
+.erp-amt b { font-weight: 800; font-variant-numeric: tabular-nums; }
+.erp-amt-sub { font-size: 11px; color: var(--text-faint); margin-top: 1px; }
+.erp-rm { width: 28px; height: 28px; margin: 0 auto; border-radius: 7px; border: 1px solid transparent; background: transparent; color: var(--text-faint); display: flex; align-items: center; justify-content: center; font-size: 15px; transition: all 0.12s; }
+.erp-rm:hover { background: #fef2f2; color: var(--danger-dark); border-color: #fecaca; }
+
+.erp-items tfoot td { background: var(--surface-2); border-top: 2px solid var(--border-strong); padding: 8px 10px; font-size: 12px; font-weight: 700; color: #334155; }
+.erp-items tfoot td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.erp-foot-lbl { color: var(--text-muted); }
+.erp-add { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: var(--primary); color: #fff; cursor: pointer; box-shadow: 0 2px 6px rgba(79, 70, 229, 0.35); transition: transform 0.1s; border: none; }
+.erp-add:hover { transform: scale(1.08); }
+.erp-add svg { font-size: 16px; }
+
+/* Bảng chi phí */
+.erp-fee-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 2px; font-size: 13px; color: #475569; }
+.erp-fee-row + .erp-fee-row { border-top: 1px dashed var(--border); }
+.erp-fee-row .v { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+.erp-fee-row.total { margin-top: 4px; border-top: 2px solid var(--border-strong); padding-top: 12px; }
+.erp-fee-row.total .lbl { font-weight: 800; font-size: 14px; color: var(--text); }
+.erp-fee-row.total .v { font-size: 18px; font-weight: 800; color: var(--primary-700); }
+.erp-fee-row.coc .v { color: var(--warning-dark); }
+
+@media (max-width: 860px) {
+  .erp-layout { flex-direction: column; }
+  .erp-rail {
+    position: sticky; bottom: 8px; top: auto; width: 100%; flex-direction: row; overflow-x: auto;
+    padding: 8px; background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(6px);
+    border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); z-index: 30;
+  }
+  .erp-rail-btn { flex: 1 1 0; min-width: 76px; }
+  .erp-chips { width: 100%; margin-left: 0; }
+  .erp-chip { flex: 1; min-width: 0; align-items: flex-start; }
+}
+
 /* ====================== UTILITIES ====================== */
 .text-success { color: var(--success-dark); }
 .text-danger { color: var(--danger-dark); }

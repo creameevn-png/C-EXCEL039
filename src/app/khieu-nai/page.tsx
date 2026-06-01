@@ -4,6 +4,14 @@ import { useEffect, useState } from 'react';
 import { FiAlertTriangle, FiCheckCircle, FiSend, FiClock, FiArrowLeft, FiAlertCircle } from 'react-icons/fi';
 import { callServer } from '@/lib/client';
 
+const LOAI_OPTS = [
+  { v: 'ThieuHang', label: 'Thiếu hàng', tmpl: 'Đơn bị thiếu hàng: thiếu (sản phẩm / số lượng) ...' },
+  { v: 'HangLoi', label: 'Hàng lỗi / dập vỡ', tmpl: 'Hàng bị lỗi / dập vỡ: ...' },
+  { v: 'GiaoSai', label: 'Giao sai', tmpl: 'Giao sai sản phẩm: đặt ... nhưng nhận ...' },
+  { v: 'KhongNhan', label: 'Không nhận được', tmpl: 'Chưa nhận được hàng dù đã báo giao: ...' },
+  { v: 'Khac', label: 'Khác', tmpl: '' }
+];
+
 export default function KhieuNaiPage() {
   const [maKH, setMaKH] = useState('');
   const [maDH, setMaDH] = useState('');
@@ -73,14 +81,16 @@ export default function KhieuNaiPage() {
               <input type="text" value={nguoiTao} onChange={(e) => setNguoiTao(e.target.value)} placeholder="VD: Nguyễn Văn A - 0901..." />
             </div>
             <div className="form-field" style={{ marginTop: 12 }}>
-              <label className="required">Loại khiếu nại</label>
-              <select value={loai} onChange={(e) => setLoai(e.target.value)}>
-                <option value="HangLoi">Hàng lỗi</option>
-                <option value="ThieuHang">Thiếu hàng</option>
-                <option value="GiaoSai">Giao sai</option>
-                <option value="KhongNhan">Không nhận được</option>
-                <option value="Khac">Khác</option>
-              </select>
+              <label className="required">Loại khiếu nại (chọn nhanh)</label>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {LOAI_OPTS.map((o) => (
+                  <button type="button" key={o.v}
+                    className={`btn btn-sm ${loai === o.v ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => { setLoai(o.v); if (!moTa.trim() && o.tmpl) setMoTa(o.tmpl); }}>
+                    {o.label}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="form-field" style={{ marginTop: 12 }}>
               <label className="required">Mô tả chi tiết</label>

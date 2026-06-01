@@ -9,10 +9,21 @@ export const dynamic = 'force-dynamic';
 export default async function MuaHangPage() {
   const user = await requireRole(['MuaHang']);
 
-  const [nguonHang, ncc] = await Promise.all([
-    prisma.nguonHang.findMany({ orderBy: { createdAt: 'desc' }, take: 200 }),
-    prisma.nCC.findMany({ orderBy: { tenNCC: 'asc' } })
-  ]);
+  const ncc = await prisma.nCC.findMany({ orderBy: { tenNCC: 'asc' } });
+
+  // Cột `danh_muc` có thể chưa tồn tại trên DB production (chờ migration) →
+  // fallback đọc các cột cũ bằng raw query để vẫn hiện được nguồn hàng.
+  let nguonHang: any[];
+  try {
+    nguonHang = await prisma.nguonHang.findMany({ orderBy: { createdAt: 'desc' }, take: 200 });
+  } catch {
+    const rows: any[] = await prisma.$queryRaw`
+      SELECT id, ten_sp AS tenSP, ten_ncc AS tenNCC, link_taobao AS linkTaobao,
+             gia_ndt AS giaNDT, moq, thoi_gian_giao AS thoiGianGiao,
+             chat_luong AS chatLuong, created_at AS createdAt
+      FROM nguon_hang ORDER BY created_at DESC LIMIT 200`;
+    nguonHang = rows.map((n) => ({ ...n, danhMuc: null }));
+  }
 
   const avg = nguonHang.length ? (nguonHang.reduce((s, n) => s + (n.chatLuong || 0), 0) / nguonHang.length).toFixed(1) : '-';
 

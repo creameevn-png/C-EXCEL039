@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export default async function KeToanPage() {
   const user = await requireRole(['KeToan']);
 
-  const [orders, customers, walletTxns] = await Promise.all([
+  const [orders, customers] = await Promise.all([
     prisma.donHang.findMany({
       where: {
         trangThai: { in: ['DaMuaHang', 'NccGiaoHang', 'KhoTqNhan', 'DangVanChuyen', 'KhoVnNhan', 'ChoThanhToan'] }
@@ -15,9 +15,16 @@ export default async function KeToanPage() {
       include: { khachHang: true, nv: true },
       orderBy: { ngayTao: 'desc' }
     }),
-    prisma.khachHang.findMany({ orderBy: { maKH: 'asc' }, select: { maKH: true, tenKH: true, sdt: true, soDuVi: true } }),
-    prisma.giaoDichVi.findMany({ orderBy: { ngay: 'desc' }, take: 120, include: { khachHang: true } })
+    prisma.khachHang.findMany({ orderBy: { maKH: 'asc' }, select: { maKH: true, tenKH: true, sdt: true, soDuVi: true } })
   ]);
+
+  // Cột `quy` có thể chưa tồn tại trên DB production (chờ migration) → tránh 500 cả trang.
+  let walletTxns: any[] = [];
+  try {
+    walletTxns = await prisma.giaoDichVi.findMany({ orderBy: { ngay: 'desc' }, take: 120, include: { khachHang: true } });
+  } catch {
+    walletTxns = [];
+  }
 
   const pending = orders
     .map((o) => ({

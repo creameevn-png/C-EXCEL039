@@ -182,6 +182,8 @@ export default function CskhClient({ initial }: Props) {
   const totals = useMemo(() => {
     const tongGiaHang = items.reduce((s, it) =>
       s + (Number(it.donGiaNDT) || 0) * (Number(it.tyGia) || 0) * (Number(it.soLuong) || 0), 0);
+    const tongNDT = items.reduce((s, it) =>
+      s + (Number(it.donGiaNDT) || 0) * (Number(it.soLuong) || 0), 0);
     const tongSL = items.reduce((s, it) => s + (Number(it.soLuong) || 0), 0);
     const totalKg = items.reduce((s, it) => s + (Number(it.kg) || 0) * (Number(it.soLuong) || 0), 0);
     const totalM3 = items.reduce((s, it) => s + (Number(it.m3) || 0) * (Number(it.soLuong) || 0), 0);
@@ -190,7 +192,7 @@ export default function CskhClient({ initial }: Props) {
     const phiVC = calcPhiVCPanama(totalKg, totalM3, tuyen);
     const tong = tongGiaHang + phiMua + phiBH + phiVC + (Number(shipND) || 0) + (Number(dongGoi) || 0) + (Number(phuThu) || 0);
     const coc = Math.round((tong * pctCoc) / 100 / 1000) * 1000;
-    return { tongGiaHang, tongSL, totalKg, totalM3, phiMua, phiBH, phiVC, tong, coc };
+    return { tongGiaHang, tongNDT, tongSL, totalKg, totalM3, phiMua, phiBH, phiVC, tong, coc };
   }, [items, tuyen, shipND, dongGoi, phuThu, pctCoc]);
 
   function resetCreateForm() {
@@ -492,7 +494,12 @@ export default function CskhClient({ initial }: Props) {
                     <td className="num">Σ {totals.totalKg.toFixed(2)}</td>
                     <td className="num">Σ {totals.totalM3.toFixed(4)}</td>
                     <td></td>
-                    <td className="num"><b>Σ {fmtVND(totals.tongGiaHang)}</b></td>
+                    <td className="num">
+                      <div className="erp-amt">
+                        <b>Σ {fmtVND(totals.tongGiaHang)}đ</b>
+                        <div className="erp-amt-sub">{formatNDT(totals.tongNDT)}</div>
+                      </div>
+                    </td>
                     <td></td>
                   </tr>
                 </tfoot>
@@ -513,7 +520,7 @@ export default function CskhClient({ initial }: Props) {
                 <input type="number" value={phuThu} onChange={(e) => setPhuThu(parseFloat(e.target.value) || 0)} /></div>
             </div>
             <div style={{ marginTop: 14 }}>
-              <div className="erp-fee-row"><span className="lbl">Tổng giá hàng</span><span className="v">{fmtVND(totals.tongGiaHang)}đ</span></div>
+              <div className="erp-fee-row"><span className="lbl">Tổng giá hàng</span><span className="v">{fmtVND(totals.tongGiaHang)}đ <small style={{ color: 'var(--text-faint)', fontWeight: 500 }}>≈ {formatNDT(totals.tongNDT)}</small></span></div>
               <div className="erp-fee-row"><span className="lbl">Tổng KG / M³</span><span className="v">{totals.totalKg.toFixed(2)} kg / {totals.totalM3.toFixed(4)} m³</span></div>
               <div className="erp-fee-row"><span className="lbl">Phí mua (2%)</span><span className="v">{fmtVND(totals.phiMua)}đ</span></div>
               <div className="erp-fee-row"><span className="lbl">Phí bảo hiểm (1%)</span><span className="v">{fmtVND(totals.phiBH)}đ</span></div>

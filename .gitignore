@@ -8,3 +8,9 @@ node_modules
 desktop.ini
 public/uploads/*
 !public/uploads/.gitkeep
+
+# File lam viec / thu nghiem - khong day len repo (video, audio, script demo, ban thu nghiem cu)
+_demo/
+apps-script/
+version2/
+excel-app/

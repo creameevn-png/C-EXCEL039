@@ -682,6 +682,28 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     return ok();
   },
 
+  // ============== GIO MUA HO (extension) ==============
+  async deleteGioMuaHo(args, user) {
+    if (!allow(user.vaiTro, ['MuaHang', 'CSKH'])) return err('Không có quyền');
+    const [id] = args;
+    if (!id) return err('Thiếu id');
+    // Mua hàng/CSKH chỉ xóa item của mình; Admin xóa được tất cả.
+    const where: any = { id: Number(id) };
+    if (user.vaiTro !== 'Admin') where.nvId = user.id;
+    const r = await prisma.gioMuaHo.deleteMany({ where });
+    if (r.count === 0) return err('Không tìm thấy hoặc không có quyền xóa');
+    await logActivity(user.email, 'DELETE_GIO_MUA_HO', String(id));
+    return ok();
+  },
+
+  async clearGioMuaHo(_args, user) {
+    if (!allow(user.vaiTro, ['MuaHang', 'CSKH'])) return err('Không có quyền');
+    const where: any = user.vaiTro === 'Admin' ? {} : { nvId: user.id };
+    const r = await prisma.gioMuaHo.deleteMany({ where });
+    await logActivity(user.email, 'CLEAR_GIO_MUA_HO', String(r.count));
+    return ok({ count: r.count });
+  },
+
   // ============== KE TOAN: VI / DINH KHOAN QUY ==============
   async walletTxn(args, user) {
     if (!allow(user.vaiTro, ['KeToan'])) return err('Không có quyền');

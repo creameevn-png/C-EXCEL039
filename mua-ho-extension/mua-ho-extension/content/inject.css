@@ -1,0 +1,71 @@
+/* Tất cả style prefix mh- + z-index cao để cô lập khỏi style 1688/Taobao */
+
+#mh-muaho-fab.mh-fab {
+  position: fixed; right: 20px; bottom: 24px; z-index: 2147483000;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 18px; border: none; border-radius: 999px;
+  background: #f0512b; color: #fff;
+  font: 600 14px/1.2 -apple-system, "Segoe UI", system-ui, sans-serif;
+  cursor: pointer; box-shadow: 0 8px 24px rgba(240, 81, 43, 0.38);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.2s ease;
+}
+#mh-muaho-fab.mh-fab:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(240, 81, 43, 0.46); }
+#mh-muaho-fab.mh-fab:active { transform: translateY(0); }
+#mh-muaho-fab.mh-fab .mh-fab-ico { font-size: 18px; }
+#mh-muaho-fab.mh-fab--loading { opacity: 0.6; pointer-events: none; }
+
+/* Nút trên thẻ sản phẩm ở trang tìm kiếm */
+.mh-card-btn {
+  position: absolute; top: 8px; right: 8px; z-index: 9999;
+  padding: 5px 10px; border: none; border-radius: 8px;
+  background: #f0512b; color: #fff;
+  font: 700 12px/1 -apple-system, "Segoe UI", system-ui, sans-serif;
+  cursor: pointer; box-shadow: 0 3px 10px rgba(240, 81, 43, 0.4); opacity: 0.95;
+}
+.mh-card-btn:hover { background: #d8431f; opacity: 1; }
+
+/* Overlay + modal */
+.mh-overlay {
+  position: fixed; inset: 0; z-index: 2147483600;
+  background: rgba(21, 17, 14, 0.55);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+  font: 14px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif;
+}
+.mh-modal { width: 440px; max-width: 100%; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3); color: #15110e; }
+.mh-modal-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px; background: #15110e; color: #fff; }
+.mh-modal-title { font-weight: 700; flex: 1; }
+.mh-badge { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; background: #f0512b; color: #fff; }
+.mh-badge--taobao, .mh-badge--tmall { background: #ff5000; }
+.mh-x { background: transparent; border: none; color: #fff; font-size: 22px; line-height: 1; cursor: pointer; padding: 0 4px; }
+.mh-modal-body { padding: 16px; }
+.mh-prod { display: flex; gap: 12px; margin-bottom: 12px; }
+.mh-thumb { width: 84px; height: 84px; flex: none; border-radius: 10px; background: #f6f1ea; display: flex; align-items: center; justify-content: center; font-size: 30px; overflow: hidden; }
+.mh-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.mh-prod-meta { flex: 1; min-width: 0; }
+.mh-price { color: #f0512b; font-weight: 700; margin-top: 6px; }
+.mh-id { color: #8a8178; font-size: 12px; margin-top: 2px; }
+.mh-sku { font-size: 13px; background: #f6f1ea; border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; }
+.mh-sku--warn { background: #fff5e6; color: #9a5b00; }
+.mh-row { display: flex; gap: 12px; }
+.mh-lbl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #6b6259; }
+.mh-moqhint { color: #f0512b; font-weight: 700; }
+.mh-grow { flex: 1; }
+.mh-field { border: 1px solid #e7ded3; border-radius: 8px; padding: 9px 10px; font: 14px/1.4 inherit; color: #15110e; background: #fff; outline: none; box-sizing: border-box; width: 100%; }
+.mh-field:focus { border-color: #f0512b; box-shadow: 0 0 0 3px rgba(240, 81, 43, 0.15); }
+.mh-name { resize: vertical; font-weight: 600; }
+.mh-qty { width: 96px; }
+.mh-modal-foot { display: flex; gap: 10px; justify-content: flex-end; padding: 14px 16px; border-top: 1px solid #f0ece5; }
+.mh-btn { padding: 10px 18px; border-radius: 9px; font: 600 14px inherit; cursor: pointer; border: 1px solid transparent; }
+.mh-btn--ghost { background: #fff; border-color: #e7ded3; color: #6b6259; }
+.mh-btn--ghost:hover { background: #f6f1ea; }
+.mh-btn--primary { background: #f0512b; color: #fff; }
+.mh-btn--primary:hover { background: #d8431f; }
+.mh-btn:disabled { opacity: 0.6; cursor: default; }
+
+/* Toast */
+.mh-toast { position: fixed; left: 50%; bottom: 36px; transform: translate(-50%, 20px); z-index: 2147483601; max-width: 360px; padding: 12px 18px; border-radius: 10px; font: 600 14px/1.4 -apple-system, "Segoe UI", system-ui, sans-serif; color: #fff; background: #15110e; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); opacity: 0; transition: opacity 0.3s ease, transform 0.3s ease; }
+.mh-toast--show { opacity: 1; transform: translate(-50%, 0); }
+.mh-toast--success { background: #16a34a; }
+.mh-toast--error { background: #dc2626; }
+
+@media (prefers-reduced-motion: reduce) { #mh-muaho-fab.mh-fab, .mh-toast { transition: none; } }

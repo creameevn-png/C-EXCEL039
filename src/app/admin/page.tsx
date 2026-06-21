@@ -55,7 +55,7 @@ export default async function AdminPage() {
     <AppShell user={user}>
       <div className="alert alert-info">
         <FiGrid />
-        <span>Bạn là <b>Admin</b> — toàn quyền hệ thống. Tài khoản mặc định: admin@cu.vn / 123456 (hãy đổi mật khẩu).</span>
+        <span>Bạn là <b>Admin</b> — toàn quyền hệ thống. Nhớ đổi mật khẩu mặc định sau khi bàn giao.</span>
       </div>
 
       <div className="kpi-row">

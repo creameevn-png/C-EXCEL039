@@ -4,7 +4,7 @@ const DEFAULTS: Record<string, string> = {
   ty_gia_ndt_vnd: '3650',
   phi_mua_pct: '2',
   phi_bh_pct: '1',
-  ten_cong_ty: 'CỪ EXCEL039',
+  ten_cong_ty: 'Quản Lý Ship Trung Việt',
   zalo_lien_he: ''
 };
 

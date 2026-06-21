@@ -28,7 +28,7 @@ export default async function CskhPage() {
 
   const initial = {
     user,
-    appName: process.env.APP_NAME || 'CỪ EXCEL039',
+    appName: process.env.APP_NAME || 'Quản Lý Ship Trung Việt',
     tyGia,
     customers: customers.map((c) => ({
       maKH: c.maKH, tenKH: c.tenKH, sdt: c.sdt || '',

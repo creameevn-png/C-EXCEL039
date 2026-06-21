@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { ToastProvider } from '@/components/Toast';
 
 export const metadata: Metadata = {
-  title: process.env.APP_NAME || 'Cừ EXCEL039 V3.6.2',
+  title: process.env.APP_NAME || 'Quản Lý Ship Trung Việt',
   description: 'Hệ thống quản lý nhập hàng Trung Quốc'
 };
 

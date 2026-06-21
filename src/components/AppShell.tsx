@@ -66,7 +66,7 @@ export default function AppShell({ user, title, subtitle, appName, children }: P
         <div className="sb-brand">
           <div className="logo"><FiPackage /></div>
           <div>
-            <div className="name">{appName || 'Cừ EXCEL039'}</div>
+            <div className="name">{appName || 'Quản Lý Ship Trung Việt'}</div>
             <div className="tag">ERP Ship TQ · VN</div>
           </div>
         </div>

@@ -45,7 +45,7 @@ export default function LoginForm() {
         {loading ? 'Đang xác thực...' : <><FiLogIn /> Đăng nhập</>}
       </button>
       <div className="hint" style={{ marginTop: 12, textAlign: 'center' }}>
-        Tài khoản mặc định (seed): admin@cu.vn / 123456
+        Đăng nhập bằng tài khoản được cấp
       </div>
     </form>
   );

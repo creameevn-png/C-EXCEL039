@@ -7,13 +7,13 @@ async function main() {
   const pwd = await bcrypt.hash('123456', 10);
 
   const users: Array<{ email: string; hoTen: string; vaiTro: VaiTro }> = [
-    { email: 'admin@cu.vn', hoTen: 'Quản trị viên', vaiTro: 'Admin' },
-    { email: 'cskh@cu.vn', hoTen: 'Nhân viên CSKH', vaiTro: 'CSKH' },
-    { email: 'gdv@cu.vn', hoTen: 'Giao dịch viên', vaiTro: 'GDV' },
-    { email: 'ketoan@cu.vn', hoTen: 'Kế toán', vaiTro: 'KeToan' },
-    { email: 'muahang@cu.vn', hoTen: 'Nhân viên Mua hàng', vaiTro: 'MuaHang' },
-    { email: 'khotq@cu.vn', hoTen: 'Nhân viên Kho TQ', vaiTro: 'KhoTQ' },
-    { email: 'khovn@cu.vn', hoTen: 'Nhân viên Kho VN', vaiTro: 'KhoVN' },
+    { email: 'admin@demo.vn', hoTen: 'Quản trị viên', vaiTro: 'Admin' },
+    { email: 'cskh@demo.vn', hoTen: 'Nhân viên CSKH', vaiTro: 'CSKH' },
+    { email: 'gdv@demo.vn', hoTen: 'Giao dịch viên', vaiTro: 'GDV' },
+    { email: 'ketoan@demo.vn', hoTen: 'Kế toán', vaiTro: 'KeToan' },
+    { email: 'muahang@demo.vn', hoTen: 'Nhân viên Mua hàng', vaiTro: 'MuaHang' },
+    { email: 'khotq@demo.vn', hoTen: 'Nhân viên Kho TQ', vaiTro: 'KhoTQ' },
+    { email: 'khovn@demo.vn', hoTen: 'Nhân viên Kho VN', vaiTro: 'KhoVN' },
     { email: 'kh001@gmail.com', hoTen: 'Anh Tuấn', vaiTro: 'Customer' }
   ];
   for (const u of users) {
@@ -29,7 +29,7 @@ async function main() {
     { ten: 'ty_gia_ndt_vnd', giaTri: '3650', ghiChu: 'Tỷ giá NDT → VND' },
     { ten: 'phi_mua_pct', giaTri: '2', ghiChu: 'Phí mua hàng (%)' },
     { ten: 'phi_bh_pct', giaTri: '1', ghiChu: 'Phí bảo hiểm (%)' },
-    { ten: 'ten_cong_ty', giaTri: 'CỪ EXCEL039 - SHIP TQ-VN', ghiChu: 'Tên doanh nghiệp' },
+    { ten: 'ten_cong_ty', giaTri: 'Quản Lý Ship Trung Việt', ghiChu: 'Tên doanh nghiệp' },
     { ten: 'zalo_lien_he', giaTri: '0901234567', ghiChu: 'Zalo liên hệ' }
   ];
   for (const s of settings) {
@@ -110,13 +110,13 @@ async function main() {
 
   console.log('✅ Seed done');
   console.log('Login mặc định (mật khẩu 123456):');
-  console.log('  Admin    : admin@cu.vn');
-  console.log('  CSKH     : cskh@cu.vn');
-  console.log('  GDV      : gdv@cu.vn');
-  console.log('  Kế toán  : ketoan@cu.vn');
-  console.log('  Mua hàng : muahang@cu.vn');
-  console.log('  Kho TQ   : khotq@cu.vn');
-  console.log('  Kho VN   : khovn@cu.vn');
+  console.log('  Admin    : admin@demo.vn');
+  console.log('  CSKH     : cskh@demo.vn');
+  console.log('  GDV      : gdv@demo.vn');
+  console.log('  Kế toán  : ketoan@demo.vn');
+  console.log('  Mua hàng : muahang@demo.vn');
+  console.log('  Kho TQ   : khotq@demo.vn');
+  console.log('  Kho VN   : khovn@demo.vn');
   console.log('  Customer : kh001@gmail.com (KH001)');
   console.log('Tra cứu public: /tra-cuu  (Mã KH: KH001, SĐT cuối: 4567)');
 }

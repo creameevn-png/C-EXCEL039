@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="popup.css">
+  <title>Mua Hộ</title>
+</head>
+<body>
+  <header class="hd">
+    <span class="hd-ico">🛒</span>
+    <div>
+      <div class="hd-title">Mua Hộ · 1688 / Taobao / Tmall</div>
+      <div class="hd-sub">v2 · kết nối hệ thống mua hộ</div>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab tab--on" data-tab="setup">Cấu hình</button>
+    <button class="tab" data-tab="cart">Giỏ mua hộ</button>
+  </nav>
+
+  <main class="body">
+    <!-- TAB CẤU HÌNH -->
+    <div class="pane pane--on" data-pane="setup">
+      <section class="card">
+        <label class="lbl" for="apiBase">Địa chỉ API hệ thống mua hộ</label>
+        <input id="apiBase" class="inp" type="url" placeholder="https://api.muaho-cua-ban.com" autocomplete="off">
+        <p class="hint">Không có dấu "/" ở cuối. Nhớ thêm domain này vào <code>host_permissions</code>.</p>
+      </section>
+
+      <section class="card">
+        <div class="card-title">Đăng nhập</div>
+        <label class="lbl" for="username">Tài khoản</label>
+        <input id="username" class="inp" type="text" placeholder="email hoặc tên đăng nhập" autocomplete="username">
+        <label class="lbl" for="password">Mật khẩu</label>
+        <input id="password" class="inp" type="password" placeholder="••••••••" autocomplete="current-password">
+        <button id="loginBtn" class="btn btn--primary">Đăng nhập</button>
+        <details class="adv">
+          <summary>Hoặc dán token thủ công</summary>
+          <label class="lbl" for="token">Access token</label>
+          <input id="token" class="inp" type="text" placeholder="Bearer token" autocomplete="off">
+          <button id="saveTokenBtn" class="btn btn--ghost">Lưu token</button>
+        </details>
+      </section>
+
+      <section class="status" id="status" hidden></section>
+      <div class="actions">
+        <button id="testBtn" class="btn btn--ghost">Kiểm tra kết nối</button>
+        <button id="logoutBtn" class="btn btn--ghost">Đăng xuất</button>
+      </div>
+    </div>
+
+    <!-- TAB GIỎ MUA HỘ -->
+    <div class="pane" data-pane="cart">
+      <div class="cart-bar">
+        <span id="cartCount" class="cart-count">—</span>
+        <button id="refreshCart" class="btn btn--ghost btn--sm">Tải lại giỏ</button>
+        <button id="resetBadge" class="btn btn--ghost btn--sm">Xoá số đếm</button>
+      </div>
+      <div id="cartList" class="cart-list">
+        <p class="empty">Bấm "Tải lại giỏ" để xem các sản phẩm đã thêm.</p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="ft">
+    Mở trang sản phẩm hoặc trang tìm kiếm 1688 / Taobao → bấm <b>Thêm vào giỏ mua hộ</b>.
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>

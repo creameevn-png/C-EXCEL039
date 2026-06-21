@@ -26,6 +26,7 @@ export const PAGE_META: Record<string, { label: string; subtitle: string; Icon: 
   '/gdv': { label: 'Giao dịch viên', subtitle: 'Mã giao dịch · mã vận đơn', Icon: FiTrendingUp },
   '/ketoan': { label: 'Kế toán', subtitle: 'Xác nhận thanh toán · sổ thu chi', Icon: FiDollarSign },
   '/mua-hang': { label: 'Mua hàng', subtitle: 'Nguồn hàng · nhà cung cấp', Icon: FiShoppingCart },
+  '/gio-mua-ho': { label: 'Giỏ mua hộ', subtitle: 'SP thêm từ extension 1688/Taobao/Tmall', Icon: FiShoppingCart },
   '/khotq': { label: 'Kho Trung Quốc', subtitle: 'Nhận từ NCC · chuyển về VN', Icon: FiPackage },
   '/khovn': { label: 'Kho Việt Nam', subtitle: 'Nhận từ TQ · giao khách', Icon: FiTruck },
   '/customer': { label: 'Khách hàng', subtitle: 'Theo dõi đơn của bạn', Icon: FiUser },
@@ -47,7 +48,7 @@ const ADMIN_MAIN: NavItem[] = [
 
 const ADMIN_OPS: NavItem[] = [
   item('/cskh'), item('/gdv'), item('/ketoan'),
-  item('/mua-hang'), item('/khotq'), item('/khovn')
+  item('/mua-hang'), item('/gio-mua-ho'), item('/khotq'), item('/khovn')
 ];
 
 /** Sidebar groups for a given role. Admin sees everything. */
@@ -70,7 +71,7 @@ export function navForRole(role: VaiTro): NavGroup[] {
     case 'KeToan':
       return [{ items: [item('/ketoan'), item('/bao-cao'), item('/admin/khach-hang'), item('/admin/khieu-nai')] }];
     case 'MuaHang':
-      return [{ items: [item('/mua-hang'), item('/admin/san-pham')] }];
+      return [{ items: [item('/mua-hang'), item('/gio-mua-ho'), item('/admin/san-pham')] }];
     case 'KhoTQ':
       return [{ items: [item('/khotq'), item('/in-tem')] }];
     case 'KhoVN':
@@ -89,7 +90,7 @@ export function pageMetaFor(pathname: string): { label: string; subtitle: string
   for (const k of keys) {
     if (pathname.startsWith(k + '/')) return PAGE_META[k];
   }
-  return { label: 'Cừ EXCEL039', subtitle: '', Icon: FiSearch };
+  return { label: 'Quản Lý Ship Trung Việt', subtitle: '', Icon: FiSearch };
 }
 
 export { FiSearch };

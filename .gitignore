@@ -14,3 +14,11 @@ _demo/
 apps-script/
 version2/
 excel-app/
+
+# Tai lieu kinh doanh (hop dong, bao gia, checklist) - khong day len repo code
+HOP_DONG_NGUYEN_TAC*
+CHECKLIST_LAM_FILE_EXCEL_VBA.md
+_hd*.html
+_hopdong_tmp.html
+# File khoa tam cua Office (~$...)
+~$*

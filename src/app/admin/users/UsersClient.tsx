@@ -117,7 +117,7 @@ export default function UsersClient({ users }: { users: U[] }) {
           <div className="modal-header"><h2><FiUserPlus /> Thêm nhân viên</h2><button className="modal-close" onClick={() => setCreateOpen(false)}><FiX /></button></div>
           <div className="modal-body">
             <div className="form-field"><label className="required">Email</label>
-              <input type="email" value={c.email} onChange={(e) => setC({ ...c, email: e.target.value })} placeholder="nv@cu.vn" /></div>
+              <input type="email" value={c.email} onChange={(e) => setC({ ...c, email: e.target.value })} placeholder="nv@demo.vn" /></div>
             <div className="form-field" style={{ marginTop: 10 }}><label className="required">Mật khẩu</label>
               <input type="text" value={c.password} onChange={(e) => setC({ ...c, password: e.target.value })} /></div>
             <div className="form-field" style={{ marginTop: 10 }}><label className="required">Họ tên</label>

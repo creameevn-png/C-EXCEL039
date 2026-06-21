@@ -66,7 +66,7 @@ export default function InTemClient({ initialMa, initialDon }: { initialMa: stri
             fontFamily: 'monospace', fontSize: 13
           }}>
             <div style={{ textAlign: 'center', borderBottom: '2px solid #000', paddingBottom: 8, marginBottom: 8 }}>
-              <div style={{ fontSize: 18, fontWeight: 800 }}>CỪ EXCEL039</div>
+              <div style={{ fontSize: 18, fontWeight: 800 }}>QUẢN LÝ SHIP TRUNG VIỆT</div>
               <div style={{ fontSize: 11 }}>SHIP TQ → VN</div>
             </div>
 

@@ -106,6 +106,7 @@ model NhanVien {
   ordersCreated DonHang[]    @relation("DonHang_NV")
   walletTxns    GiaoDichVi[]
   payments      ThanhToan[]
+  gioMuaHo      GioMuaHo[]
 
   @@index([email])
   @@map("nhan_vien")
@@ -382,6 +383,37 @@ model YeuCauMua {
   @@index([trangThai])
   @@index([ngayTao(sort: Desc)])
   @@map("yeu_cau_mua")
+}
+
+/// Giỏ "mua hộ" — sản phẩm nhân viên Mua hàng thêm từ extension 1688/Taobao/Tmall.
+model GioMuaHo {
+  id          Int       @id @default(autoincrement())
+  nvId        Int       @map("nv_id")
+  source      String    @default("") // 1688 | taobao | tmall
+  productId   String?   @map("product_id")
+  productUrl  String?   @map("product_url") @db.Text
+  title       String    @db.Text
+  image       String?   @db.Text
+  images      String?   @db.Text // JSON array URL
+  priceText   String?   @map("price_text")
+  priceValue  Float?    @map("price_value")
+  currency    String?   @default("CNY")
+  quantity    Int       @default(1)
+  minQuantity Int       @default(1) @map("min_quantity")
+  sku         String?   @db.Text // JSON array
+  skuText     String?   @map("sku_text") @db.Text
+  note        String?   @db.Text
+  fromListing Boolean   @default(false) @map("from_listing")
+  raw         String?   @db.Text // JSON probe gốc
+  daXuLy      Boolean   @default(false) @map("da_xu_ly") // đã chuyển thành đơn chưa
+  capturedAt  DateTime? @map("captured_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  nhanVien NhanVien @relation(fields: [nvId], references: [id], onDelete: Cascade)
+
+  @@index([nvId, createdAt(sort: Desc)])
+  @@map("gio_mua_ho")
 }
 
 model ChungTu {

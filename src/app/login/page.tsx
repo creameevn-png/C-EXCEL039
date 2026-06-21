@@ -11,7 +11,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     <div className="auth-shell">
       <div className="auth-card">
         <div className="auth-logo"><FiPackage /></div>
-        <h1>{process.env.APP_NAME || 'Cừ EXCEL039'}</h1>
+        <h1>{process.env.APP_NAME || 'Quản Lý Ship Trung Việt'}</h1>
         <p className="subtitle">Đăng nhập hệ thống ERP Ship TQ · VN</p>
         {sp.error === 'blocked' && (
           <div className="login-error"><FiAlertCircle /> Tài khoản đang bị tạm khóa. Liên hệ Admin.</div>

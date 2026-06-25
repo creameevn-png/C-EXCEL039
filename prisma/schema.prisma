@@ -402,6 +402,9 @@ model KhieuNai {
   hoanVi        Boolean      @default(false) @map("hoan_vi")
   daHoanVi      Boolean      @default(false) @map("da_hoan_vi")
   quyChiuPhi    String?      @map("quy_chiu_phi")
+  // Khi quỹ chịu = NCC: tên NCC/shop gánh chi phí + cờ đã cấn trừ vào sổ công nợ NCC.
+  doiTacNCC     String?      @map("doi_tac_ncc")
+  daTruNCC      Boolean      @default(false) @map("da_tru_ncc")
   ghiChuXuLy    String?      @map("ghi_chu_xu_ly") @db.Text
   duyetCap1By   String?      @map("duyet_cap1_by")
   duyetCap1At   DateTime?    @map("duyet_cap1_at")

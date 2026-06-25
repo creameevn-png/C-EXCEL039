@@ -17,6 +17,7 @@ type KN = {
   trangThai: string; phuongAn: string;
   soTienHoan: number;
   phiDoiTra: number; hoanVi: boolean; daHoanVi: boolean; quyChiuPhi: string;
+  doiTacNCC: string; daTruNCC: boolean;
   ghiChuXuLy: string;
 };
 
@@ -30,7 +31,7 @@ const QUY_LABEL: Record<string, string> = {
 
 export default function KnClient({ userVaiTro, list }: { userVaiTro: string; list: KN[] }) {
   const [editing, setEditing] = useState<KN | null>(null);
-  const [patch, setPatch] = useState({ trangThai: 'DangXuLy', phuongAn: '', soTienHoan: 0, phiDoiTra: 0, hoanVi: false, quyChiuPhi: 'QuyKho', ghiChuXuLy: '' });
+  const [patch, setPatch] = useState({ trangThai: 'DangXuLy', phuongAn: '', soTienHoan: 0, phiDoiTra: 0, hoanVi: false, quyChiuPhi: 'QuyKho', doiTacNCC: '', ghiChuXuLy: '' });
   const [busy, setBusy] = useState(false);
   const [q, setQ] = useState('');
   const [statusF, setStatusF] = useState('');
@@ -50,6 +51,7 @@ export default function KnClient({ userVaiTro, list }: { userVaiTro: string; lis
       trangThai: k.trangThai, phuongAn: k.phuongAn || 'HoanTien',
       soTienHoan: k.soTienHoan || 0, phiDoiTra: k.phiDoiTra || 0,
       hoanVi: !!k.hoanVi, quyChiuPhi: k.quyChiuPhi || 'QuyKho',
+      doiTacNCC: k.doiTacNCC || '',
       ghiChuXuLy: k.ghiChuXuLy || ''
     });
   }
@@ -78,9 +80,13 @@ export default function KnClient({ userVaiTro, list }: { userVaiTro: string; lis
     const r = await callServer('duyetKhieuNaiCap2', editing.maKN, accepted, patch.ghiChuXuLy);
     setBusy(false);
     if (r?.success) {
-      const msg = accepted
-        ? (r.hoanVi > 0 ? `Đã duyệt + hoàn ${formatCurrency(r.hoanVi)}đ vào ví KH` : 'Đã duyệt cấp 2 - hoàn tất')
-        : 'Đã từ chối';
+      let msg = accepted ? 'Đã duyệt cấp 2 - hoàn tất' : 'Đã từ chối';
+      if (accepted) {
+        const parts: string[] = [];
+        if (r.hoanVi > 0) parts.push(`hoàn ${formatCurrency(r.hoanVi)}đ vào ví KH`);
+        if (r.truNCC > 0) parts.push(`cấn trừ ${formatCurrency(r.truNCC)}đ công nợ NCC`);
+        if (parts.length) msg = 'Đã duyệt + ' + parts.join(' + ');
+      }
       showToast(msg, accepted ? 'success' : 'info');
       setEditing(null); reload();
     } else showToast(r?.message || 'Lỗi', 'error');
@@ -179,6 +185,15 @@ export default function KnClient({ userVaiTro, list }: { userVaiTro: string; lis
                     <select value={patch.quyChiuPhi} onChange={(e) => setPatch({ ...patch, quyChiuPhi: e.target.value })}>
                       {Object.keys(QUY_LABEL).map((k) => <option key={k} value={k}>{QUY_LABEL[k]}</option>)}
                     </select>
+                    {patch.quyChiuPhi === 'NCC' && (
+                      <>
+                        <input style={{ marginTop: 6 }} value={patch.doiTacNCC} onChange={(e) => setPatch({ ...patch, doiTacNCC: e.target.value })} placeholder="Tên NCC/shop chịu (để cấn trừ công nợ)" />
+                        <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+                          → Khi duyệt sẽ tự cấn trừ <b>{formatCurrency((patch.soTienHoan || 0) + (patch.phiDoiTra || 0))}đ</b> vào công nợ NCC «{patch.doiTacNCC || '…'}».
+                        </div>
+                        {editing.daTruNCC && <div style={{ fontSize: 11, marginTop: 4, color: 'var(--success-dark)' }}>✓ Đã cấn trừ công nợ NCC.</div>}
+                      </>
+                    )}
                   </div>
                   <div className="form-field">
                     <label className="icon-inline" style={{ cursor: 'pointer' }}>

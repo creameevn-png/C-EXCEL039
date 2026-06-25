@@ -8,4 +8,6 @@ ALTER TABLE `khieu_nai`
   ADD COLUMN `phi_doi_tra`  DOUBLE       NOT NULL DEFAULT 0      AFTER `so_tien_hoan`,
   ADD COLUMN `hoan_vi`      TINYINT(1)   NOT NULL DEFAULT 0      AFTER `phi_doi_tra`,
   ADD COLUMN `da_hoan_vi`   TINYINT(1)   NOT NULL DEFAULT 0      AFTER `hoan_vi`,
-  ADD COLUMN `quy_chiu_phi` VARCHAR(191) NULL                   AFTER `da_hoan_vi`;
+  ADD COLUMN `quy_chiu_phi` VARCHAR(191) NULL                   AFTER `da_hoan_vi`,
+  ADD COLUMN `doi_tac_ncc`  VARCHAR(191) NULL                   AFTER `quy_chiu_phi`,
+  ADD COLUMN `da_tru_ncc`   TINYINT(1)   NOT NULL DEFAULT 0      AFTER `doi_tac_ncc`;

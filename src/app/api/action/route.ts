@@ -680,6 +680,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (patch?.phiDoiTra !== undefined) data.phiDoiTra = Number(patch.phiDoiTra) || 0;
     if (patch?.hoanVi !== undefined) data.hoanVi = !!patch.hoanVi;
     if (patch?.quyChiuPhi !== undefined) data.quyChiuPhi = patch.quyChiuPhi || null;
+    if (patch?.doiTacNCC !== undefined) data.doiTacNCC = patch.doiTacNCC || null;
     if (patch?.ghiChuXuLy !== undefined) data.ghiChuXuLy = patch.ghiChuXuLy;
     await prisma.khieuNai.update({ where: { maKN }, data });
     await logActivity(user.email, 'UPDATE_KHIEU_NAI', maKN, patch);
@@ -739,8 +740,30 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         hoanVi = kn.soTienHoan;
       }
     }
-    await logActivity(user.email, 'DUYET_KN_CAP2', maKN, { accepted, hoanVi, quy: kn.quyChiuPhi });
-    return ok({ hoanVi });
+
+    // Quỹ chịu = NCC → tự cấn trừ khoản bồi thường (tiền hoàn + phí đổi trả) vào
+    // sổ công nợ NCC (giảm nợ phải trả NCC = đòi lại NCC). Idempotent qua daTruNCC.
+    let truNCC = 0;
+    if (accepted && kn.quyChiuPhi === 'NCC' && kn.doiTacNCC && !kn.daTruNCC) {
+      const boiThuong = (kn.soTienHoan || 0) + (kn.phiDoiTra || 0);
+      if (boiThuong > 0) {
+        await prisma.$transaction([
+          prisma.congNoNCC.create({
+            data: {
+              doiTac: kn.doiTacNCC, maDH: kn.maDH || null, loai: 'ThanhToan',
+              soTien: boiThuong,
+              ghiChu: `NCC bồi thường khiếu nại ${maKN} (cấn trừ công nợ)`,
+              nguoiTao: user.email
+            }
+          }),
+          prisma.khieuNai.update({ where: { maKN }, data: { daTruNCC: true } })
+        ]);
+        truNCC = boiThuong;
+      }
+    }
+
+    await logActivity(user.email, 'DUYET_KN_CAP2', maKN, { accepted, hoanVi, quy: kn.quyChiuPhi, truNCC });
+    return ok({ hoanVi, truNCC });
   },
 
   // ============== YEU CAU MUA (public) ==============

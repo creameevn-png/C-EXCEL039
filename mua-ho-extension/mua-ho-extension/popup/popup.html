@@ -26,8 +26,12 @@
     <div class="pane pane--on" data-pane="setup">
       <section class="card">
         <label class="lbl" for="apiBase">Địa chỉ API hệ thống mua hộ</label>
-        <input id="apiBase" class="inp" type="url" placeholder="https://api.muaho-cua-ban.com" autocomplete="off">
-        <p class="hint">Không có dấu "/" ở cuối. Nhớ thêm domain này vào <code>host_permissions</code>.</p>
+        <input id="apiBase" class="inp" type="url" placeholder="https://cuexcel.vercel.app/api/ext" autocomplete="off">
+        <div class="quickfill">
+          <button type="button" class="btn btn--ghost btn--sm" data-base="https://cuexcel.vercel.app/api/ext">Dùng bản chạy thật</button>
+          <button type="button" class="btn btn--ghost btn--sm" data-base="http://localhost:3000/api/ext">Local (test)</button>
+        </div>
+        <p class="hint">Phải kết thúc bằng <code>/api/ext</code>, không có dấu "/" ở cuối.</p>
       </section>
 
       <section class="card">

@@ -41,6 +41,15 @@ function saveApiBase() {
 }
 els.apiBase.addEventListener("change", saveApiBase);
 
+/* ---- Nút điền nhanh địa chỉ API (bản thật / local) ---- */
+document.querySelectorAll(".quickfill [data-base]").forEach((b) => {
+  b.addEventListener("click", () => {
+    els.apiBase.value = b.dataset.base;
+    saveApiBase();
+    showStatus("Đã đặt địa chỉ API: " + b.dataset.base, true);
+  });
+});
+
 els.loginBtn.addEventListener("click", async () => {
   await saveApiBase();
   const username = els.username.value.trim();

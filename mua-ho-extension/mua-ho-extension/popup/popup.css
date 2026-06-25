@@ -22,6 +22,7 @@ body { width: 348px; margin: 0; font: 14px/1.5 -apple-system, "Segoe UI", system
 .hint code { background: #f3ede4; padding: 1px 5px; border-radius: 4px; }
 .btn { width: 100%; margin-top: 10px; padding: 10px; border-radius: 9px; font: 600 14px inherit; cursor: pointer; border: 1px solid transparent; }
 .btn--sm { width: auto; margin-top: 0; padding: 7px 12px; font-size: 12px; }
+.quickfill { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 .btn--primary { background: #f0512b; color: #fff; }
 .btn--primary:hover { background: #d8431f; }
 .btn--ghost { background: #fff; border-color: #e7ded3; color: #4a443d; }

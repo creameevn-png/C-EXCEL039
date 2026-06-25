@@ -49,11 +49,16 @@ type OrderDetail = {
   daTra: number;
   conLai: number;
   ghiChu: string;
+  canSeeProfit?: boolean;
+  vonNDT?: number;
+  shipNDTQ?: number;
+  tongThuNDT?: number;
+  loiNhuanNDT?: number;
   anh: { khoTQ?: string; roiTQ?: string; khoVN?: string; giaoKH?: string };
   payments: Payment[];
 };
 
-export default function OrderDetailModalHost({ canSeeMoney }: { canSeeMoney: boolean }) {
+export default function OrderDetailModalHost({ canSeeMoney, canSeeProfit = false }: { canSeeMoney: boolean; canSeeProfit?: boolean }) {
   const [data, setData] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -159,6 +164,18 @@ export default function OrderDetailModalHost({ canSeeMoney }: { canSeeMoney: boo
                   <div className="fee-row"><span>Đã trả</span><span className="fee-value" style={{ color: '#059669' }}>{fmtVND(data.daTra)}đ</span></div>
                   <div className="fee-row"><span><b>Còn lại</b></span>
                     <span className="fee-value" style={{ color: data.conLai > 0 ? '#DC2626' : '#059669' }}>{fmtVND(data.conLai)}đ</span>
+                  </div>
+                </div>
+              )}
+
+              {canSeeProfit && (
+                <div className="fee-summary" style={{ marginTop: 12 }}>
+                  <div className="fee-row"><span>Tệ khách trả trên đơn</span><span className="fee-value">{(data.tongThuNDT || 0).toLocaleString('zh-CN')}¥</span></div>
+                  <div className="fee-row"><span>Tệ MUA thực tế (giá vốn)</span><span className="fee-value">{(data.vonNDT || 0).toLocaleString('zh-CN')}¥</span></div>
+                  <div className="fee-row"><span>Ship nội địa TQ</span><span className="fee-value">{(data.shipNDTQ || 0).toLocaleString('zh-CN')}¥</span></div>
+                  <div className="fee-row" style={{ borderTop: '1px solid #CBD5E1' }}>
+                    <span><b>Lợi nhuận GDV (tệ)</b></span>
+                    <span className="fee-value" style={{ color: (data.loiNhuanNDT || 0) >= 0 ? '#059669' : '#DC2626' }}>{(data.loiNhuanNDT || 0).toLocaleString('zh-CN')}¥</span>
                   </div>
                 </div>
               )}

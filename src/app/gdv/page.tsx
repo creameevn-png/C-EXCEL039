@@ -9,7 +9,7 @@ export default async function GdvPage() {
   const [pending, khieuNai] = await Promise.all([
     prisma.donHang.findMany({
       where: { trangThai: { in: ['DatCoc', 'DaMuaHang'] } },
-      include: { khachHang: true, chiTiet: { take: 3, orderBy: { stt: 'asc' } } },
+      include: { khachHang: true, chiTiet: { orderBy: { stt: 'asc' } } },
       orderBy: { ngayTao: 'desc' }
     }),
     prisma.khieuNai.findMany({
@@ -26,8 +26,10 @@ export default async function GdvPage() {
       web: o.chiTiet[0]?.webNguon || '',
       tongKg: o.tongKg, tuyen: o.tuyen,
       tongTien: o.tongTien, daTra: o.daTra,
-      tenHang: o.chiTiet.map((c) => `${c.tenSP} (x${c.soLuong})`).join(' · '),
-      maGD: o.maGD || '', maVD: o.maVD || '', trangThai: o.trangThai
+      tenHang: o.chiTiet.slice(0, 3).map((c) => `${c.tenSP} (x${c.soLuong})`).join(' · '),
+      maGD: o.maGD || '', maVD: o.maVD || '', trangThai: o.trangThai,
+      vonNDT: o.vonNDT, shipNDTQ: o.shipNDTQ, loiNhuanNDT: o.loiNhuanNDT,
+      tongThuNDT: o.chiTiet.reduce((s, c) => s + c.donGiaNDT * c.soLuong, 0)
     }))}
     khieuNai={khieuNai.map((k) => ({
       maKN: k.maKN, ngayTao: k.ngayTao.toISOString(), maDH: k.maDH || '', maKH: k.maKH || '',

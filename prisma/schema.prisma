@@ -174,8 +174,13 @@ model DonHang {
   nvId        Int?         @map("nv_id")
   tuyen       Tuyen        @default(HaNoi)
 
-  maGD        String?      @map("ma_gd")
-  maVD        String?      @map("ma_vd")
+  maGD        String?      @map("ma_gd") @db.Text
+  maVD        String?      @map("ma_vd") @db.Text
+
+  // Đợt 2 — giá vốn GDV (đơn vị: tệ NDT). lợi nhuận = tệ khách trả − (vốn mua + ship nội địa TQ)
+  vonNDT      Float        @default(0) @map("von_ndt")
+  shipNDTQ    Float        @default(0) @map("ship_nd_tq")
+  loiNhuanNDT Float        @default(0) @map("loi_nhuan_ndt")
 
   tongKg      Float        @default(0) @map("tong_kg")
   tongM3      Float        @default(0) @map("tong_m3")

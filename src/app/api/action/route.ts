@@ -277,6 +277,23 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     return ok();
   },
 
+  // GDV nhập giá vốn thực mua (tệ) + ship nội địa TQ → tự tính lợi nhuận GDV.
+  async updateVonGDV(args, user) {
+    if (!allow(user.vaiTro, ['GDV', 'KeToan'])) return err('Không có quyền');
+    const [maDH, patch] = args;
+    if (!maDH) return err('Thiếu mã đơn');
+    const o = await prisma.donHang.findUnique({ where: { maDH }, include: { chiTiet: true } });
+    if (!o) return err('Đơn không tồn tại');
+    const vonNDT = Math.max(0, Number(patch?.vonNDT) || 0);
+    const shipNDTQ = Math.max(0, Number(patch?.shipNDTQ) || 0);
+    // Tệ khách trả trên đơn = Σ(đơn giá NDT × số lượng) của các dòng hàng.
+    const tongThuNDT = o.chiTiet.reduce((s, c) => s + c.donGiaNDT * c.soLuong, 0);
+    const loiNhuanNDT = tongThuNDT - (vonNDT + shipNDTQ);
+    await prisma.donHang.update({ where: { maDH }, data: { vonNDT, shipNDTQ, loiNhuanNDT } });
+    await logActivity(user.email, 'UPDATE_VON_GDV', maDH, { vonNDT, shipNDTQ, loiNhuanNDT });
+    return ok({ vonNDT, shipNDTQ, tongThuNDT, loiNhuanNDT });
+  },
+
   // ============== KE TOAN ==============
   async confirmPayment(args, user) {
     if (!allow(user.vaiTro, ['KeToan'])) return err('Không có quyền');
@@ -555,6 +572,9 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     });
     if (!o) return err('Đơn không tồn tại');
     const canSeeMoney = ['Admin', 'CSKH', 'KeToan', 'Customer'].includes(user?.vaiTro || 'Customer');
+    // Giá vốn & lợi nhuận: CHỈ Admin / Kế toán / GDV được xem (CSKH không thấy).
+    const canSeeProfit = ['Admin', 'KeToan', 'GDV'].includes(user?.vaiTro || '');
+    const tongThuNDT = o.chiTiet.reduce((s, c) => s + c.donGiaNDT * c.soLuong, 0);
     return ok({
       data: {
         maDH: o.maDH,
@@ -596,6 +616,11 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         daTra: canSeeMoney ? o.daTra : 0,
         conLai: canSeeMoney ? o.conLai : 0,
         ghiChu: o.ghiChu || '',
+        canSeeProfit,
+        vonNDT: canSeeProfit ? o.vonNDT : 0,
+        shipNDTQ: canSeeProfit ? o.shipNDTQ : 0,
+        tongThuNDT: canSeeProfit ? tongThuNDT : 0,
+        loiNhuanNDT: canSeeProfit ? o.loiNhuanNDT : 0,
         anh: {
           khoTQ: o.anhKhoTQ || undefined,
           roiTQ: o.anhRoiTQ || undefined,

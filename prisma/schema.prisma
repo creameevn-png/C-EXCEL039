@@ -205,6 +205,9 @@ model DonHang {
 
   // Đợt 4 — kho TQ: người phụ trách nhận (2 NV kho)
   nguoiPhuTrachTQ String?  @map("nguoi_phu_trach_tq")
+
+  // Đợt 5 — đơn thuộc bao tổng nào (gộp nhiều đơn → 1 bao chuyển về VN)
+  maBao       String?      @map("ma_bao")
   tongTien    Float        @default(0) @map("tong_tien")
   tienCoc     Float        @default(0) @map("tien_coc")
   daTra       Float        @default(0) @map("da_tra")
@@ -260,6 +263,26 @@ model ChiTietDon {
 
   @@index([maDH, stt])
   @@map("chi_tiet_don")
+}
+
+/// Đợt 5 — bao tổng (lô/chuyến): gộp nhiều đơn theo line, đóng 1 mã bao, xuất về VN.
+model BaoTong {
+  id          Int       @id @default(autoincrement())
+  maBao       String    @unique @map("ma_bao")
+  line        LineVC    @default(LineThuong)
+  trangThai   String    @default("DangDong") @map("trang_thai") // DangDong | DaXuat | DaVeVN | HoanThanh
+  tongKg      Float     @default(0) @map("tong_kg")
+  tongM3      Float     @default(0) @map("tong_m3")
+  soKien      Int       @default(0) @map("so_kien")
+  ghiChu      String?   @map("ghi_chu") @db.Text
+  nguoiTao    String?   @map("nguoi_tao")
+  nguoiNhanVN String?   @map("nguoi_nhan_vn")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  xuatAt      DateTime? @map("xuat_at")
+  veVNAt      DateTime? @map("ve_vn_at")
+
+  @@index([trangThai, createdAt(sort: Desc)])
+  @@map("bao_tong")
 }
 
 /// Đợt 4 — hàng "vô chủ": mã VĐ về kho TQ nhưng chưa khớp đơn nào; khi tìm ra đơn sẽ gán vào.

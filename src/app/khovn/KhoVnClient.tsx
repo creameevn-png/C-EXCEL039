@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import {
   FiInfo, FiTruck, FiPackage, FiCheckCircle, FiDownload, FiClock, FiCheck, FiAlertCircle, FiTarget,
-  FiEdit2, FiX
+  FiEdit2, FiX, FiBox, FiMapPin, FiSave
 } from 'react-icons/fi';
 import type { SessionUser } from '@/lib/auth';
 import AppShell from '@/components/AppShell';
@@ -17,12 +17,18 @@ import { fmtVND } from '@/lib/format';
 type WeighLine = { stt: number; tenSP: string; soLuong: number; kg: string; m3: string };
 
 type Row = {
-  maDH: string; maVD: string; tenKH: string;
-  tenHang: string; tuyen: string; conLai: number;
+  maDH: string; maVD: string; maBao: string; tenKH: string;
+  tenHang: string; tuyen: string; conLai: number; shipND: number;
+  diaChiNhan: string; nguoiNhan: string; sdtNhan: string;
 };
+type Bao = {
+  maBao: string; line: string; trangThai: string;
+  tongKg: number; tongM3: number; soKien: number; daNhan: number; tong: number;
+};
+const LINE_LABEL: Record<string, string> = { LineNhanh: 'Nhanh', LineThuong: 'Thường', LineRe: 'Tiết kiệm' };
 
-export default function KhoVnClient({ user, incomingShipments, atWarehouse, readyToDeliver }:
-  { user: SessionUser; incomingShipments: Row[]; atWarehouse: Row[]; readyToDeliver: Row[] }) {
+export default function KhoVnClient({ user, incomingShipments, atWarehouse, readyToDeliver, baos }:
+  { user: SessionUser; incomingShipments: Row[]; atWarehouse: Row[]; readyToDeliver: Row[]; baos: Bao[] }) {
 
   const [weighMaDH, setWeighMaDH] = useState<string | null>(null);
   const [weighLines, setWeighLines] = useState<WeighLine[]>([]);
@@ -65,6 +71,52 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
     });
   }
 
+  // Đợt 5 — nhận cả bao + ship nội địa VN
+  const [baoInput, setBaoInput] = useState('');
+  const [shipInputs, setShipInputs] = useState<Record<string, string>>({});
+
+  async function receiveBao(maBao: string) {
+    const ma = (maBao || baoInput).trim();
+    if (!ma) return showToast('Nhập/quét mã bao', 'error');
+    const r = await callServer('receiveBaoAtVN', ma);
+    if (r?.success) {
+      const warn = r.conChua > 0 ? ` ⚠ còn ${r.conChua} đơn chưa về` : '';
+      showToast(`Nhận bao ${ma}: ${r.received}/${r.total} đơn${warn}`, r.conChua > 0 ? 'error' : 'success');
+      reload();
+    } else showToast(r?.message || 'Lỗi', 'error');
+  }
+
+  async function saveShipVN(maDH: string) {
+    const v = parseFloat(shipInputs[maDH] || '0') || 0;
+    const r = await callServer('updateShipVN', maDH, v);
+    if (r?.success) { showToast('Đã cập nhật ship nội địa VN', 'success'); reload(); }
+    else showToast(r?.message || 'Lỗi', 'error');
+  }
+
+  function ShipVN({ o }: { o: Row }) {
+    return (
+      <div className="form-grid" style={{ marginTop: 8 }}>
+        <div className="form-field">
+          <label>Ship nội địa VN (VNĐ)</label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input type="number" defaultValue={o.shipND || ''} placeholder="phí giao VN"
+              onChange={(e) => setShipInputs((p) => ({ ...p, [o.maDH]: e.target.value }))} />
+            <button className="btn btn-secondary btn-sm" onClick={() => saveShipVN(o.maDH)}><FiSave /></button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function DiaChi({ o }: { o: Row }) {
+    if (!o.diaChiNhan && !o.nguoiNhan) return null;
+    return (
+      <div className="icon-inline" style={{ background: '#ECFDF5', padding: 8, borderRadius: 6, marginTop: 8, fontSize: 12, color: '#065F46' }}>
+        <FiMapPin /> Giao: <b>{o.nguoiNhan || o.tenKH}</b>{o.sdtNhan ? ` · ${o.sdtNhan}` : ''}{o.diaChiNhan ? ` · ${o.diaChiNhan}` : ''}
+      </div>
+    );
+  }
+
   const tabIncoming = (
     <div className="form-section">
       <div className="section-title"><FiDownload /> Hàng từ TQ đang về kho VN</div>
@@ -80,7 +132,10 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
             Đơn: <b style={{ cursor: 'pointer', textDecoration: 'underline', color: '#1E3A8A' }}
                     onClick={() => (window as any).openOrderDetail?.(o.maDH)}>{o.maDH}</b> ·
             KH: {o.tenKH} · {o.tenHang} · Tuyến: <b>{o.tuyen === 'HCM' ? 'HCM' : 'Hà Nội'}</b>
+            {o.maBao && <> · Bao: <b>{o.maBao}</b></>}
           </div>
+          <DiaChi o={o} />
+          <ShipVN o={o} />
           <div className="ac-actions">
             <button className="btn btn-success" onClick={() => confirmKhoVN(o.maDH)}>
               <FiCheck /> Xác nhận đã nhận tại VN
@@ -133,6 +188,7 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
             <span className="status-badge s-vn">Sẵn sàng giao</span>
           </div>
           <div className="ac-meta">KH: <b>{o.tenKH}</b> · {o.tenHang} · Tuyến: <b>{o.tuyen === 'HCM' ? 'HCM' : 'Hà Nội'}</b></div>
+          <DiaChi o={o} />
           {o.conLai > 0.5 && (
             <div className="icon-inline" style={{ background: '#FEE2E2', padding: 8, borderRadius: 6, marginTop: 8, fontSize: 12, color: '#991B1B' }}>
               <FiAlertCircle /> Còn nợ {fmtVND(o.conLai)}đ — không thể giao đến khi thanh toán đủ
@@ -145,6 +201,45 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
           </div>
         </div>
       ))}
+    </div>
+  );
+
+  const tabBao = (
+    <div className="form-section">
+      <div className="section-title"><FiBox /> Nhận bao tổng — quét mã bao để nhận cả lô</div>
+      <div className="action-card">
+        <div className="form-grid" style={{ marginTop: 4 }}>
+          <div className="form-field"><label>Quét / nhập mã bao</label>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input value={baoInput} onChange={(e) => setBaoInput(e.target.value)} placeholder="BAO0001" />
+              <button className="btn btn-success" onClick={() => receiveBao('')}><FiCheck /> Nhận bao</button>
+            </div>
+          </div>
+        </div>
+        <div className="hint">Nhận bao sẽ xác nhận tất cả đơn trong bao đã về VN. Nếu còn đơn chưa về sẽ cảnh báo.</div>
+      </div>
+
+      {baos.length === 0 ? <div className="empty-state"><FiBox /><p>Không có bao nào đang về.</p></div> :
+        baos.map((b) => {
+          const thieu = b.tong - b.daNhan;
+          return (
+            <div key={b.maBao} className="action-card">
+              <div className="ac-header">
+                <div className="ac-title"><FiBox /> {b.maBao} · Line {LINE_LABEL[b.line] || b.line}</div>
+                <span className={`status-badge ${thieu > 0 ? 's-waiting' : 's-vn'}`}>{b.trangThai === 'DaVeVN' ? 'Đang nhận' : 'Đã xuất'}</span>
+              </div>
+              <div className="ac-meta">{b.soKien} kiện · {b.tongKg}kg · {b.tongM3}m³ · Đã nhận: <b>{b.daNhan}/{b.tong}</b></div>
+              {thieu > 0 && (
+                <div className="icon-inline" style={{ background: '#FEF3C7', padding: 8, borderRadius: 6, marginTop: 8, fontSize: 12, color: '#92400E' }}>
+                  <FiAlertCircle /> Còn <b>{thieu}</b> đơn trong bao chưa về VN — bao chưa hoàn thành.
+                </div>
+              )}
+              <div className="ac-actions">
+                <button className="btn btn-success" onClick={() => receiveBao(b.maBao)}><FiCheck /> Xác nhận nhận bao này</button>
+              </div>
+            </div>
+          );
+        })}
     </div>
   );
 
@@ -174,6 +269,7 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
       </div>
 
       <Tabs tabs={[
+        { id: 'tab-bao', label: <><FiBox /> Nhận bao ({baos.length})</>, content: tabBao },
         { id: 'tab-incoming', label: <><FiDownload /> Đang về VN ({incomingShipments.length})</>, content: tabIncoming },
         { id: 'tab-at-vn', label: <><FiPackage /> Tại VN - chờ TT ({atWarehouse.length})</>, content: tabAtVN },
         { id: 'tab-ready', label: <><FiTruck /> Sẵn sàng giao ({readyToDeliver.length})</>, content: tabReady }

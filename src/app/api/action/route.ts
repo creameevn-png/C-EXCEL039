@@ -66,6 +66,16 @@ async function recomputeDonHang(maDH: string) {
   });
 }
 
+async function recomputeBao(maBao: string) {
+  const orders = await prisma.donHang.findMany({ where: { maBao } });
+  const tongKg = orders.reduce((s, o) => s + o.tongKg, 0);
+  const tongM3 = orders.reduce((s, o) => s + o.tongM3, 0);
+  await prisma.baoTong.update({
+    where: { maBao },
+    data: { tongKg, tongM3, soKien: orders.length }
+  });
+}
+
 const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnType<typeof getSession>>>) => Promise<Resp>> = {
   // ============== CSKH ==============
   async createOrder(args, user) {
@@ -447,6 +457,100 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       data: { tongDon: { increment: 1 }, doanhThu: { increment: o.tongTien } }
     });
     await logActivity(user.email, 'DELIVERED', maDH);
+    return ok();
+  },
+
+  // ============== BAO TONG / LO-CHUYEN (Đợt 5) ==============
+  async createBaoTong(args, user) {
+    if (!allow(user.vaiTro, ['KhoTQ'])) return err('Không có quyền');
+    const d = args[0] || {};
+    const n = await prisma.baoTong.count();
+    const maBao = 'BAO' + String(n + 1).padStart(4, '0');
+    await prisma.baoTong.create({
+      data: { maBao, line: (d.line as LineVC) || 'LineThuong', ghiChu: d.ghiChu || null, nguoiTao: user.hoTen || user.email }
+    });
+    await logActivity(user.email, 'CREATE_BAO', maBao, { line: d.line });
+    return ok({ maBao });
+  },
+
+  async addOrderToBao(args, user) {
+    if (!allow(user.vaiTro, ['KhoTQ'])) return err('Không có quyền');
+    const [maBao, maDH] = args;
+    if (!maBao || !maDH) return err('Thiếu mã bao hoặc mã đơn');
+    const bao = await prisma.baoTong.findUnique({ where: { maBao } });
+    if (!bao) return err('Bao không tồn tại');
+    if (bao.trangThai !== 'DangDong') return err('Bao đã xuất, không thêm đơn được');
+    const o = await prisma.donHang.findUnique({ where: { maDH: String(maDH).trim() } });
+    if (!o) return err('Đơn không tồn tại: ' + maDH);
+    if (o.trangThai !== 'KhoTqNhan') return err('Chỉ gán được đơn đang ở "Kho TQ nhận"');
+    await prisma.donHang.update({ where: { maDH: o.maDH }, data: { maBao } });
+    await recomputeBao(maBao);
+    await logActivity(user.email, 'ADD_TO_BAO', maBao, { maDH: o.maDH });
+    return ok();
+  },
+
+  async removeOrderFromBao(args, user) {
+    if (!allow(user.vaiTro, ['KhoTQ'])) return err('Không có quyền');
+    const [maDH] = args;
+    const o = await prisma.donHang.findUnique({ where: { maDH } });
+    if (!o || !o.maBao) return err('Đơn không thuộc bao nào');
+    const maBao = o.maBao;
+    await prisma.donHang.update({ where: { maDH }, data: { maBao: null } });
+    await recomputeBao(maBao);
+    await logActivity(user.email, 'REMOVE_FROM_BAO', maBao, { maDH });
+    return ok();
+  },
+
+  async xuatBao(args, user) {
+    if (!allow(user.vaiTro, ['KhoTQ'])) return err('Không có quyền');
+    const [maBao] = args;
+    const bao = await prisma.baoTong.findUnique({ where: { maBao } });
+    if (!bao) return err('Bao không tồn tại');
+    if (bao.trangThai !== 'DangDong') return err('Bao đã xuất rồi');
+    const orders = await prisma.donHang.findMany({ where: { maBao, trangThai: 'KhoTqNhan' } });
+    if (orders.length === 0) return err('Bao chưa có đơn nào ở kho TQ để xuất');
+    await prisma.$transaction([
+      prisma.donHang.updateMany({ where: { maBao, trangThai: 'KhoTqNhan' }, data: { trangThai: 'DangVanChuyen' } }),
+      prisma.baoTong.update({ where: { maBao }, data: { trangThai: 'DaXuat', xuatAt: new Date() } }),
+    ]);
+    await logActivity(user.email, 'XUAT_BAO', maBao, { soDon: orders.length });
+    return ok({ soDon: orders.length });
+  },
+
+  // Kho VN nhận cả bao: xác nhận từng đơn trong bao đã về; cảnh báo nếu còn đơn chưa về.
+  async receiveBaoAtVN(args, user) {
+    if (!allow(user.vaiTro, ['KhoVN'])) return err('Không có quyền');
+    const [maBao] = args;
+    const bao = await prisma.baoTong.findUnique({ where: { maBao } });
+    if (!bao) return err('Bao không tồn tại: ' + maBao);
+    if (!['DaXuat', 'DaVeVN'].includes(bao.trangThai)) return err('Bao chưa xuất từ TQ');
+    const orders = await prisma.donHang.findMany({ where: { maBao } });
+    let received = 0;
+    for (const o of orders) {
+      if (o.trangThai === 'DangVanChuyen') {
+        const next: TrangThaiDon = o.conLai <= 0.5 ? 'KhoVnNhan' : 'ChoThanhToan';
+        await prisma.donHang.update({ where: { maDH: o.maDH }, data: { trangThai: next } });
+        received++;
+      }
+    }
+    const conChua = orders.filter((o) => o.trangThai === 'DangVanChuyen').length - received;
+    const allIn = orders.every((o) => o.trangThai !== 'DangVanChuyen') ;
+    await prisma.baoTong.update({
+      where: { maBao },
+      data: { trangThai: allIn ? 'HoanThanh' : 'DaVeVN', veVNAt: new Date(), nguoiNhanVN: user.hoTen || user.email }
+    });
+    await logActivity(user.email, 'NHAN_BAO_VN', maBao, { received });
+    return ok({ received, total: orders.length, conChua: Math.max(0, conChua) });
+  },
+
+  async updateShipVN(args, user) {
+    if (!allow(user.vaiTro, ['KhoVN', 'CSKH'])) return err('Không có quyền');
+    const [maDH, shipVN] = args;
+    const o = await prisma.donHang.findUnique({ where: { maDH } });
+    if (!o) return err('Đơn không tồn tại');
+    await prisma.donHang.update({ where: { maDH }, data: { shipND: Math.max(0, Number(shipVN) || 0) } });
+    await recomputeDonHang(maDH);
+    await logActivity(user.email, 'UPDATE_SHIP_VN', maDH, { shipVN });
     return ok();
   },
 

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import {
   FiInfo, FiClock, FiPackage, FiTruck, FiCheckCircle, FiDownload, FiCheck, FiLock,
-  FiAlertTriangle, FiPlus, FiLink, FiTrash2, FiHelpCircle
+  FiAlertTriangle, FiPlus, FiLink, FiTrash2, FiHelpCircle, FiBox, FiSend
 } from 'react-icons/fi';
 import type { SessionUser } from '@/lib/auth';
 import AppShell from '@/components/AppShell';
@@ -17,15 +17,20 @@ type Line = { stt: number; tenSP: string; soLuong: number; kiemKe: string; kiemK
 type Row = {
   maDH: string; maVD: string; tenHang: string;
   kg: number; m3: number; web: string; tuyen: string;
-  kiemDem: boolean; dongGo: boolean; nguoiPhuTrachTQ: string; lines: Line[];
+  kiemDem: boolean; dongGo: boolean; nguoiPhuTrachTQ: string; maBao: string; lines: Line[];
 };
 type VoChu = {
   id: number; maVD: string; kg: number; dai: number; rong: number; cao: number; m3: number;
   ghiChu: string; nguoiNhap: string; createdAt: string;
 };
+type Bao = {
+  maBao: string; line: string; trangThai: string;
+  tongKg: number; tongM3: number; soKien: number; orders: string[];
+};
+const LINE_LABEL: Record<string, string> = { LineNhanh: 'Nhanh', LineThuong: 'Thường', LineRe: 'Tiết kiệm' };
 
-export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu }:
-  { user: SessionUser; pendingArrivals: Row[]; atWarehouse: Row[]; voChu: VoChu[] }) {
+export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu, baos }:
+  { user: SessionUser; pendingArrivals: Row[]; atWarehouse: Row[]; voChu: VoChu[]; baos: Bao[] }) {
 
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [keNote, setKeNote] = useState<Record<string, string>>({});
@@ -87,6 +92,32 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu 
     if (!confirm('Xoá kiện hàng vô chủ này?')) return;
     const r = await callServer('deleteHangVoChu', id);
     if (r?.success) { showToast('Đã xoá', 'success'); reload(); }
+    else showToast(r?.message || 'Lỗi', 'error');
+  }
+
+  // ===== Bao tổng =====
+  const [baoLine, setBaoLine] = useState('LineThuong');
+  const [baoGhiChu, setBaoGhiChu] = useState('');
+  const [addBaoInput, setAddBaoInput] = useState<Record<string, string>>({});
+
+  async function createBao() {
+    setBusy((p) => ({ ...p, bao: true }));
+    const r = await callServer('createBaoTong', { line: baoLine, ghiChu: baoGhiChu });
+    setBusy((p) => ({ ...p, bao: false }));
+    if (r?.success) { showToast(`Đã tạo bao ${r.maBao}`, 'success'); reload(); }
+    else showToast(r?.message || 'Lỗi', 'error');
+  }
+  async function addToBao(maBao: string) {
+    const maDH = (addBaoInput[maBao] || '').trim();
+    if (!maDH) return showToast('Nhập/quét mã đơn để gán', 'error');
+    const r = await callServer('addOrderToBao', maBao, maDH);
+    if (r?.success) { showToast(`Đã gán ${maDH} vào ${maBao}`, 'success'); reload(); }
+    else showToast(r?.message || 'Lỗi', 'error');
+  }
+  async function xuatBao(maBao: string) {
+    if (!confirm(`Xuất bao ${maBao} về VN? Tất cả đơn trong bao sẽ chuyển sang "Đang vận chuyển".`)) return;
+    const r = await callServer('xuatBao', maBao);
+    if (r?.success) { showToast(`Đã xuất ${maBao} (${r.soDon} đơn)`, 'success'); reload(); }
     else showToast(r?.message || 'Lỗi', 'error');
   }
 
@@ -251,6 +282,55 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu 
     </div>
   );
 
+  const openBaos = baos.filter((b) => b.trangThai === 'DangDong');
+  const exportedBaos = baos.filter((b) => b.trangThai === 'DaXuat');
+  const unbagged = atWarehouse.filter((o) => !o.maBao);
+
+  const tabBao = (
+    <div className="form-section">
+      <div className="section-title"><FiBox /> Bao tổng — gộp đơn theo line, xuất về VN</div>
+      <div className="action-card">
+        <div className="ac-header"><div className="ac-title"><FiPlus /> Tạo bao mới</div></div>
+        <div className="form-grid" style={{ marginTop: 8 }}>
+          <div className="form-field"><label>Line vận chuyển</label>
+            <select value={baoLine} onChange={(e) => setBaoLine(e.target.value)}>
+              <option value="LineNhanh">Nhanh</option><option value="LineThuong">Thường</option><option value="LineRe">Tiết kiệm</option>
+            </select></div>
+          <div className="form-field"><label>Ghi chú</label>
+            <input value={baoGhiChu} onChange={(e) => setBaoGhiChu(e.target.value)} placeholder="vd: chuyến 25/06" /></div>
+        </div>
+        <div className="ac-actions"><button className="btn btn-success" onClick={createBao} disabled={busy.bao}><FiPlus /> Tạo bao</button></div>
+      </div>
+
+      <div className="hint" style={{ margin: '8px 0' }}>Đơn ở kho TQ chưa vào bao: <b>{unbagged.length ? unbagged.map((o) => o.maDH).join(', ') : 'không có'}</b></div>
+
+      {openBaos.length === 0 ? <div className="empty-state"><FiBox /><p>Chưa có bao đang mở.</p></div> :
+        openBaos.map((b) => (
+          <div key={b.maBao} className="action-card">
+            <div className="ac-header">
+              <div className="ac-title"><FiBox /> {b.maBao} · Line {LINE_LABEL[b.line] || b.line}</div>
+              <span className="status-badge s-tq">Đang đóng</span>
+            </div>
+            <div className="ac-meta">{b.soKien} kiện · {b.tongKg}kg · {b.tongM3}m³ · Đơn: <b>{b.orders.length ? b.orders.join(', ') : '(trống)'}</b></div>
+            <div className="form-grid" style={{ margin: '10px 0' }}>
+              <div className="form-field"><label>Gán đơn vào bao (nhập / quét mã đơn)</label>
+                <input value={addBaoInput[b.maBao] || ''} onChange={(e) => setAddBaoInput((p) => ({ ...p, [b.maBao]: e.target.value }))} placeholder="DH-..." /></div>
+            </div>
+            <div className="ac-actions">
+              <button className="btn btn-primary" onClick={() => addToBao(b.maBao)}><FiLink /> Gán đơn</button>
+              <button className="btn btn-success" onClick={() => xuatBao(b.maBao)}><FiSend /> Xuất bao về VN</button>
+            </div>
+          </div>
+        ))}
+
+      {exportedBaos.length > 0 && <>
+        <div className="section-title" style={{ marginTop: 16 }}><FiTruck /> Bao đã xuất (đang về VN)</div>
+        <table className="data-table"><thead><tr><th>Mã bao</th><th>Line</th><th>Kiện</th><th>Kg/M³</th></tr></thead>
+          <tbody>{exportedBaos.map((b) => (<tr key={b.maBao}><td className="ma-don">{b.maBao}</td><td>{LINE_LABEL[b.line] || b.line}</td><td>{b.soKien}</td><td>{b.tongKg}/{b.tongM3}</td></tr>))}</tbody></table>
+      </>}
+    </div>
+  );
+
   return (
     <AppShell user={user}>
       <div className="alert alert-info">
@@ -281,6 +361,7 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu 
       <Tabs tabs={[
         { id: 'tab-receive', label: <><FiDownload /> Chờ nhận từ NCC ({pendingArrivals.length})</>, content: tabReceive },
         { id: 'tab-ship', label: <><FiTruck /> Chuyển về VN ({atWarehouse.length})</>, content: tabShip },
+        { id: 'tab-bao', label: <><FiBox /> Bao tổng ({openBaos.length})</>, content: tabBao },
         { id: 'tab-vochu', label: <><FiHelpCircle /> Hàng vô chủ ({voChu.length})</>, content: tabVoChu }
       ]} />
 

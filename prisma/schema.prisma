@@ -196,6 +196,12 @@ model DonHang {
   phiKiemHoa  Float        @default(0) @map("phi_kiem_hoa")
   phiLuuKho   Float        @default(0) @map("phi_luu_kho")
   ngachHQ     String       @default("Tiểu ngạch") @map("ngach_hq")
+
+  // Đợt 3 — dịch vụ GTGT kiểm đếm + thông tin người nhận hàng (mặc định theo KH, sửa được)
+  kiemDem     Boolean      @default(false) @map("kiem_dem")
+  nguoiNhan   String?      @map("nguoi_nhan")
+  sdtNhan     String?      @map("sdt_nhan")
+  diaChiNhan  String?      @map("dia_chi_nhan") @db.Text
   tongTien    Float        @default(0) @map("tong_tien")
   tienCoc     Float        @default(0) @map("tien_coc")
   daTra       Float        @default(0) @map("da_tra")

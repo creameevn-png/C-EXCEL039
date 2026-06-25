@@ -49,6 +49,10 @@ type OrderDetail = {
   daTra: number;
   conLai: number;
   ghiChu: string;
+  kiemDem?: boolean;
+  nguoiNhan?: string;
+  sdtNhan?: string;
+  diaChiNhan?: string;
   canSeeProfit?: boolean;
   vonNDT?: number;
   shipNDTQ?: number;
@@ -106,7 +110,14 @@ export default function OrderDetailModalHost({ canSeeMoney, canSeeProfit = false
                   {data.sdt && <>SĐT: {data.sdt} · </>}
                   Tuyến: <b>{data.tuyen === 'HCM' ? 'HCM' : 'Hà Nội'}</b> ·
                   Line: <b>{data.lineVC}</b> · Loại: <b>{data.loaiHang}</b> · Ngạch: <b>{data.ngachHQ || 'Tiểu ngạch'}</b>
+                  {data.kiemDem && <> · <b style={{ color: '#b45309' }}>✔ Kiểm đếm (GTGT)</b></>}
                 </div>
+                {(data.nguoiNhan || data.diaChiNhan) && (
+                  <div style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
+                    Người nhận: <b>{data.nguoiNhan || '-'}</b>{data.sdtNhan ? ` · ${data.sdtNhan}` : ''}
+                    {data.diaChiNhan ? <> · Địa chỉ: <b>{data.diaChiNhan}</b></> : ''}
+                  </div>
+                )}
               </div>
 
               <div style={{ marginBottom: 12 }}>

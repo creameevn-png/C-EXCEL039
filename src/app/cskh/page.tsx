@@ -31,7 +31,7 @@ export default async function CskhPage() {
     appName: process.env.APP_NAME || 'Quản Lý Ship Trung Việt',
     tyGia,
     customers: customers.map((c) => ({
-      maKH: c.maKH, tenKH: c.tenKH, sdt: c.sdt || '',
+      maKH: c.maKH, tenKH: c.tenKH, sdt: c.sdt || '', diaChi: c.diaChi || '',
       pctCoc: c.pctCoc, soDuVi: c.soDuVi, congNo: c.congNo
     })),
     products: products.map((p) => ({

@@ -20,7 +20,7 @@ import { fmtVND, fmtDateDDMM, formatNDT } from '@/lib/format';
 import { statusToLabel, statusToClass } from '@/lib/status';
 import { calcPhiVCPanama } from '@/lib/shipping-fee';
 
-type Customer = { maKH: string; tenKH: string; sdt: string; pctCoc: number; soDuVi: number; congNo: number };
+type Customer = { maKH: string; tenKH: string; sdt: string; diaChi: string; pctCoc: number; soDuVi: number; congNo: number };
 type Product = { maSP: string; tenSP: string; kgGoiY: number; m3GoiY: number; giaThamKhao: number; webNguon: string };
 type MyOrder = { maDH: string; ngayTao: string; tenKH: string; tenHang: string; tongTien: number; daTra: number; conLai: number; trangThai: string };
 
@@ -78,6 +78,10 @@ export default function CskhClient({ initial }: Props) {
   const [vat, setVat] = useState(0);
   const [phiKiemHoa, setPhiKiemHoa] = useState(0);
   const [phiLuuKho, setPhiLuuKho] = useState(0);
+  const [kiemDem, setKiemDem] = useState(false);
+  const [nguoiNhan, setNguoiNhan] = useState('');
+  const [sdtNhan, setSdtNhan] = useState('');
+  const [diaChiNhan, setDiaChiNhan] = useState('');
   const [pctCoc, setPctCoc] = useState(70);
   const [ghiChu, setGhiChu] = useState('');
   const [hintCoc, setHintCoc] = useState('% cọc sẽ tự động lấy từ thông tin KH');
@@ -160,7 +164,11 @@ export default function CskhClient({ initial }: Props) {
     const c = customers.find((x) => x.maKH === v);
     if (!c) { setHintCoc('% cọc sẽ tự động lấy từ thông tin KH'); return; }
     setPctCoc(c.pctCoc);
-    setHintCoc(`Đã lấy ${c.pctCoc}% cọc từ KH`);
+    // Điền sẵn người nhận theo KH (sửa được sau)
+    setNguoiNhan(c.tenKH || '');
+    setSdtNhan(c.sdt || '');
+    setDiaChiNhan(c.diaChi || '');
+    setHintCoc(`Đã lấy ${c.pctCoc}% cọc + thông tin nhận hàng từ KH`);
   }
 
   function updateItem(tempId: number, patch: Partial<LineItem>) {
@@ -206,6 +214,7 @@ export default function CskhClient({ initial }: Props) {
     setMaKH(''); setTuyen('HaNoi'); setLineVC('LineThuong'); setLoaiHang('Thường');
     setShipND(0); setDongGoi(0); setPhuThu(0); setPctCoc(70); setGhiChu('');
     setPhiPhatSinh(0); setNgachHQ('Tiểu ngạch'); setThueNK(0); setVat(0); setPhiKiemHoa(0); setPhiLuuKho(0);
+    setKiemDem(false); setNguoiNhan(''); setSdtNhan(''); setDiaChiNhan('');
     setItems([mkLine({}, tyGia)]);
   }
 
@@ -220,6 +229,7 @@ export default function CskhClient({ initial }: Props) {
       pctCoc,
       phiShipND: shipND, phiDongGoi: dongGoi, phiPhuThu: phuThu,
       phiPhatSinh, ngachHQ, thueNK, vat, phiKiemHoa, phiLuuKho,
+      kiemDem, nguoiNhan, sdtNhan, diaChiNhan,
       ghiChu,
       chiTiet: validItems.map((it) => ({
         tenSP: it.tenSP,
@@ -277,7 +287,7 @@ export default function CskhClient({ initial }: Props) {
     setAddKhBusy(false);
     if (r?.success) {
       showToast(`Đã tạo KH ${r.maKH} - ${r.tenKH}`, 'success');
-      setCustomers((prev) => [...prev, { maKH: r.maKH, tenKH: r.tenKH, sdt: addKh.sdt, pctCoc: r.pctCoc, soDuVi: 0, congNo: 0 }]);
+      setCustomers((prev) => [...prev, { maKH: r.maKH, tenKH: r.tenKH, sdt: addKh.sdt, diaChi: addKh.diaChi, pctCoc: r.pctCoc, soDuVi: 0, congNo: 0 }]);
       setMaKH(r.maKH);
       setPctCoc(r.pctCoc);
       setHintCoc(`Đã lấy ${r.pctCoc}% cọc từ KH`);
@@ -396,6 +406,22 @@ export default function CskhClient({ initial }: Props) {
               </div>
             </div>
             <div className="hint" style={{ marginTop: 6 }}>{hintCoc}</div>
+          </ErpSection>
+
+          {/* NGƯỜI NHẬN HÀNG & DỊCH VỤ */}
+          <ErpSection icon={<FiPackage />} title="Người nhận hàng & dịch vụ">
+            <div className="erp-fields">
+              <div className="erp-field w-md"><label>Tên người nhận</label>
+                <input value={nguoiNhan} onChange={(e) => setNguoiNhan(e.target.value)} placeholder="Mặc định theo KH (sửa được)" /></div>
+              <div className="erp-field w-sm"><label>SĐT nhận</label>
+                <input value={sdtNhan} onChange={(e) => setSdtNhan(e.target.value)} placeholder="SĐT người nhận" /></div>
+              <div className="erp-field w-lg"><label>Địa chỉ nhận hàng</label>
+                <input value={diaChiNhan} onChange={(e) => setDiaChiNhan(e.target.value)} placeholder="Địa chỉ chi tiết để giao hàng VN" /></div>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, cursor: 'pointer' }}>
+              <input type="checkbox" checked={kiemDem} onChange={(e) => setKiemDem(e.target.checked)} style={{ width: 16, height: 16 }} />
+              <span>Dịch vụ <b>kiểm đếm (GTGT)</b> — kho TQ mở kiểm tra số lượng/chất lượng từng link hàng</span>
+            </label>
           </ErpSection>
 
           {/* SẢN PHẨM */}

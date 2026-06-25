@@ -111,6 +111,10 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         vat: Number(d.vat) || 0,
         phiKiemHoa: Number(d.phiKiemHoa) || 0,
         phiLuuKho: Number(d.phiLuuKho) || 0,
+        kiemDem: !!d.kiemDem,
+        nguoiNhan: (d.nguoiNhan && String(d.nguoiNhan).trim()) || kh.tenKH,
+        sdtNhan: (d.sdtNhan && String(d.sdtNhan).trim()) || kh.sdt || null,
+        diaChiNhan: (d.diaChiNhan && String(d.diaChiNhan).trim()) || kh.diaChi || null,
         ghiChu: d.ghiChu || null,
         trangThai: 'DonMoiTao'
       }
@@ -611,6 +615,10 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         phiKiemHoa: canSeeMoney ? o.phiKiemHoa : 0,
         phiLuuKho: canSeeMoney ? o.phiLuuKho : 0,
         ngachHQ: o.ngachHQ,
+        kiemDem: o.kiemDem,
+        nguoiNhan: o.nguoiNhan || '',
+        sdtNhan: o.sdtNhan || '',
+        diaChiNhan: o.diaChiNhan || '',
         tongTien: canSeeMoney ? o.tongTien : 0,
         tienCoc: canSeeMoney ? o.tienCoc : 0,
         daTra: canSeeMoney ? o.daTra : 0,
@@ -810,6 +818,10 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (patch?.vat !== undefined) { data.vat = Number(patch.vat) || 0; changes.vat = data.vat; }
     if (patch?.phiKiemHoa !== undefined) { data.phiKiemHoa = Number(patch.phiKiemHoa) || 0; changes.phiKiemHoa = data.phiKiemHoa; }
     if (patch?.phiLuuKho !== undefined) { data.phiLuuKho = Number(patch.phiLuuKho) || 0; changes.phiLuuKho = data.phiLuuKho; }
+    if (patch?.kiemDem !== undefined) { data.kiemDem = !!patch.kiemDem; changes.kiemDem = data.kiemDem; }
+    if (patch?.nguoiNhan !== undefined) { data.nguoiNhan = patch.nguoiNhan || null; changes.nguoiNhan = 'updated'; }
+    if (patch?.sdtNhan !== undefined) { data.sdtNhan = patch.sdtNhan || null; changes.sdtNhan = 'updated'; }
+    if (patch?.diaChiNhan !== undefined) { data.diaChiNhan = patch.diaChiNhan || null; changes.diaChiNhan = 'updated'; }
     if (patch?.ghiChu !== undefined) { data.ghiChu = patch.ghiChu || null; changes.ghiChu = 'updated'; }
     if (Object.keys(data).length) await prisma.donHang.update({ where: { maDH }, data });
     await recomputeDonHang(maDH);

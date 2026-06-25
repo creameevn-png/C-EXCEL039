@@ -396,6 +396,12 @@ model KhieuNai {
   trangThai     TrangThaiKN  @default(ChoXuLy) @map("trang_thai")
   phuongAn      String?      @map("phuong_an")
   soTienHoan    Float        @default(0) @map("so_tien_hoan")
+  // Đợt 7 — đổi/trả: phí ship đổi-trả, hoàn tiền vào ví KH (tự động khi duyệt cấp 2),
+  // tách chi phí khiếu nại theo quỹ chịu (Shop tự chịu / NCC / Quỹ kho / KH chịu).
+  phiDoiTra     Float        @default(0) @map("phi_doi_tra")
+  hoanVi        Boolean      @default(false) @map("hoan_vi")
+  daHoanVi      Boolean      @default(false) @map("da_hoan_vi")
+  quyChiuPhi    String?      @map("quy_chiu_phi")
   ghiChuXuLy    String?      @map("ghi_chu_xu_ly") @db.Text
   duyetCap1By   String?      @map("duyet_cap1_by")
   duyetCap1At   DateTime?    @map("duyet_cap1_at")

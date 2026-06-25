@@ -15,16 +15,22 @@ type KN = {
   maDH: string; maKH: string; nguoiTao: string;
   loai: string; moTa: string; anh: string;
   trangThai: string; phuongAn: string;
-  soTienHoan: number; ghiChuXuLy: string;
+  soTienHoan: number;
+  phiDoiTra: number; hoanVi: boolean; daHoanVi: boolean; quyChiuPhi: string;
+  ghiChuXuLy: string;
 };
 
 const LOAI_LABEL: Record<string, string> = {
   HangLoi: 'Hàng lỗi', ThieuHang: 'Thiếu hàng', GiaoSai: 'Giao sai', KhongNhan: 'Không nhận', Khac: 'Khác'
 };
 
+const QUY_LABEL: Record<string, string> = {
+  QuyKho: 'Quỹ kho (shop tự chịu)', NCC: 'NCC chịu', VanChuyen: 'Đơn vị VC chịu', KhachHang: 'Khách hàng chịu'
+};
+
 export default function KnClient({ userVaiTro, list }: { userVaiTro: string; list: KN[] }) {
   const [editing, setEditing] = useState<KN | null>(null);
-  const [patch, setPatch] = useState({ trangThai: 'DangXuLy', phuongAn: '', soTienHoan: 0, ghiChuXuLy: '' });
+  const [patch, setPatch] = useState({ trangThai: 'DangXuLy', phuongAn: '', soTienHoan: 0, phiDoiTra: 0, hoanVi: false, quyChiuPhi: 'QuyKho', ghiChuXuLy: '' });
   const [busy, setBusy] = useState(false);
   const [q, setQ] = useState('');
   const [statusF, setStatusF] = useState('');
@@ -42,7 +48,9 @@ export default function KnClient({ userVaiTro, list }: { userVaiTro: string; lis
     setEditing(k);
     setPatch({
       trangThai: k.trangThai, phuongAn: k.phuongAn || 'HoanTien',
-      soTienHoan: k.soTienHoan || 0, ghiChuXuLy: k.ghiChuXuLy || ''
+      soTienHoan: k.soTienHoan || 0, phiDoiTra: k.phiDoiTra || 0,
+      hoanVi: !!k.hoanVi, quyChiuPhi: k.quyChiuPhi || 'QuyKho',
+      ghiChuXuLy: k.ghiChuXuLy || ''
     });
   }
 
@@ -70,7 +78,10 @@ export default function KnClient({ userVaiTro, list }: { userVaiTro: string; lis
     const r = await callServer('duyetKhieuNaiCap2', editing.maKN, accepted, patch.ghiChuXuLy);
     setBusy(false);
     if (r?.success) {
-      showToast(accepted ? 'Đã duyệt cấp 2 - hoàn tất' : 'Đã từ chối', accepted ? 'success' : 'info');
+      const msg = accepted
+        ? (r.hoanVi > 0 ? `Đã duyệt + hoàn ${formatCurrency(r.hoanVi)}đ vào ví KH` : 'Đã duyệt cấp 2 - hoàn tất')
+        : 'Đã từ chối';
+      showToast(msg, accepted ? 'success' : 'info');
       setEditing(null); reload();
     } else showToast(r?.message || 'Lỗi', 'error');
   }
@@ -152,9 +163,35 @@ export default function KnClient({ userVaiTro, list }: { userVaiTro: string; lis
                     </select>
                   </div>
                 </div>
-                <div className="form-field" style={{ marginTop: 10 }}>
-                  <label>Số tiền hoàn (nếu có)</label>
-                  <input type="number" value={patch.soTienHoan} onChange={(e) => setPatch({ ...patch, soTienHoan: parseFloat(e.target.value) || 0 })} />
+                <div className="form-grid" style={{ marginTop: 10 }}>
+                  <div className="form-field">
+                    <label>Số tiền hoàn KH (nếu có)</label>
+                    <input type="number" value={patch.soTienHoan} onChange={(e) => setPatch({ ...patch, soTienHoan: parseFloat(e.target.value) || 0 })} />
+                  </div>
+                  <div className="form-field">
+                    <label>Phí đổi/trả (ship đổi-trả)</label>
+                    <input type="number" value={patch.phiDoiTra} onChange={(e) => setPatch({ ...patch, phiDoiTra: parseFloat(e.target.value) || 0 })} />
+                  </div>
+                </div>
+                <div className="form-grid" style={{ marginTop: 10 }}>
+                  <div className="form-field">
+                    <label>Quỹ chịu chi phí khiếu nại</label>
+                    <select value={patch.quyChiuPhi} onChange={(e) => setPatch({ ...patch, quyChiuPhi: e.target.value })}>
+                      {Object.keys(QUY_LABEL).map((k) => <option key={k} value={k}>{QUY_LABEL[k]}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-field">
+                    <label className="icon-inline" style={{ cursor: 'pointer' }}>
+                      <input type="checkbox" checked={patch.hoanVi} onChange={(e) => setPatch({ ...patch, hoanVi: e.target.checked })} style={{ width: 'auto', marginRight: 6 }} />
+                      Hoàn tiền vào ví KH khi duyệt
+                    </label>
+                    {patch.hoanVi && patch.soTienHoan > 0 && (
+                      <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+                        → Khi Admin duyệt cấp 2, hệ thống tự nạp <b>{formatCurrency(patch.soTienHoan)}đ</b> vào ví KH (quỹ {QUY_LABEL[patch.quyChiuPhi] || patch.quyChiuPhi}).
+                      </div>
+                    )}
+                    {editing.daHoanVi && <div style={{ fontSize: 11, marginTop: 4, color: 'var(--success-dark)' }}>✓ Đã hoàn vào ví.</div>}
+                  </div>
                 </div>
                 <div className="form-field" style={{ marginTop: 10 }}>
                   <label>Ghi chú xử lý / duyệt</label>

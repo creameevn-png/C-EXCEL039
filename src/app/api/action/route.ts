@@ -658,6 +658,9 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (patch?.trangThai) data.trangThai = patch.trangThai as TrangThaiKN;
     if (patch?.phuongAn !== undefined) data.phuongAn = patch.phuongAn;
     if (patch?.soTienHoan !== undefined) data.soTienHoan = Number(patch.soTienHoan) || 0;
+    if (patch?.phiDoiTra !== undefined) data.phiDoiTra = Number(patch.phiDoiTra) || 0;
+    if (patch?.hoanVi !== undefined) data.hoanVi = !!patch.hoanVi;
+    if (patch?.quyChiuPhi !== undefined) data.quyChiuPhi = patch.quyChiuPhi || null;
     if (patch?.ghiChuXuLy !== undefined) data.ghiChuXuLy = patch.ghiChuXuLy;
     await prisma.khieuNai.update({ where: { maKN }, data });
     await logActivity(user.email, 'UPDATE_KHIEU_NAI', maKN, patch);
@@ -683,6 +686,9 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
   async duyetKhieuNaiCap2(args, user) {
     if (user.vaiTro !== 'Admin') return err('Chỉ Admin duyệt cấp 2');
     const [maKN, accepted, note] = args;
+    const kn = await prisma.khieuNai.findUnique({ where: { maKN } });
+    if (!kn) return err('Khiếu nại không tồn tại');
+
     await prisma.khieuNai.update({
       where: { maKN },
       data: {
@@ -692,8 +698,30 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         trangThai: accepted ? 'DaXuLy' : 'TuChoi'
       }
     });
-    await logActivity(user.email, 'DUYET_KN_CAP2', maKN, { accepted });
-    return ok();
+
+    // Đợt 7 — duyệt + chọn hoàn ví + có số tiền + chưa hoàn → nạp tự động vào ví KH.
+    let hoanVi = 0;
+    if (accepted && kn.hoanVi && !kn.daHoanVi && kn.soTienHoan > 0 && kn.maKH) {
+      const khh = await prisma.khachHang.findUnique({ where: { maKH: kn.maKH } });
+      if (khh) {
+        const newDu = khh.soDuVi + kn.soTienHoan;
+        await prisma.$transaction([
+          prisma.khachHang.update({ where: { maKH: kn.maKH }, data: { soDuVi: newDu } }),
+          prisma.giaoDichVi.create({
+            data: {
+              maKH: kn.maKH, loai: 'Nap', soTien: kn.soTienHoan, soDuSau: newDu,
+              quy: kn.quyChiuPhi || 'QuyKho',
+              ghiChu: `Hoàn tiền khiếu nại ${maKN}${kn.maDH ? ' (đơn ' + kn.maDH + ')' : ''}`,
+              nv: user.email, nvId: user.id
+            }
+          }),
+          prisma.khieuNai.update({ where: { maKN }, data: { daHoanVi: true } })
+        ]);
+        hoanVi = kn.soTienHoan;
+      }
+    }
+    await logActivity(user.email, 'DUYET_KN_CAP2', maKN, { accepted, hoanVi, quy: kn.quyChiuPhi });
+    return ok({ hoanVi });
   },
 
   // ============== YEU CAU MUA (public) ==============

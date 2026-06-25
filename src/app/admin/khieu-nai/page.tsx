@@ -17,6 +17,8 @@ export default async function AdminKhieuNaiPage() {
         loai: k.loai, moTa: k.moTa,
         anh: k.anhBangChung || '', trangThai: k.trangThai,
         phuongAn: k.phuongAn || '', soTienHoan: k.soTienHoan,
+        phiDoiTra: k.phiDoiTra, hoanVi: k.hoanVi, daHoanVi: k.daHoanVi,
+        quyChiuPhi: k.quyChiuPhi || '',
         ghiChuXuLy: k.ghiChuXuLy || ''
       }))} />
     </AppShell>

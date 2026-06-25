@@ -39,6 +39,11 @@ type OrderDetail = {
   shipND: number;
   dongGo: number;
   phuThu: number;
+  thueNK: number;
+  vat: number;
+  phiKiemHoa: number;
+  phiLuuKho: number;
+  ngachHQ: string;
   tongTien: number;
   tienCoc: number;
   daTra: number;
@@ -95,7 +100,7 @@ export default function OrderDetailModalHost({ canSeeMoney }: { canSeeMoney: boo
                 <div style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
                   {data.sdt && <>SĐT: {data.sdt} · </>}
                   Tuyến: <b>{data.tuyen === 'HCM' ? 'HCM' : 'Hà Nội'}</b> ·
-                  Line: <b>{data.lineVC}</b> · Loại: <b>{data.loaiHang}</b>
+                  Line: <b>{data.lineVC}</b> · Loại: <b>{data.loaiHang}</b> · Ngạch: <b>{data.ngachHQ || 'Tiểu ngạch'}</b>
                 </div>
               </div>
 
@@ -137,11 +142,15 @@ export default function OrderDetailModalHost({ canSeeMoney }: { canSeeMoney: boo
                 <div className="fee-summary" style={{ marginTop: 0 }}>
                   <div className="fee-row"><span>Tổng giá hàng</span><span className="fee-value">{fmtVND(data.tongGiaHang)}đ</span></div>
                   <div className="fee-row"><span>Phí mua hàng</span><span className="fee-value">{fmtVND(data.phiMua)}đ</span></div>
-                  <div className="fee-row"><span>Phí bảo hiểm</span><span className="fee-value">{fmtVND(data.phiBH)}đ</span></div>
                   <div className="fee-row"><span>Phí vận chuyển</span><span className="fee-value">{fmtVND(data.phiVC)}đ</span></div>
                   <div className="fee-row"><span>Phí ship VN</span><span className="fee-value">{fmtVND(data.shipND)}đ</span></div>
-                  <div className="fee-row"><span>Phí đóng gói</span><span className="fee-value">{fmtVND(data.dongGo)}đ</span></div>
-                  <div className="fee-row"><span>Phí phụ thu</span><span className="fee-value">{fmtVND(data.phuThu)}đ</span></div>
+                  {data.dongGo > 0 && <div className="fee-row"><span>Phí đóng gói</span><span className="fee-value">{fmtVND(data.dongGo)}đ</span></div>}
+                  {data.phuThu > 0 && <div className="fee-row"><span>Phí phụ thu</span><span className="fee-value">{fmtVND(data.phuThu)}đ</span></div>}
+                  {data.phiBH > 0 && <div className="fee-row"><span>Phí phát sinh khác</span><span className="fee-value">{fmtVND(data.phiBH)}đ</span></div>}
+                  {data.thueNK > 0 && <div className="fee-row"><span>Thuế nhập khẩu</span><span className="fee-value">{fmtVND(data.thueNK)}đ</span></div>}
+                  {data.vat > 0 && <div className="fee-row"><span>VAT</span><span className="fee-value">{fmtVND(data.vat)}đ</span></div>}
+                  {data.phiKiemHoa > 0 && <div className="fee-row"><span>Phí kiểm hóa</span><span className="fee-value">{fmtVND(data.phiKiemHoa)}đ</span></div>}
+                  {data.phiLuuKho > 0 && <div className="fee-row"><span>Phí lưu kho</span><span className="fee-value">{fmtVND(data.phiLuuKho)}đ</span></div>}
                   <div className="fee-row" style={{ borderTop: '1px solid #CBD5E1' }}>
                     <span><b>Tổng tiền</b></span>
                     <span className="fee-value" style={{ color: '#1E3A8A' }}>{fmtVND(data.tongTien)}đ</span>

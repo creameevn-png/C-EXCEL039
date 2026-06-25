@@ -48,6 +48,8 @@ async function recomputeDonHang(maDH: string) {
     kg: tongKg, m3: tongM3,
     tuyen: o.tuyen,
     phiShipND: o.shipND, phiDongGoi: o.dongGo, phiPhuThu: o.phuThu,
+    phiPhatSinh: o.phiBH,
+    thueNK: o.thueNK, vat: o.vat, phiKiemHoa: o.phiKiemHoa, phiLuuKho: o.phiLuuKho,
     pctCoc: o.pctCoc,
     lineVC: o.lineVC, loaiHang: o.loaiHang
   });
@@ -103,6 +105,12 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         shipND: Number(d.phiShipND) || 0,
         dongGo: Number(d.phiDongGoi) || 0,
         phuThu: Number(d.phiPhuThu) || 0,
+        phiBH: Number(d.phiPhatSinh) || 0,
+        ngachHQ: d.ngachHQ || 'Tiểu ngạch',
+        thueNK: Number(d.thueNK) || 0,
+        vat: Number(d.vat) || 0,
+        phiKiemHoa: Number(d.phiKiemHoa) || 0,
+        phiLuuKho: Number(d.phiLuuKho) || 0,
         ghiChu: d.ghiChu || null,
         trangThai: 'DonMoiTao'
       }
@@ -578,6 +586,11 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         shipND: canSeeMoney ? o.shipND : 0,
         dongGo: canSeeMoney ? o.dongGo : 0,
         phuThu: canSeeMoney ? o.phuThu : 0,
+        thueNK: canSeeMoney ? o.thueNK : 0,
+        vat: canSeeMoney ? o.vat : 0,
+        phiKiemHoa: canSeeMoney ? o.phiKiemHoa : 0,
+        phiLuuKho: canSeeMoney ? o.phiLuuKho : 0,
+        ngachHQ: o.ngachHQ,
         tongTien: canSeeMoney ? o.tongTien : 0,
         tienCoc: canSeeMoney ? o.tienCoc : 0,
         daTra: canSeeMoney ? o.daTra : 0,
@@ -766,6 +779,12 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (patch?.shipND !== undefined) { data.shipND = Number(patch.shipND) || 0; changes.shipND = data.shipND; }
     if (patch?.dongGo !== undefined) { data.dongGo = Number(patch.dongGo) || 0; changes.dongGo = data.dongGo; }
     if (patch?.phuThu !== undefined) { data.phuThu = Number(patch.phuThu) || 0; changes.phuThu = data.phuThu; }
+    if (patch?.phiPhatSinh !== undefined) { data.phiBH = Number(patch.phiPhatSinh) || 0; changes.phiPhatSinh = data.phiBH; }
+    if (patch?.ngachHQ !== undefined) { data.ngachHQ = patch.ngachHQ || 'Tiểu ngạch'; changes.ngachHQ = data.ngachHQ; }
+    if (patch?.thueNK !== undefined) { data.thueNK = Number(patch.thueNK) || 0; changes.thueNK = data.thueNK; }
+    if (patch?.vat !== undefined) { data.vat = Number(patch.vat) || 0; changes.vat = data.vat; }
+    if (patch?.phiKiemHoa !== undefined) { data.phiKiemHoa = Number(patch.phiKiemHoa) || 0; changes.phiKiemHoa = data.phiKiemHoa; }
+    if (patch?.phiLuuKho !== undefined) { data.phiLuuKho = Number(patch.phiLuuKho) || 0; changes.phiLuuKho = data.phiLuuKho; }
     if (patch?.ghiChu !== undefined) { data.ghiChu = patch.ghiChu || null; changes.ghiChu = 'updated'; }
     if (Object.keys(data).length) await prisma.donHang.update({ where: { maDH }, data });
     await recomputeDonHang(maDH);

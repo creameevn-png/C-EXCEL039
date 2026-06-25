@@ -42,11 +42,10 @@ export default function DatHangClient({ kh }: { kh: { maKH: string; tenKH: strin
     const kg = items.reduce((s, it) => s + it.kg * it.soLuong, 0);
     const m3 = items.reduce((s, it) => s + it.m3 * it.soLuong, 0);
     const phiMua = Math.round(giaHang * 0.02 / 1000) * 1000;
-    const phiBH = Math.round(giaHang * 0.01 / 1000) * 1000;
     const phiVC = calcPhiVCPanama(kg, m3, tuyen);
-    const tong = giaHang + phiMua + phiBH + phiVC;
+    const tong = giaHang + phiMua + phiVC;
     const coc = Math.round(tong * pctCoc / 100 / 1000) * 1000;
-    return { giaHang, sl, kg, m3, phiMua, phiBH, phiVC, tong, coc };
+    return { giaHang, sl, kg, m3, phiMua, phiVC, tong, coc };
   }, [items, tuyen, pctCoc]);
 
   async function submit() {
@@ -237,7 +236,6 @@ export default function DatHangClient({ kh }: { kh: { maKH: string; tenKH: strin
           <ErpSection icon={<FiDollarSign />} title="Chi phí & thanh toán">
             <div className="erp-fee-row"><span className="lbl">Tiền hàng</span><span className="v">{fmtVND(tot.giaHang)}đ</span></div>
             <div className="erp-fee-row"><span className="lbl">Phí mua hàng (2%)</span><span className="v">{fmtVND(tot.phiMua)}đ</span></div>
-            <div className="erp-fee-row"><span className="lbl">Phí bảo hiểm (1%)</span><span className="v">{fmtVND(tot.phiBH)}đ</span></div>
             <div className="erp-fee-row"><span className="lbl">Phí vận chuyển ({tot.kg.toFixed(2)} kg / {tot.m3.toFixed(4)} m³)</span><span className="v">{fmtVND(tot.phiVC)}đ</span></div>
             <div className="erp-fee-row total"><span className="lbl">Tổng tiền (ước tính)</span><span className="v">{fmtVND(tot.tong)}đ</span></div>
             <div className="erp-fee-row coc"><span className="lbl">Cọc ({pctCoc}%)</span><span className="v">{fmtVND(tot.coc)}đ</span></div>

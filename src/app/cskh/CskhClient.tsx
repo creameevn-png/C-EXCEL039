@@ -72,6 +72,12 @@ export default function CskhClient({ initial }: Props) {
   const [shipND, setShipND] = useState(0);
   const [dongGoi, setDongGoi] = useState(0);
   const [phuThu, setPhuThu] = useState(0);
+  const [phiPhatSinh, setPhiPhatSinh] = useState(0);
+  const [ngachHQ, setNgachHQ] = useState('Tiểu ngạch');
+  const [thueNK, setThueNK] = useState(0);
+  const [vat, setVat] = useState(0);
+  const [phiKiemHoa, setPhiKiemHoa] = useState(0);
+  const [phiLuuKho, setPhiLuuKho] = useState(0);
   const [pctCoc, setPctCoc] = useState(70);
   const [ghiChu, setGhiChu] = useState('');
   const [hintCoc, setHintCoc] = useState('% cọc sẽ tự động lấy từ thông tin KH');
@@ -188,16 +194,18 @@ export default function CskhClient({ initial }: Props) {
     const totalKg = items.reduce((s, it) => s + (Number(it.kg) || 0) * (Number(it.soLuong) || 0), 0);
     const totalM3 = items.reduce((s, it) => s + (Number(it.m3) || 0) * (Number(it.soLuong) || 0), 0);
     const phiMua = Math.round((tongGiaHang * 0.02) / 1000) * 1000;
-    const phiBH = Math.round((tongGiaHang * 0.01) / 1000) * 1000;
+    const phiBH = Math.round(Number(phiPhatSinh) || 0);
     const phiVC = calcPhiVCPanama(totalKg, totalM3, tuyen);
-    const tong = tongGiaHang + phiMua + phiBH + phiVC + (Number(shipND) || 0) + (Number(dongGoi) || 0) + (Number(phuThu) || 0);
+    const phiThue = (Number(thueNK) || 0) + (Number(vat) || 0) + (Number(phiKiemHoa) || 0) + (Number(phiLuuKho) || 0);
+    const tong = tongGiaHang + phiMua + phiBH + phiVC + (Number(shipND) || 0) + (Number(dongGoi) || 0) + (Number(phuThu) || 0) + phiThue;
     const coc = Math.round((tong * pctCoc) / 100 / 1000) * 1000;
-    return { tongGiaHang, tongNDT, tongSL, totalKg, totalM3, phiMua, phiBH, phiVC, tong, coc };
-  }, [items, tuyen, shipND, dongGoi, phuThu, pctCoc]);
+    return { tongGiaHang, tongNDT, tongSL, totalKg, totalM3, phiMua, phiBH, phiVC, phiThue, tong, coc };
+  }, [items, tuyen, shipND, dongGoi, phuThu, phiPhatSinh, thueNK, vat, phiKiemHoa, phiLuuKho, pctCoc]);
 
   function resetCreateForm() {
     setMaKH(''); setTuyen('HaNoi'); setLineVC('LineThuong'); setLoaiHang('Thường');
     setShipND(0); setDongGoi(0); setPhuThu(0); setPctCoc(70); setGhiChu('');
+    setPhiPhatSinh(0); setNgachHQ('Tiểu ngạch'); setThueNK(0); setVat(0); setPhiKiemHoa(0); setPhiLuuKho(0);
     setItems([mkLine({}, tyGia)]);
   }
 
@@ -211,6 +219,7 @@ export default function CskhClient({ initial }: Props) {
       maKH, tuyen, lineVC, loaiHang,
       pctCoc,
       phiShipND: shipND, phiDongGoi: dongGoi, phiPhuThu: phuThu,
+      phiPhatSinh, ngachHQ, thueNK, vat, phiKiemHoa, phiLuuKho,
       ghiChu,
       chiTiet: validItems.map((it) => ({
         tenSP: it.tenSP,
@@ -518,13 +527,31 @@ export default function CskhClient({ initial }: Props) {
                 </select></div>
               <div className="erp-field"><label>Phí phụ thu khác (VNĐ)</label>
                 <input type="number" value={phuThu} onChange={(e) => setPhuThu(parseFloat(e.target.value) || 0)} /></div>
+              <div className="erp-field"><label>Phí phát sinh khác (VNĐ)</label>
+                <input type="number" value={phiPhatSinh} onChange={(e) => setPhiPhatSinh(parseFloat(e.target.value) || 0)} /></div>
+            </div>
+            <div className="erp-fields" style={{ marginTop: 10 }}>
+              <div className="erp-field w-md"><label>Ngạch hải quan</label>
+                <select value={ngachHQ} onChange={(e) => setNgachHQ(e.target.value)}>
+                  <option value="Tiểu ngạch">Tiểu ngạch</option>
+                  <option value="Chính ngạch">Chính ngạch</option>
+                </select></div>
+              <div className="erp-field"><label>Thuế nhập khẩu (VNĐ)</label>
+                <input type="number" value={thueNK} onChange={(e) => setThueNK(parseFloat(e.target.value) || 0)} /></div>
+              <div className="erp-field"><label>VAT (VNĐ)</label>
+                <input type="number" value={vat} onChange={(e) => setVat(parseFloat(e.target.value) || 0)} /></div>
+              <div className="erp-field"><label>Phí kiểm hóa (VNĐ)</label>
+                <input type="number" value={phiKiemHoa} onChange={(e) => setPhiKiemHoa(parseFloat(e.target.value) || 0)} /></div>
+              <div className="erp-field"><label>Phí lưu kho (VNĐ)</label>
+                <input type="number" value={phiLuuKho} onChange={(e) => setPhiLuuKho(parseFloat(e.target.value) || 0)} /></div>
             </div>
             <div style={{ marginTop: 14 }}>
               <div className="erp-fee-row"><span className="lbl">Tổng giá hàng</span><span className="v">{fmtVND(totals.tongGiaHang)}đ <small style={{ color: 'var(--text-faint)', fontWeight: 500 }}>≈ {formatNDT(totals.tongNDT)}</small></span></div>
               <div className="erp-fee-row"><span className="lbl">Tổng KG / M³</span><span className="v">{totals.totalKg.toFixed(2)} kg / {totals.totalM3.toFixed(4)} m³</span></div>
               <div className="erp-fee-row"><span className="lbl">Phí mua (2%)</span><span className="v">{fmtVND(totals.phiMua)}đ</span></div>
-              <div className="erp-fee-row"><span className="lbl">Phí bảo hiểm (1%)</span><span className="v">{fmtVND(totals.phiBH)}đ</span></div>
               <div className="erp-fee-row"><span className="lbl">Phí vận chuyển (Panama)</span><span className="v">{fmtVND(totals.phiVC)}đ</span></div>
+              {totals.phiBH > 0 && <div className="erp-fee-row"><span className="lbl">Phí phát sinh khác</span><span className="v">{fmtVND(totals.phiBH)}đ</span></div>}
+              {totals.phiThue > 0 && <div className="erp-fee-row"><span className="lbl">Thuế / VAT / kiểm hóa / lưu kho ({ngachHQ})</span><span className="v">{fmtVND(totals.phiThue)}đ</span></div>}
               <div className="erp-fee-row total"><span className="lbl">Tổng tiền</span><span className="v">{fmtVND(totals.tong)}đ</span></div>
               <div className="erp-fee-row coc"><span className="lbl">Cọc ({pctCoc}%)</span><span className="v">{fmtVND(totals.coc)}đ</span></div>
             </div>

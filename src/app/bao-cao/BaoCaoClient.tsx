@@ -106,7 +106,7 @@ export default function BaoCaoClient({ rows }: { rows: Row[] }) {
     { k: 'Đã thu thực tế', now: aCur.daTra, prev: aPrev.daTra, money: true },
     { k: 'Tiền hàng', now: aCur.tongGiaHang, prev: aPrev.tongGiaHang, money: true },
     { k: 'Phí mua hàng', now: aCur.phiMua, prev: aPrev.phiMua, money: true },
-    { k: 'Phí bảo hiểm', now: aCur.phiBH, prev: aPrev.phiBH, money: true },
+    { k: 'Phí phát sinh khác', now: aCur.phiBH, prev: aPrev.phiBH, money: true },
     { k: 'Phí vận chuyển', now: aCur.phiVC, prev: aPrev.phiVC, money: true },
     { k: 'Phí ship VN + đóng gỗ + phụ thu', now: aCur.shipND + aCur.dongGo + aCur.phuThu, prev: aPrev.shipND + aPrev.dongGo + aPrev.phuThu, money: true }
   ];

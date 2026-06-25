@@ -60,20 +60,32 @@ export async function computeOrderTotals(input: {
   pctCoc: number;
   lineVC?: LineVC;
   loaiHang?: string;
+  /** Phí phát sinh khác (CSKH nhập tay, thay cho phí bảo hiểm tự động 1% cũ). */
+  phiPhatSinh?: number;
+  thueNK?: number;
+  vat?: number;
+  phiKiemHoa?: number;
+  phiLuuKho?: number;
 }) {
   const giaHang = Number(input.giaHang) || 0;
   const pctMua = await getNumber('phi_mua_pct', 2);
-  const pctBH = await getNumber('phi_bh_pct', 1);
   const phiMua = Math.round((giaHang * pctMua) / 100 / 1000) * 1000;
-  const phiBH = Math.round((giaHang * pctBH) / 100 / 1000) * 1000;
+  // "Phí phát sinh khác" do CSKH nhập tay (kế toán duyệt). Mặc định 0 (không còn ép bảo hiểm 1%).
+  const phiBH = Math.round(Number(input.phiPhatSinh) || 0);
 
   let phiVC = 0;
   if (input.lineVC) phiVC = await calcPhiVCByLine(input.kg, input.m3, input.lineVC, input.loaiHang || 'Thường');
   if (!phiVC) phiVC = calcPhiVCPanama(input.kg, input.m3, input.tuyen);
 
+  const thueNK = Number(input.thueNK) || 0;
+  const vat = Number(input.vat) || 0;
+  const phiKiemHoa = Number(input.phiKiemHoa) || 0;
+  const phiLuuKho = Number(input.phiLuuKho) || 0;
+
   const tongTien =
     giaHang + phiMua + phiBH + phiVC +
-    (input.phiShipND || 0) + (input.phiDongGoi || 0) + (input.phiPhuThu || 0);
+    (input.phiShipND || 0) + (input.phiDongGoi || 0) + (input.phiPhuThu || 0) +
+    thueNK + vat + phiKiemHoa + phiLuuKho;
   const coc = Math.round((tongTien * input.pctCoc) / 100 / 1000) * 1000;
-  return { giaHang, phiMua, phiBH, phiVC, tongTien, coc };
+  return { giaHang, phiMua, phiBH, phiVC, thueNK, vat, phiKiemHoa, phiLuuKho, tongTien, coc };
 }

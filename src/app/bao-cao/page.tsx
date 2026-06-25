@@ -12,11 +12,17 @@ export default async function BaoCaoPage() {
   const since = new Date();
   since.setMonth(since.getMonth() - 18);
 
-  const orders = await prisma.donHang.findMany({
-    where: { ngayTao: { gte: since }, trangThai: { not: 'Huy' } },
-    include: { khachHang: true, nv: true },
-    orderBy: { ngayTao: 'desc' }
-  });
+  const [orders, khieuNai] = await Promise.all([
+    prisma.donHang.findMany({
+      where: { ngayTao: { gte: since }, trangThai: { not: 'Huy' } },
+      include: { khachHang: true, nv: true },
+      orderBy: { ngayTao: 'desc' }
+    }),
+    prisma.khieuNai.findMany({
+      where: { ngayTao: { gte: since } },
+      orderBy: { ngayTao: 'desc' }
+    })
+  ]);
 
   const rows = orders.map((o) => ({
     maDH: o.maDH,
@@ -26,16 +32,25 @@ export default async function BaoCaoPage() {
     nv: o.nv?.hoTen || o.nvTao || '(không rõ)',
     lineVC: o.lineVC as string,
     tuyen: o.tuyen as string,
+    trangThai: o.trangThai as string,
     tongKg: o.tongKg, tongM3: o.tongM3,
     tongGiaHang: o.tongGiaHang,
     phiMua: o.phiMua, phiBH: o.phiBH, phiVC: o.phiVC,
     shipND: o.shipND, dongGo: o.dongGo, phuThu: o.phuThu,
-    tongTien: o.tongTien, daTra: o.daTra
+    vonNDT: o.vonNDT, loiNhuanNDT: o.loiNhuanNDT,
+    tongTien: o.tongTien, daTra: o.daTra, conLai: o.conLai
+  }));
+
+  const knRows = khieuNai.map((k) => ({
+    maKN: k.maKN, ngayTao: k.ngayTao.toISOString(),
+    maKH: k.maKH || '', maDH: k.maDH || '',
+    loai: k.loai as string, trangThai: k.trangThai as string,
+    soTienHoan: k.soTienHoan, phiDoiTra: k.phiDoiTra
   }));
 
   return (
     <AppShell user={user}>
-      <BaoCaoClient rows={rows} />
+      <BaoCaoClient rows={rows} knRows={knRows} />
     </AppShell>
   );
 }

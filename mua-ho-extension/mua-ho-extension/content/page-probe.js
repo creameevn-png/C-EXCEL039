@@ -69,23 +69,6 @@
     };
   }
 
-  function fromAlibaba() {
-    const root =
-      safe(() => window.detailData) ||
-      safe(() => window.runParams && window.runParams.data) ||
-      safe(() => window.__GLOBAL_DATA) ||
-      safe(() => window.__page__ && window.__page__.data) ||
-      safe(() => window.context);
-    if (!root) return null;
-    return {
-      title: deepFind(root, ["subject", "title", "productTitle", "name"], 0),
-      priceText: deepFind(root, ["price", "priceText", "formatPrice"], 0),
-      priceRanges: deepFind(root, ["priceRanges", "ladderPrices", "skuPriceScale", "priceList"], 0),
-      skuModel: deepFind(root, ["skuModel", "skuMap", "skuProps", "sku"], 0),
-      mainImage: deepFind(root, ["mainImage", "image", "images", "mediaItems"], 0),
-    };
-  }
-
   function scanScriptsForJson() {
     // Quét các thẻ <script type="application/ld+json"> hoặc JSON inline có dấu hiệu sản phẩm.
     const out = {};
@@ -108,8 +91,6 @@
     let data = {};
     if (host.includes("1688")) {
       data = from1688() || {};
-    } else if (host.includes("alibaba")) {
-      data = fromAlibaba() || {};
     } else {
       data = fromTaobao() || {};
     }

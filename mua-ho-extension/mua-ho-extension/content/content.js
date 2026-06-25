@@ -54,6 +54,11 @@
     const skuLine = product.skuText
       ? `<div class="mh-sku"><b>Phân loại đang chọn:</b> ${escapeHtml(product.skuText)}</div>`
       : `<div class="mh-sku mh-sku--warn">Chưa nhận diện được phân loại — hãy ghi rõ màu/size ở ô ghi chú.</div>`;
+    const tiers = Array.isArray(product.priceTiers) ? product.priceTiers : [];
+    const cur = product.currency || "CNY";
+    const tierLine = tiers.length
+      ? `<div class="mh-tiers"><b>Bậc giá (SL → đơn giá):</b> ${tiers.map((t) => `≥${escapeHtml(String(t.minQty))}: ${escapeHtml(String(t.price))} ${cur}`).join(" · ")}</div>`
+      : "";
     const moqHint = moq > 1 ? `<span class="mh-moqhint">tối thiểu ${moq}</span>` : "";
 
     overlay.innerHTML = `
@@ -73,6 +78,7 @@
             </div>
           </div>
           ${skuLine}
+          ${tierLine}
           <div class="mh-row">
             <label class="mh-lbl">Số lượng ${moqHint}
               <input class="mh-field mh-qty" type="number" min="1" step="1" value="${moq}">

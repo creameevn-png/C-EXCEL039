@@ -6,6 +6,7 @@ const els = {
   loginBtn: $("loginBtn"), saveTokenBtn: $("saveTokenBtn"), testBtn: $("testBtn"), logoutBtn: $("logoutBtn"),
   status: $("status"), refreshCart: $("refreshCart"), resetBadge: $("resetBadge"),
   cartList: $("cartList"), cartCount: $("cartCount"),
+  orderList: $("orderList"), orderCount: $("orderCount"), refreshOrders: $("refreshOrders"),
 };
 
 /* ---- Tabs ---- */
@@ -15,6 +16,7 @@ document.querySelectorAll(".tab").forEach((t) => {
     const name = t.dataset.tab;
     document.querySelectorAll(".pane").forEach((p) => p.classList.toggle("pane--on", p.dataset.pane === name));
     if (name === "cart") loadCart();
+    if (name === "orders") loadOrders();
   });
 });
 
@@ -106,5 +108,36 @@ els.refreshCart.addEventListener("click", loadCart);
 els.resetBadge.addEventListener("click", () => {
   chrome.runtime.sendMessage({ type: "MH_RESET_BADGE" }, () => load());
 });
+
+/* ---- Đơn đã đặt ---- */
+const ST_LABEL = {
+  DonMoiTao: "Mới tạo", DatCoc: "Đã cọc", DaMuaHang: "Đã mua", NccGiaoHang: "NCC giao",
+  KhoTqNhan: "Kho TQ", DangVanChuyen: "Đang VC", KhoVnNhan: "Kho VN",
+  ChoThanhToan: "Chờ TT", GiaoHang: "Đang giao", HoanThanh: "Hoàn thành", Huy: "Huỷ", KHTuDat: "KH tự đặt",
+};
+function fmtVnd(n) { return Number(n || 0).toLocaleString("vi-VN"); }
+
+function loadOrders() {
+  els.orderList.innerHTML = '<p class="empty">Đang tải...</p>';
+  chrome.runtime.sendMessage({ type: "MH_GET_ORDERS" }, (res) => {
+    if (!res || !res.ok) {
+      els.orderList.innerHTML = `<p class="empty">${escapeHtml((res && res.message) || "Không tải được đơn. Đăng nhập + cấu hình API trước.")}</p>`;
+      return;
+    }
+    const items = res.items || [];
+    els.orderCount.textContent = items.length + " đơn gần đây";
+    if (!items.length) { els.orderList.innerHTML = '<p class="empty">Chưa có đơn nào.</p>'; return; }
+    els.orderList.innerHTML = items.map((o) => {
+      const st = ST_LABEL[o.trangThai] || o.trangThai || "";
+      const con = Number(o.conLai || 0);
+      return `<div class="cart-item">
+        <div class="ci-meta">
+          <div class="ci-title">${escapeHtml(o.maDH || "")} · ${escapeHtml(o.tenKH || o.maKH || "")}</div>
+          <div class="ci-sub">${escapeHtml(st)} · Tổng ${fmtVnd(o.tongTien)}đ${con > 0 ? " · còn " + fmtVnd(con) + "đ" : " · đã đủ"}</div>
+        </div></div>`;
+    }).join("");
+  });
+}
+els.refreshOrders.addEventListener("click", loadOrders);
 
 load();

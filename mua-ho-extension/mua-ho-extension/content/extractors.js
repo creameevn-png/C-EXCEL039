@@ -25,12 +25,19 @@
     },
   };
   SELECTORS.tmall = SELECTORS.taobao;
+  SELECTORS.alibaba = {
+    title: ["h1.product-title", ".module-pdp-title h1", '[class*="product-title" i]', "h1.module-pdp-title", "h1"],
+    price: [".product-price .price", '[class*="Price" i] [class*="price" i]', ".price-list .price", '[class*="price--" i]', '[class*="priceText" i]'],
+    image: [".detail-gallery-img img", '[class*="mainImage" i] img', "img.magnifier-image", '[class*="gallery" i] img'],
+    gallery: ['[class*="thumb" i] img', '[class*="gallery" i] img', '[class*="image-list" i] img'],
+  };
 
   function detectSource() {
     const h = location.hostname;
     if (h.includes("1688.com")) return "1688";
     if (h.includes("tmall.com")) return "tmall";
     if (h.includes("taobao.com")) return "taobao";
+    if (h.includes("alibaba.com")) return "alibaba";
     return "unknown";
   }
 
@@ -38,6 +45,11 @@
     const url = location.href;
     if (source === "1688") {
       const m = url.match(/offer\/(\d+)\.html/) || url.match(/[?&]offerId=(\d+)/);
+      return m ? m[1] : null;
+    }
+    if (source === "alibaba") {
+      // .../product-detail/Ten-San-Pham_1600123456789.html  hoặc  /(\d+).html
+      const m = url.match(/_(\d{6,})\.html/) || url.match(/\/(\d{6,})\.html/) || url.match(/[?&]productId=(\d+)/);
       return m ? m[1] : null;
     }
     const m = url.match(/[?&]id=(\d+)/);
@@ -154,7 +166,22 @@
     const id = getProductId(source);
     if (source === "1688" && id) return `https://detail.1688.com/offer/${id}.html`;
     if ((source === "taobao" || source === "tmall") && id) return `https://item.taobao.com/item.htm?id=${id}`;
+    if (source === "alibaba") return location.href.split("#")[0].split("?")[0];
     return location.href.split("#")[0];
+  }
+
+  /* ----- Chuẩn hoá "bậc giá" (giá theo số lượng) thành mảng {minQty, price} ----- */
+  function normalizePriceTiers(raw) {
+    if (!raw) return [];
+    const arr = Array.isArray(raw) ? raw : (Array.isArray(raw.priceRanges) ? raw.priceRanges : []);
+    const out = [];
+    for (const r of arr) {
+      if (!r || typeof r !== "object") continue;
+      const qty = Number(r.startQuantity ?? r.beginAmount ?? r.min ?? r.quantity ?? r.startAmount);
+      const price = Number(r.price ?? r.value ?? r.promotionPrice ?? r.priceText);
+      if (!isNaN(price)) out.push({ minQty: isNaN(qty) ? 1 : qty, price });
+    }
+    return out.slice(0, 6);
   }
 
   async function extract() {
@@ -169,6 +196,7 @@
     const { priceText, priceValue } = parsePrice(pickText(sel.price) || probe.priceText || "");
     const skuValues = readSelectedSku();
     const moq = readMoq(source);
+    const priceTiers = normalizePriceTiers(probe.priceRanges);
 
     return {
       source,
@@ -179,10 +207,11 @@
       images: readGallery(sel),
       priceText,
       priceValue,
-      currency: "CNY",
+      currency: source === "alibaba" ? "USD" : "CNY",
       skuValues,                       // mảng phân loại đang chọn, vd ["Be","Size L"]
       skuText: skuValues.join(" / "),  // chuỗi gộp để hiển thị
       moq,                             // số lượng tối thiểu
+      priceTiers,                      // bậc giá theo SL: [{minQty, price}]
       capturedAt: new Date().toISOString(),
       probe: { skuModel: probe.skuModel || null, priceRanges: probe.priceRanges || null },
     };

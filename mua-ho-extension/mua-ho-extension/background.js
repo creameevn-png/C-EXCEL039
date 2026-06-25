@@ -53,6 +53,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "MH_LOGIN") { handleLogin(msg.username, msg.password).then(sendResponse); return true; }
   if (msg.type === "MH_TEST") { handleTest().then(sendResponse); return true; }
   if (msg.type === "MH_GET_CART") { handleGetCart().then(sendResponse); return true; }
+  if (msg.type === "MH_GET_ORDERS") { handleGetOrders().then(sendResponse); return true; }
   if (msg.type === "MH_RESET_BADGE") {
     chrome.storage.local.set({ mhAdded: 0 });
     chrome.action.setBadgeText({ text: "" });
@@ -124,4 +125,16 @@ async function handleGetCart() {
   }
   if (res.status === 401) return { ok: false, needSetup: true, message: "Chưa đăng nhập." };
   return { ok: false, message: res.message || "Không lấy được giỏ hàng." };
+}
+
+async function handleGetOrders() {
+  const res = await apiFetch("/orders", { method: "GET" });
+  if (res.needSetup) return res;
+  if (res.ok) {
+    const data = res.data;
+    const items = Array.isArray(data) ? data : data.items || [];
+    return { ok: true, items };
+  }
+  if (res.status === 401) return { ok: false, needSetup: true, message: "Chưa đăng nhập." };
+  return { ok: false, message: res.message || "Không lấy được danh sách đơn." };
 }

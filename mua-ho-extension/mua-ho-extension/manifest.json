@@ -1,20 +1,21 @@
 {
   "manifest_version": 3,
-  "name": "Mua Hộ - 1688, Taobao & Tmall",
-  "version": "2.0.0",
-  "description": "Thêm sản phẩm 1688 / Taobao / Tmall vào giỏ hàng hệ thống mua hộ: nút trên trang chi tiết + thêm nhanh từ trang tìm kiếm, tự bắt phân loại (SKU) và số lượng tối thiểu.",
+  "name": "Mua Hộ Cừ - 1688, Taobao, Tmall & Alibaba",
+  "version": "2.1.0",
+  "description": "Thêm sản phẩm 1688 / Taobao / Tmall / Alibaba vào hệ thống mua hộ: nút trên trang chi tiết + thêm nhanh từ trang tìm kiếm, tự bắt phân loại (SKU), bậc giá & số lượng tối thiểu; xem đơn đã đặt.",
   "default_locale": "vi",
   "permissions": ["storage", "scripting", "activeTab"],
   "host_permissions": [
     "https://*.1688.com/*",
     "https://*.taobao.com/*",
     "https://*.tmall.com/*",
+    "https://*.alibaba.com/*",
     "http://localhost:3000/*",
     "https://cuexcel.vercel.app/*"
   ],
   "action": {
     "default_popup": "popup/popup.html",
-    "default_title": "Mua Hộ",
+    "default_title": "Mua Hộ Cừ",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -29,7 +30,8 @@
       "matches": [
         "https://*.1688.com/*",
         "https://*.taobao.com/*",
-        "https://*.tmall.com/*"
+        "https://*.tmall.com/*",
+        "https://*.alibaba.com/*"
       ],
       "js": ["content/extractors.js", "content/content.js", "content/listing.js"],
       "css": ["content/inject.css"],
@@ -43,7 +45,8 @@
       "matches": [
         "https://*.1688.com/*",
         "https://*.taobao.com/*",
-        "https://*.tmall.com/*"
+        "https://*.tmall.com/*",
+        "https://*.alibaba.com/*"
       ]
     }
   ],

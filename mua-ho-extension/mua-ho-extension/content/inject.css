@@ -69,3 +69,15 @@
 .mh-toast--error { background: #dc2626; }
 
 @media (prefers-reduced-motion: reduce) { #mh-muaho-fab.mh-fab, .mh-toast { transition: none; } }
+
+/* v2.1: dòng bậc giá theo số lượng */
+.mh-tiers {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 6px 8px;
+}

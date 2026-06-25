@@ -202,6 +202,9 @@ model DonHang {
   nguoiNhan   String?      @map("nguoi_nhan")
   sdtNhan     String?      @map("sdt_nhan")
   diaChiNhan  String?      @map("dia_chi_nhan") @db.Text
+
+  // Đợt 4 — kho TQ: người phụ trách nhận (2 NV kho)
+  nguoiPhuTrachTQ String?  @map("nguoi_phu_trach_tq")
   tongTien    Float        @default(0) @map("tong_tien")
   tienCoc     Float        @default(0) @map("tien_coc")
   daTra       Float        @default(0) @map("da_tra")
@@ -248,12 +251,35 @@ model ChiTietDon {
   webNguon   String?  @map("web_nguon")
   linkTaobao String?  @map("link_taobao") @db.Text
   ghiChu     String?  @map("ghi_chu") @db.Text
+  // Đợt 4 — kiểm đếm tại kho TQ theo từng link sản phẩm: "Đủ" | "Thiếu" | null
+  kiemKe     String?  @map("kiem_ke")
+  kiemKeNote String?  @map("kiem_ke_note") @db.Text
   createdAt  DateTime @default(now()) @map("created_at")
 
   donHang DonHang @relation(fields: [maDH], references: [maDH], onDelete: Cascade)
 
   @@index([maDH, stt])
   @@map("chi_tiet_don")
+}
+
+/// Đợt 4 — hàng "vô chủ": mã VĐ về kho TQ nhưng chưa khớp đơn nào; khi tìm ra đơn sẽ gán vào.
+model HangVoChu {
+  id        Int      @id @default(autoincrement())
+  maVD      String   @map("ma_vd")
+  kg        Float    @default(0)
+  dai       Float    @default(0)
+  rong      Float    @default(0)
+  cao       Float    @default(0)
+  m3        Float    @default(0)
+  anh       String?  @db.Text
+  ghiChu    String?  @map("ghi_chu") @db.Text
+  daGan     Boolean  @default(false) @map("da_gan")
+  maDH      String?  @map("ma_dh")
+  nguoiNhap String?  @map("nguoi_nhap")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([daGan, createdAt(sort: Desc)])
+  @@map("hang_vo_chu")
 }
 
 model GiaoDichVi {

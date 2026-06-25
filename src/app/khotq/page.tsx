@@ -7,26 +7,45 @@ export const dynamic = 'force-dynamic';
 export default async function KhoTqPage() {
   const user = await requireRole(['KhoTQ']);
 
-  const [pending, atW] = await Promise.all([
+  const [pending, atW, voChu] = await Promise.all([
     prisma.donHang.findMany({
       where: { trangThai: 'NccGiaoHang' },
-      include: { chiTiet: { take: 3, orderBy: { stt: 'asc' } } },
+      include: { chiTiet: { orderBy: { stt: 'asc' } } },
       orderBy: { ngayTao: 'desc' }
     }),
     prisma.donHang.findMany({
       where: { trangThai: 'KhoTqNhan' },
-      include: { chiTiet: { take: 3, orderBy: { stt: 'asc' } } },
+      include: { chiTiet: { orderBy: { stt: 'asc' } } },
       orderBy: { ngayTao: 'desc' }
+    }),
+    prisma.hangVoChu.findMany({
+      where: { daGan: false },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
     })
   ]);
 
   const map = (o: any) => ({
     maDH: o.maDH, maVD: o.maVD || '',
-    tenHang: o.chiTiet.map((c: any) => `${c.tenSP} (x${c.soLuong})`).join(' · '),
+    tenHang: o.chiTiet.slice(0, 3).map((c: any) => `${c.tenSP} (x${c.soLuong})`).join(' · '),
     kg: o.tongKg, m3: o.tongM3,
     web: o.chiTiet[0]?.webNguon || '',
-    tuyen: o.tuyen
+    tuyen: o.tuyen,
+    kiemDem: o.kiemDem, dongGo: o.dongGo > 0,
+    nguoiPhuTrachTQ: o.nguoiPhuTrachTQ || '',
+    lines: o.chiTiet.map((c: any) => ({
+      stt: c.stt, tenSP: c.tenSP, soLuong: c.soLuong,
+      kiemKe: c.kiemKe || '', kiemKeNote: c.kiemKeNote || ''
+    }))
   });
 
-  return <KhoTqClient user={user} pendingArrivals={pending.map(map)} atWarehouse={atW.map(map)} />;
+  return <KhoTqClient
+    user={user}
+    pendingArrivals={pending.map(map)}
+    atWarehouse={atW.map(map)}
+    voChu={voChu.map((h) => ({
+      id: h.id, maVD: h.maVD, kg: h.kg, dai: h.dai, rong: h.rong, cao: h.cao, m3: h.m3,
+      ghiChu: h.ghiChu || '', nguoiNhap: h.nguoiNhap || '', createdAt: h.createdAt.toISOString()
+    }))}
+  />;
 }

@@ -333,9 +333,71 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (o.trangThai !== 'NccGiaoHang') return err('Đơn chưa được NCC giao');
     await prisma.donHang.update({
       where: { maDH },
-      data: { trangThai: 'KhoTqNhan', anhKhoTQ: imageBase64 || null }
+      data: { trangThai: 'KhoTqNhan', anhKhoTQ: imageBase64 || null, nguoiPhuTrachTQ: user.hoTen || user.email }
     });
     await logActivity(user.email, 'KHO_TQ_NHAN', maDH);
+    return ok();
+  },
+
+  // Kho TQ kiểm đếm theo từng link sản phẩm: "Đủ" / "Thiếu" + ghi chú.
+  async markKiemKe(args, user) {
+    if (!allow(user.vaiTro, ['KhoTQ', 'KhoVN'])) return err('Không có quyền');
+    const [maDH, stt, patch] = args;
+    if (!maDH || !stt) return err('Thiếu thông tin dòng hàng');
+    const line = await prisma.chiTietDon.findFirst({ where: { maDH, stt: Number(stt) } });
+    if (!line) return err('Không tìm thấy dòng hàng');
+    await prisma.chiTietDon.update({
+      where: { id: line.id },
+      data: {
+        kiemKe: patch?.trangThai === 'Đủ' || patch?.trangThai === 'Thiếu' ? patch.trangThai : null,
+        kiemKeNote: patch?.note ?? line.kiemKeNote,
+      }
+    });
+    await logActivity(user.email, 'KIEM_KE', maDH, { stt, trangThai: patch?.trangThai });
+    return ok();
+  },
+
+  // ===== Hàng vô chủ (kho TQ) =====
+  async addHangVoChu(args, user) {
+    if (!allow(user.vaiTro, ['KhoTQ', 'KhoVN'])) return err('Không có quyền');
+    const d = args[0] || {};
+    if (!d.maVD || !String(d.maVD).trim()) return err('Vui lòng nhập mã vận đơn');
+    const dai = Number(d.dai) || 0, rong = Number(d.rong) || 0, cao = Number(d.cao) || 0;
+    // m3 = dài×rộng×cao (cm) / 1.000.000; nếu nhập m3 trực tiếp thì ưu tiên giá trị đó.
+    const m3 = Number(d.m3) || (dai && rong && cao ? Math.round((dai * rong * cao) / 1000000 * 10000) / 10000 : 0);
+    const r = await prisma.hangVoChu.create({
+      data: {
+        maVD: String(d.maVD).trim(),
+        kg: Number(d.kg) || 0, dai, rong, cao, m3,
+        anh: d.anh || null, ghiChu: d.ghiChu || null,
+        nguoiNhap: user.hoTen || user.email,
+      }
+    });
+    await logActivity(user.email, 'ADD_HANG_VO_CHU', String(r.id), { maVD: d.maVD });
+    return ok({ id: r.id });
+  },
+
+  async matchHangVoChu(args, user) {
+    if (!allow(user.vaiTro, ['KhoTQ', 'KhoVN'])) return err('Không có quyền');
+    const [id, maDH] = args;
+    if (!id || !maDH) return err('Thiếu id hàng vô chủ hoặc mã đơn');
+    const o = await prisma.donHang.findUnique({ where: { maDH: String(maDH).trim() } });
+    if (!o) return err('Đơn không tồn tại: ' + maDH);
+    const h = await prisma.hangVoChu.findUnique({ where: { id: Number(id) } });
+    if (!h) return err('Không tìm thấy hàng vô chủ');
+    await prisma.hangVoChu.update({ where: { id: Number(id) }, data: { daGan: true, maDH: o.maDH } });
+    // Gắn mã VĐ vào đơn nếu đơn chưa có
+    if (!o.maVD) await prisma.donHang.update({ where: { maDH: o.maDH }, data: { maVD: h.maVD } });
+    await logActivity(user.email, 'MATCH_HANG_VO_CHU', String(id), { maDH: o.maDH, maVD: h.maVD });
+    return ok();
+  },
+
+  async deleteHangVoChu(args, user) {
+    if (!allow(user.vaiTro, ['KhoTQ', 'KhoVN'])) return err('Không có quyền');
+    const [id] = args;
+    if (!id) return err('Thiếu id');
+    await prisma.hangVoChu.delete({ where: { id: Number(id) } });
+    await logActivity(user.email, 'DELETE_HANG_VO_CHU', String(id));
     return ok();
   },
 

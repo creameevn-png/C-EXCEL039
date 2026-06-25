@@ -29,6 +29,7 @@ export const PAGE_META: Record<string, { label: string; subtitle: string; Icon: 
   '/gio-mua-ho': { label: 'Giỏ mua hộ', subtitle: 'SP thêm từ extension 1688/Taobao/Tmall', Icon: FiShoppingCart },
   '/khotq': { label: 'Kho Trung Quốc', subtitle: 'Nhận từ NCC · chuyển về VN', Icon: FiPackage },
   '/khovn': { label: 'Kho Việt Nam', subtitle: 'Nhận từ TQ · giao khách', Icon: FiTruck },
+  '/phieu-giao': { label: 'Phiếu giao', subtitle: 'Gộp nhiều đơn 1 khách · in · công nợ theo phiếu', Icon: FiFileText },
   '/customer': { label: 'Khách hàng', subtitle: 'Theo dõi đơn của bạn', Icon: FiUser },
   '/dat-hang': { label: 'Đặt đơn hàng', subtitle: 'Tạo đơn nhanh', Icon: FiPlusCircle },
   '/in-tem': { label: 'In tem', subtitle: 'Dán lên kiện hàng', Icon: FiTag },
@@ -48,7 +49,7 @@ const ADMIN_MAIN: NavItem[] = [
 
 const ADMIN_OPS: NavItem[] = [
   item('/cskh'), item('/gdv'), item('/ketoan'),
-  item('/mua-hang'), item('/gio-mua-ho'), item('/khotq'), item('/khovn')
+  item('/mua-hang'), item('/gio-mua-ho'), item('/khotq'), item('/khovn'), item('/phieu-giao')
 ];
 
 /** Sidebar groups for a given role. Admin sees everything. */
@@ -63,7 +64,7 @@ export function navForRole(role: VaiTro): NavGroup[] {
       return [{
         items: [
           item('/cskh'), item('/admin/yeu-cau'), item('/admin/khach-hang'),
-          item('/admin/san-pham'), item('/admin/khieu-nai'), item('/in-tem')
+          item('/admin/san-pham'), item('/phieu-giao'), item('/admin/khieu-nai'), item('/in-tem')
         ]
       }];
     case 'GDV':
@@ -75,7 +76,7 @@ export function navForRole(role: VaiTro): NavGroup[] {
     case 'KhoTQ':
       return [{ items: [item('/khotq'), item('/in-tem')] }];
     case 'KhoVN':
-      return [{ items: [item('/khovn'), item('/in-tem')] }];
+      return [{ items: [item('/khovn'), item('/phieu-giao'), item('/in-tem')] }];
     case 'Customer':
       return [{ items: [item('/customer'), item('/dat-hang')] }];
     default:

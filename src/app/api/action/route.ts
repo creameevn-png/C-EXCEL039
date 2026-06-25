@@ -554,6 +554,80 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     return ok();
   },
 
+  // ============== PHIEU GIAO (Đợt 6) ==============
+  async createPhieuGiao(args, user) {
+    if (!allow(user.vaiTro, ['CSKH', 'KhoVN', 'KeToan'])) return err('Không có quyền');
+    const d = args[0] || {};
+    const maKH = d.maKH;
+    const maDHs: string[] = Array.isArray(d.maDHs) ? d.maDHs.filter(Boolean) : [];
+    if (!maKH) return err('Thiếu mã KH');
+    if (maDHs.length === 0) return err('Chọn ít nhất 1 đơn để gộp phiếu');
+    const orders = await prisma.donHang.findMany({ where: { maDH: { in: maDHs } } });
+    if (orders.length !== maDHs.length) return err('Có đơn không tồn tại');
+    const wrong = orders.find((o) => o.maKH !== maKH);
+    if (wrong) return err(`Đơn ${wrong.maDH} không thuộc khách ${maKH}`);
+    const inPhieu = orders.find((o) => o.maPhieuGiao);
+    if (inPhieu) return err(`Đơn ${inPhieu.maDH} đã nằm trong phiếu ${inPhieu.maPhieuGiao}`);
+
+    const kh = await prisma.khachHang.findUnique({ where: { maKH } });
+    const n = await prisma.phieuGiao.count();
+    const maPhieu = 'PG' + String(n + 1).padStart(4, '0');
+    const tongTien = orders.reduce((s, o) => s + o.tongTien, 0);
+    const daThu = orders.reduce((s, o) => s + o.daTra, 0);
+    const conLai = tongTien - daThu;
+
+    await prisma.$transaction([
+      prisma.phieuGiao.create({
+        data: {
+          maPhieu, maKH, tenKH: kh?.tenKH || null, soDon: orders.length,
+          tongTien, daThu, conLai, ghiChu: d.ghiChu || null, nguoiTao: user.hoTen || user.email,
+        }
+      }),
+      prisma.donHang.updateMany({ where: { maDH: { in: maDHs } }, data: { maPhieuGiao: maPhieu } }),
+    ]);
+    await logActivity(user.email, 'CREATE_PHIEU_GIAO', maPhieu, { maKH, soDon: orders.length, conLai });
+    return ok({ maPhieu, conLai });
+  },
+
+  async deletePhieuGiao(args, user) {
+    if (!allow(user.vaiTro, ['CSKH', 'KhoVN', 'KeToan'])) return err('Không có quyền');
+    const [maPhieu] = args;
+    if (!maPhieu) return err('Thiếu mã phiếu');
+    await prisma.$transaction([
+      prisma.donHang.updateMany({ where: { maPhieuGiao: maPhieu }, data: { maPhieuGiao: null } }),
+      prisma.phieuGiao.delete({ where: { maPhieu } }),
+    ]);
+    await logActivity(user.email, 'DELETE_PHIEU_GIAO', maPhieu);
+    return ok();
+  },
+
+  async getPhieuGiaoDetail(args, user) {
+    if (!user) return err('Chưa đăng nhập');
+    const [maPhieu] = args;
+    const p = await prisma.phieuGiao.findUnique({ where: { maPhieu } });
+    if (!p) return err('Phiếu không tồn tại');
+    const orders = await prisma.donHang.findMany({
+      where: { maPhieuGiao: maPhieu },
+      include: { chiTiet: { orderBy: { stt: 'asc' } } },
+      orderBy: { ngayTao: 'asc' }
+    });
+    const kh = await prisma.khachHang.findUnique({ where: { maKH: p.maKH } });
+    return ok({
+      data: {
+        maPhieu: p.maPhieu, maKH: p.maKH, tenKH: p.tenKH || kh?.tenKH || '',
+        sdt: kh?.sdt || '', diaChi: kh?.diaChi || '',
+        soDon: p.soDon, tongTien: p.tongTien, daThu: p.daThu, conLai: p.conLai,
+        nguoiTao: p.nguoiTao || '', ghiChu: p.ghiChu || '', createdAt: p.createdAt.toISOString(),
+        orders: orders.map((o) => ({
+          maDH: o.maDH, trangThai: o.trangThai,
+          nguoiNhan: o.nguoiNhan || '', diaChiNhan: o.diaChiNhan || '',
+          tongTien: o.tongTien, daTra: o.daTra, conLai: o.conLai,
+          hang: o.chiTiet.map((c) => `${c.tenSP} (x${c.soLuong})`).join(', ')
+        }))
+      }
+    });
+  },
+
   // ============== KHIEU NAI ==============
   async createKhieuNai(args, user) {
     const d = args[0] || {};

@@ -208,6 +208,9 @@ model DonHang {
 
   // Đợt 5 — đơn thuộc bao tổng nào (gộp nhiều đơn → 1 bao chuyển về VN)
   maBao       String?      @map("ma_bao")
+
+  // Đợt 6 — đơn thuộc phiếu giao gộp nào
+  maPhieuGiao String?      @map("ma_phieu_giao")
   tongTien    Float        @default(0) @map("tong_tien")
   tienCoc     Float        @default(0) @map("tien_coc")
   daTra       Float        @default(0) @map("da_tra")
@@ -263,6 +266,24 @@ model ChiTietDon {
 
   @@index([maDH, stt])
   @@map("chi_tiet_don")
+}
+
+/// Đợt 6 — phiếu giao gộp nhiều đơn của 1 khách; công nợ tính theo phiếu.
+model PhieuGiao {
+  id        Int      @id @default(autoincrement())
+  maPhieu   String   @unique @map("ma_phieu")
+  maKH      String   @map("ma_kh")
+  tenKH     String?  @map("ten_kh")
+  soDon     Int      @default(0) @map("so_don")
+  tongTien  Float    @default(0) @map("tong_tien")
+  daThu     Float    @default(0) @map("da_thu")
+  conLai    Float    @default(0) @map("con_lai")
+  nguoiTao  String?  @map("nguoi_tao")
+  ghiChu    String?  @map("ghi_chu") @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([maKH, createdAt(sort: Desc)])
+  @@map("phieu_giao")
 }
 
 /// Đợt 5 — bao tổng (lô/chuyến): gộp nhiều đơn theo line, đóng 1 mã bao, xuất về VN.

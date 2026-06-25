@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth';
 import { computeOrderTotals } from '@/lib/shipping-fee';
 import { nextMaDH, nextMaKH, nextMaSP, nextMaKN, nextMaYC, nextMaNCC } from '@/lib/codes';
 import { logActivity } from '@/lib/audit';
+import { pushNotify } from '@/lib/notify';
 import { getNumber } from '@/lib/settings';
 import type { VaiTro, TrangThaiDon, Tuyen, LineVC, LoaiKN, TrangThaiKN, TrangThaiYC } from '@prisma/client';
 
@@ -155,6 +156,12 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
 
     await recomputeDonHang(maDH);
     await logActivity(user.email, 'CREATE_ORDER', maDH, { maKH: kh.maKH, items: items.length });
+    await pushNotify({
+      vaiTro: ['GDV'], loai: 'info', maDH,
+      tieuDe: `Đơn mới ${maDH}`,
+      noiDung: `${kh.tenKH} · ${items.length} SP · chờ đặt cọc / xử lý`,
+      link: '/gdv', nguoiTao: user.email
+    });
     return ok({ maDH });
   },
 
@@ -514,6 +521,12 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       prisma.baoTong.update({ where: { maBao }, data: { trangThai: 'DaXuat', xuatAt: new Date() } }),
     ]);
     await logActivity(user.email, 'XUAT_BAO', maBao, { soDon: orders.length });
+    await pushNotify({
+      vaiTro: ['KhoVN'], loai: 'info',
+      tieuDe: `Bao ${maBao} đang về VN`,
+      noiDung: `${orders.length} đơn (${bao.line}) đã xuất từ kho TQ`,
+      link: '/khovn', nguoiTao: user.email
+    });
     return ok({ soDon: orders.length });
   },
 
@@ -647,6 +660,12 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       }
     });
     await logActivity(user?.email || null, 'CREATE_KHIEU_NAI', maKN, { loai: d.loai });
+    await pushNotify({
+      vaiTro: ['CSKH', 'Admin'], loai: 'warning', maDH: d.maDH || undefined,
+      tieuDe: `Khiếu nại mới ${maKN}`,
+      noiDung: `${d.maDH ? 'Đơn ' + d.maDH + ' · ' : ''}${String(d.moTa).slice(0, 80)}`,
+      link: '/admin/khieu-nai', nguoiTao: d.nguoiTao || user?.email || 'KH'
+    });
     return ok({ maKN });
   },
 

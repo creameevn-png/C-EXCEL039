@@ -1,11 +1,25 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { FiSearch, FiInbox, FiEdit2, FiX, FiCheck, FiClock } from 'react-icons/fi';
+import { FiSearch, FiInbox, FiEdit2, FiX, FiCheck, FiClock, FiFilter, FiDownload } from 'react-icons/fi';
 import { formatCurrency, formatDate } from '@/lib/format';
-import { statusToClass, statusToLabel, LINE_LABEL } from '@/lib/status';
+import { statusToClass, statusToLabel, LINE_LABEL, TRANG_THAI_LABEL, TUYEN_LABEL } from '@/lib/status';
 import { callServer, reload } from '@/lib/client';
 import { showToast } from '@/components/Toast';
+
+function exportOrdersCSV(rows: Row[]) {
+  const esc = (v: any) => { const s = String(v ?? ''); return /[",\n\r;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const headers = ['Mã đơn', 'Ngày', 'Mã KH', 'Khách hàng', 'Tổng tiền', 'Còn lại', 'Trạng thái', 'Tuyến', 'Line', 'NV', 'Mã GD', 'Mã VĐ'];
+  const body = rows.map((o) => [o.maDH, formatDate(o.ngayTao), o.maKH, o.tenKH, o.tongTien, o.conLai,
+    (TRANG_THAI_LABEL as any)[o.trangThai] || o.trangThai, (TUYEN_LABEL as any)[o.tuyen] || o.tuyen,
+    (LINE_LABEL as any)[o.lineVC] || o.lineVC, o.nvTao, o.maGD, o.maVD]);
+  const csv = [headers, ...body].map((r) => r.map(esc).join(',')).join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'don_hang.csv'; document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
 
 type Row = {
   maDH: string; ngayTao: string; tenKH: string; maKH: string;
@@ -17,6 +31,12 @@ type Row = {
 
 export default function DonHangTable({ orders }: { orders: Row[] }) {
   const [q, setQ] = useState('');
+  const [fStatus, setFStatus] = useState('');
+  const [fLine, setFLine] = useState('');
+  const [fTuyen, setFTuyen] = useState('');
+  const [fNo, setFNo] = useState(''); // '' | 'con' | 'het'
+  const [fFrom, setFFrom] = useState('');
+  const [fTo, setFTo] = useState('');
   const [edit, setEdit] = useState<Row | null>(null);
   const [form, setForm] = useState<any>({});
   const [busy, setBusy] = useState(false);
@@ -43,19 +63,76 @@ export default function DonHangTable({ orders }: { orders: Row[] }) {
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
-    if (!s) return orders;
-    return orders.filter((o) =>
-      [o.maDH, o.tenKH, o.maKH, o.maGD, o.maVD].some((v) => (v || '').toLowerCase().includes(s))
-    );
-  }, [orders, q]);
+    const from = fFrom ? new Date(fFrom + 'T00:00:00').getTime() : 0;
+    const to = fTo ? new Date(fTo + 'T23:59:59').getTime() : 0;
+    return orders.filter((o) => {
+      if (s && ![o.maDH, o.tenKH, o.maKH, o.maGD, o.maVD].some((v) => (v || '').toLowerCase().includes(s))) return false;
+      if (fStatus && o.trangThai !== fStatus) return false;
+      if (fLine && o.lineVC !== fLine) return false;
+      if (fTuyen && o.tuyen !== fTuyen) return false;
+      if (fNo === 'con' && o.conLai <= 0.5) return false;
+      if (fNo === 'het' && o.conLai > 0.5) return false;
+      if (from || to) {
+        const t = new Date(o.ngayTao).getTime();
+        if (from && t < from) return false;
+        if (to && t > to) return false;
+      }
+      return true;
+    });
+  }, [orders, q, fStatus, fLine, fTuyen, fNo, fFrom, fTo]);
+
+  const sumTongTien = filtered.reduce((s, o) => s + o.tongTien, 0);
+  const sumConLai = filtered.reduce((s, o) => s + o.conLai, 0);
+  const hasFilter = q || fStatus || fLine || fTuyen || fNo || fFrom || fTo;
+  function clearFilters() { setQ(''); setFStatus(''); setFLine(''); setFTuyen(''); setFNo(''); setFFrom(''); setFTo(''); }
 
   return (
     <>
-      <div className="form-field" style={{ maxWidth: 360, marginBottom: 14 }}>
-        <div style={{ position: 'relative' }}>
-          <FiSearch style={{ position: 'absolute', left: 10, top: 10, color: 'var(--text-faint)' }} />
-          <input style={{ paddingLeft: 32 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm mã đơn / KH / mã GD / VĐ..." />
+      <div className="form-grid" style={{ marginBottom: 10 }}>
+        <div className="form-field">
+          <div style={{ position: 'relative' }}>
+            <FiSearch style={{ position: 'absolute', left: 10, top: 10, color: 'var(--text-faint)' }} />
+            <input style={{ paddingLeft: 32 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm mã đơn / KH / mã GD / VĐ..." />
+          </div>
         </div>
+        <div className="form-field">
+          <select value={fStatus} onChange={(e) => setFStatus(e.target.value)}>
+            <option value="">— Mọi trạng thái —</option>
+            {Object.entries(TRANG_THAI_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+        </div>
+        <div className="form-field">
+          <select value={fLine} onChange={(e) => setFLine(e.target.value)}>
+            <option value="">— Mọi line —</option>
+            {Object.entries(LINE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+        </div>
+        <div className="form-field">
+          <select value={fTuyen} onChange={(e) => setFTuyen(e.target.value)}>
+            <option value="">— Mọi tuyến —</option>
+            {Object.entries(TUYEN_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+        </div>
+      </div>
+      <div className="form-grid" style={{ marginBottom: 14, alignItems: 'end' }}>
+        <div className="form-field">
+          <label style={{ fontSize: 11 }}>Công nợ</label>
+          <select value={fNo} onChange={(e) => setFNo(e.target.value)}>
+            <option value="">— Tất cả —</option>
+            <option value="con">Còn nợ</option>
+            <option value="het">Đã thu đủ</option>
+          </select>
+        </div>
+        <div className="form-field"><label style={{ fontSize: 11 }}>Từ ngày</label><input type="date" value={fFrom} onChange={(e) => setFFrom(e.target.value)} /></div>
+        <div className="form-field"><label style={{ fontSize: 11 }}>Đến ngày</label><input type="date" value={fTo} onChange={(e) => setFTo(e.target.value)} /></div>
+        <div className="form-field" style={{ display: 'flex', gap: 6, alignItems: 'end' }}>
+          {hasFilter && <button className="btn btn-secondary btn-sm" onClick={clearFilters}><FiX /> Xoá lọc</button>}
+          <button className="btn btn-secondary btn-sm" onClick={() => exportOrdersCSV(filtered)} disabled={!filtered.length}><FiDownload /> Excel</button>
+        </div>
+      </div>
+
+      <div className="icon-inline" style={{ marginBottom: 10, fontSize: 12, color: 'var(--text-muted)' }}>
+        <FiFilter /> <b>{filtered.length}</b>/{orders.length} đơn · Tổng tiền <b>{formatCurrency(sumTongTien)}</b> · Còn nợ <b style={{ color: sumConLai > 0 ? 'var(--danger-dark)' : 'var(--success-dark)' }}>{formatCurrency(sumConLai)}</b>
       </div>
 
       {filtered.length === 0 ? (

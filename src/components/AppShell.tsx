@@ -6,6 +6,7 @@ import { FiLogOut, FiMenu, FiPackage } from 'react-icons/fi';
 import type { SessionUser } from '@/lib/auth';
 import type { VaiTro } from '@prisma/client';
 import { navForRole, pageMetaFor } from '@/lib/nav';
+import NotifyBell from '@/components/NotifyBell';
 
 const ROLE_BADGE: Record<VaiTro, { label: string; bg: string; color: string }> = {
   Admin: { label: 'ADMIN', bg: '#fee2e2', color: '#991b1b' },
@@ -117,7 +118,8 @@ export default function AppShell({ user, title, subtitle, appName, children }: P
             <h1>{title || meta.label}</h1>
             {(subtitle ?? meta.subtitle) && <p>{subtitle ?? meta.subtitle}</p>}
           </div>
-          <div className="tb-right">
+          <div className="tb-right" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {user.vaiTro !== 'Customer' && <NotifyBell />}
             <span className="role-badge" style={{ background: badge.bg, color: badge.color }}>
               {badge.label}
             </span>

@@ -543,6 +543,24 @@ model GioMuaHo {
   @@map("gio_mua_ho")
 }
 
+/// Đợt 10 — thông báo nội bộ (notify gần realtime qua polling). vaiTro = đối tượng
+/// nhận (null = mọi vai trò). Trạng thái "đã đọc" lưu client-side theo mốc lastSeen.
+model ThongBao {
+  id        Int      @id @default(autoincrement())
+  ngay      DateTime @default(now())
+  vaiTro    String?  @map("vai_tro")
+  loai      String   @default("info")
+  tieuDe    String   @map("tieu_de")
+  noiDung   String?  @map("noi_dung") @db.Text
+  link      String?
+  maDH      String?  @map("ma_dh")
+  nguoiTao  String?  @map("nguoi_tao")
+
+  @@index([vaiTro, ngay(sort: Desc)])
+  @@index([ngay(sort: Desc)])
+  @@map("thong_bao")
+}
+
 model ChungTu {
   id        Int          @id @default(autoincrement())
   maCT      String       @unique @map("ma_ct")

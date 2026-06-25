@@ -3,7 +3,7 @@ import type { IconType } from 'react-icons';
 import {
   FiGrid, FiShoppingBag, FiUsers, FiBox, FiUserCheck, FiAlertTriangle,
   FiDollarSign, FiSettings, FiFileText, FiBriefcase, FiTrendingUp,
-  FiShoppingCart, FiPackage, FiTruck, FiUser, FiPlusCircle, FiTag, FiSearch, FiInbox, FiBarChart2
+  FiShoppingCart, FiPackage, FiTruck, FiUser, FiPlusCircle, FiTag, FiSearch, FiInbox, FiBarChart2, FiGlobe
 } from 'react-icons/fi';
 
 export type NavItem = { href: string; label: string; Icon: IconType };
@@ -19,6 +19,8 @@ export const PAGE_META: Record<string, { label: string; subtitle: string; Icon: 
   '/admin/yeu-cau': { label: 'Yêu cầu mua', subtitle: 'Khách gửi yêu cầu order', Icon: FiInbox },
   '/admin/khieu-nai': { label: 'Khiếu nại', subtitle: 'Xử lý · duyệt 2 tầng', Icon: FiAlertTriangle },
   '/admin/bang-gia': { label: 'Bảng giá', subtitle: '3 line vận chuyển × loại hàng', Icon: FiDollarSign },
+  '/admin/bang-gia-web': { label: 'Bảng giá theo web', subtitle: 'Tỷ giá · % phí mua theo 1688/Taobao/Tmall', Icon: FiGlobe },
+  '/cong-no-ncc': { label: 'Công nợ NCC', subtitle: 'Phải trả NCC/shop TQ theo shop & đơn', Icon: FiTruck },
   '/admin/cai-dat': { label: 'Cài đặt', subtitle: 'Tỷ giá · phí · thông tin DN', Icon: FiSettings },
   '/admin/audit-log': { label: 'Audit log', subtitle: 'Lịch sử hoạt động hệ thống', Icon: FiFileText },
   '/bao-cao': { label: 'Báo cáo', subtitle: 'Sản lượng · doanh thu · KQKD theo tháng/quý', Icon: FiBarChart2 },
@@ -44,12 +46,12 @@ function item(href: string): NavItem {
 const ADMIN_MAIN: NavItem[] = [
   item('/admin'), item('/admin/don-hang'), item('/admin/yeu-cau'), item('/admin/khach-hang'),
   item('/admin/san-pham'), item('/admin/users'), item('/admin/khieu-nai'),
-  item('/admin/bang-gia'), item('/bao-cao'), item('/admin/cai-dat'), item('/admin/audit-log')
+  item('/admin/bang-gia'), item('/admin/bang-gia-web'), item('/bao-cao'), item('/admin/cai-dat'), item('/admin/audit-log')
 ];
 
 const ADMIN_OPS: NavItem[] = [
   item('/cskh'), item('/gdv'), item('/ketoan'),
-  item('/mua-hang'), item('/gio-mua-ho'), item('/khotq'), item('/khovn'), item('/phieu-giao')
+  item('/mua-hang'), item('/cong-no-ncc'), item('/gio-mua-ho'), item('/khotq'), item('/khovn'), item('/phieu-giao')
 ];
 
 /** Sidebar groups for a given role. Admin sees everything. */
@@ -70,9 +72,9 @@ export function navForRole(role: VaiTro): NavGroup[] {
     case 'GDV':
       return [{ items: [item('/gdv')] }];
     case 'KeToan':
-      return [{ items: [item('/ketoan'), item('/bao-cao'), item('/admin/khach-hang'), item('/admin/khieu-nai')] }];
+      return [{ items: [item('/ketoan'), item('/bao-cao'), item('/cong-no-ncc'), item('/admin/khach-hang'), item('/admin/khieu-nai')] }];
     case 'MuaHang':
-      return [{ items: [item('/mua-hang'), item('/gio-mua-ho'), item('/admin/san-pham')] }];
+      return [{ items: [item('/mua-hang'), item('/cong-no-ncc'), item('/gio-mua-ho'), item('/admin/san-pham')] }];
     case 'KhoTQ':
       return [{ items: [item('/khotq'), item('/in-tem')] }];
     case 'KhoVN':

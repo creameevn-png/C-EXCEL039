@@ -438,6 +438,41 @@ model BangGia {
   @@map("bang_gia")
 }
 
+/// Đợt 8 — bảng giá mua hàng theo website nguồn (tỷ giá + % phí mua + phí tối thiểu).
+/// Giúp CSKH/Mua hàng báo giá nhất quán theo từng sàn (1688/Taobao/Tmall/Alibaba…).
+model BangGiaWeb {
+  id        Int      @id @default(autoincrement())
+  web       String   @unique
+  tyGia     Float    @default(3650) @map("ty_gia")
+  phiMuaPct Float    @default(0) @map("phi_mua_pct")
+  phiMuaMin Float    @default(0) @map("phi_mua_min")
+  ghiChu    String?  @map("ghi_chu") @db.Text
+  hoatDong  Boolean  @default(true) @map("hoat_dong")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("bang_gia_web")
+}
+
+/// Đợt 8 — sổ công nợ nhà cung cấp / shop TQ theo từng shop + theo đơn.
+/// loai: "PhatSinh" (mua hàng → tăng nợ phải trả) | "ThanhToan" (trả NCC → giảm nợ).
+model CongNoNCC {
+  id        Int      @id @default(autoincrement())
+  ngay      DateTime @default(now())
+  doiTac    String   @map("doi_tac")
+  web       String?
+  maDH      String?  @map("ma_dh")
+  loai      String   @default("PhatSinh")
+  soTien    Float    @default(0) @map("so_tien")
+  soTienNDT Float    @default(0) @map("so_tien_ndt")
+  tyGia     Float    @default(0) @map("ty_gia")
+  ghiChu    String?  @map("ghi_chu") @db.Text
+  nguoiTao  String?  @map("nguoi_tao")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([doiTac, ngay(sort: Desc)])
+  @@map("cong_no_ncc")
+}
+
 model NguonHang {
   id           Int      @id @default(autoincrement())
   tenSP        String   @map("ten_sp")

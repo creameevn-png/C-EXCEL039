@@ -1018,6 +1018,65 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     return ok({ count: r.count });
   },
 
+  // ============== ĐỢT 8: BANG GIA THEO WEB ==============
+  async upsertBangGiaWeb(args, user) {
+    if (user.vaiTro !== 'Admin') return err('Chỉ Admin sửa bảng giá web');
+    const d = args[0] || {};
+    const web = String(d.web || '').trim().toLowerCase();
+    if (!web) return err('Vui lòng nhập tên web (vd: 1688, taobao, tmall)');
+    const data = {
+      tyGia: Number(d.tyGia) || 3650,
+      phiMuaPct: Number(d.phiMuaPct) || 0,
+      phiMuaMin: Number(d.phiMuaMin) || 0,
+      ghiChu: d.ghiChu || null,
+      hoatDong: d.hoatDong === undefined ? true : !!d.hoatDong
+    };
+    await prisma.bangGiaWeb.upsert({ where: { web }, update: data, create: { web, ...data } });
+    await logActivity(user.email, 'UPSERT_BANG_GIA_WEB', web, data);
+    return ok();
+  },
+
+  async deleteBangGiaWeb(args, user) {
+    if (user.vaiTro !== 'Admin') return err('Chỉ Admin');
+    const [web] = args;
+    if (!web) return err('Thiếu web');
+    await prisma.bangGiaWeb.delete({ where: { web: String(web) } });
+    await logActivity(user.email, 'DEL_BANG_GIA_WEB', String(web));
+    return ok();
+  },
+
+  // ============== ĐỢT 8: CONG NO NCC / SHOP ==============
+  async addCongNoNCC(args, user) {
+    if (!allow(user.vaiTro, ['MuaHang', 'KeToan'])) return err('Không có quyền');
+    const d = args[0] || {};
+    const doiTac = String(d.doiTac || '').trim();
+    if (!doiTac) return err('Vui lòng nhập tên shop / NCC');
+    const loai = d.loai === 'ThanhToan' ? 'ThanhToan' : 'PhatSinh';
+    const ndt = Number(d.soTienNDT) || 0;
+    const tyGia = Number(d.tyGia) || 0;
+    let soTien = Number(d.soTien) || 0;
+    if (!soTien && ndt && tyGia) soTien = Math.round(ndt * tyGia);
+    if (soTien <= 0) return err('Số tiền không hợp lệ');
+    await prisma.congNoNCC.create({
+      data: {
+        doiTac, web: d.web || null, maDH: d.maDH || null, loai,
+        soTien, soTienNDT: ndt, tyGia,
+        ghiChu: d.ghiChu || null, nguoiTao: user.email
+      }
+    });
+    await logActivity(user.email, loai === 'ThanhToan' ? 'NCC_THANH_TOAN' : 'NCC_PHAT_SINH', doiTac, { soTien, maDH: d.maDH });
+    return ok();
+  },
+
+  async deleteCongNoNCC(args, user) {
+    if (!allow(user.vaiTro, ['MuaHang', 'KeToan'])) return err('Không có quyền');
+    const [id] = args;
+    if (!id) return err('Thiếu id');
+    await prisma.congNoNCC.delete({ where: { id: Number(id) } });
+    await logActivity(user.email, 'NCC_XOA_BUT_TOAN', String(id));
+    return ok();
+  },
+
   // ============== KE TOAN: VI / DINH KHOAN QUY ==============
   async walletTxn(args, user) {
     if (!allow(user.vaiTro, ['KeToan'])) return err('Không có quyền');

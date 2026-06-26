@@ -523,6 +523,7 @@ model GioMuaHo {
   productId   String?   @map("product_id")
   productUrl  String?   @map("product_url") @db.Text
   title       String    @db.Text
+  titleVi     String?   @map("title_vi") @db.Text // tên dịch sang tiếng Việt (extension tự dịch)
   image       String?   @db.Text
   images      String?   @db.Text // JSON array URL
   priceText   String?   @map("price_text")

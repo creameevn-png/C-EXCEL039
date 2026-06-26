@@ -1,14 +1,15 @@
 {
   "manifest_version": 3,
   "name": "Mua Hộ Cừ - 1688, Taobao & Tmall",
-  "version": "2.2.0",
-  "description": "Thêm sản phẩm 1688 / Taobao / Tmall vào hệ thống mua hộ: nút trên trang chi tiết + thêm nhanh từ trang tìm kiếm, tự bắt phân loại (SKU), bậc giá & số lượng tối thiểu; xem đơn đã đặt.",
+  "version": "2.3.0",
+  "description": "Thêm sản phẩm 1688 / Taobao / Tmall vào hệ thống mua hộ: nút trên trang chi tiết + thêm nhanh từ trang tìm kiếm, tự bắt phân loại (SKU), bậc giá & số lượng tối thiểu; tự dịch tiếng Trung sang tiếng Việt; xem đơn đã đặt.",
   "default_locale": "vi",
   "permissions": ["storage", "scripting", "activeTab"],
   "host_permissions": [
     "https://*.1688.com/*",
     "https://*.taobao.com/*",
     "https://*.tmall.com/*",
+    "https://translate.googleapis.com/*",
     "http://localhost:3000/*",
     "https://cuexcel.vercel.app/*"
   ],

@@ -27,6 +27,7 @@ export default async function GioMuaHoPage() {
     productId: r.productId || '',
     productUrl: r.productUrl || '',
     title: r.title,
+    titleVi: r.titleVi || '',
     image: r.image || '',
     priceText: r.priceText || '',
     priceValue: r.priceValue,

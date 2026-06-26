@@ -34,6 +34,7 @@ export async function POST(req: Request) {
         productId: b.productId != null ? String(b.productId) : null,
         productUrl: b.productUrl != null ? String(b.productUrl) : null,
         title,
+        titleVi: b.titleVi != null && String(b.titleVi).trim() ? String(b.titleVi).trim() : null,
         image: b.image != null ? String(b.image) : null,
         images: asJson(b.images),
         priceText: b.priceText != null ? String(b.priceText) : null,

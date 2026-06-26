@@ -2,7 +2,7 @@
 
 const $ = (id) => document.getElementById(id);
 const els = {
-  apiBase: $("apiBase"), username: $("username"), password: $("password"), token: $("token"),
+  apiBase: $("apiBase"), username: $("username"), password: $("password"), token: $("token"), autoTranslate: $("autoTranslate"),
   loginBtn: $("loginBtn"), saveTokenBtn: $("saveTokenBtn"), testBtn: $("testBtn"), logoutBtn: $("logoutBtn"),
   status: $("status"), refreshCart: $("refreshCart"), resetBadge: $("resetBadge"),
   cartList: $("cartList"), cartCount: $("cartCount"),
@@ -27,13 +27,18 @@ function showStatus(message, ok) {
 }
 
 function load() {
-  chrome.storage.local.get(["apiBase", "token", "mhAdded"], (s) => {
+  chrome.storage.local.get(["apiBase", "token", "mhAdded", "autoTranslate"], (s) => {
     els.apiBase.value = s.apiBase || "";
     els.token.value = s.token || "";
+    els.autoTranslate.checked = s.autoTranslate !== false; // mặc định BẬT
     els.cartCount.textContent = "Đã thêm phiên này: " + (s.mhAdded || 0);
     if (s.token) showStatus("Đã có phiên đăng nhập.", true);
   });
 }
+
+els.autoTranslate.addEventListener("change", () => {
+  chrome.storage.local.set({ autoTranslate: els.autoTranslate.checked });
+});
 
 function saveApiBase() {
   const apiBase = els.apiBase.value.trim().replace(/\/+$/, "");

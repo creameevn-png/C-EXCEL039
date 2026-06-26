@@ -55,6 +55,8 @@
 **Thoại:**
 > "Vào trang sản phẩm bất kỳ, bấm *Thêm vào giỏ mua hộ*. Extension **tự lấy** tên, ảnh, giá, **bậc giá theo số lượng**, **phân loại** và **số lượng tối thiểu** — mình chỉ chọn phân loại, nhập số lượng, ghi chú rồi xác nhận. Không phải gõ tay gì cả."
 
+> ⭐ **Dịch tiếng Trung (nếu bật):** ngay khi modal mở, dưới tên tiếng Trung hiện dòng **🇻🇳 tên tiếng Việt** (và bản dịch phân loại). Dừng 2 giây cho khách thấy. *(Bật/tắt ở tab Cấu hình — ô "Tự dịch tiếng Trung → tiếng Việt".)*
+
 ---
 
 ### CẢNH 4 — Thêm NHANH từ TRANG TÌM KIẾM (1:25 – 1:55)
@@ -91,7 +93,7 @@
 
 ### CẢNH 7 — Kết (2:50 – 3:00)
 **Thoại/caption:**
-> "Extension hỗ trợ **1688 · Taobao · Tmall**, tự bắt sản phẩm đẩy thẳng vào hệ thống. *(Dịch tiếng Trung tự động là tính năng mở rộng, có thể bổ sung sau.)*"
+> "Extension hỗ trợ **1688 · Taobao · Tmall**, **tự dịch tiếng Trung sang tiếng Việt**, bắt sản phẩm đẩy thẳng vào hệ thống — không nhập tay."
 
 ---
 

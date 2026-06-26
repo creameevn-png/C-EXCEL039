@@ -10,7 +10,7 @@ import { callServer, reload } from '@/lib/client';
 import { showToast } from '@/components/Toast';
 
 type Item = {
-  id: number; source: string; productId: string; productUrl: string; title: string;
+  id: number; source: string; productId: string; productUrl: string; title: string; titleVi?: string;
   image: string; priceText: string; priceValue: number | null; currency: string;
   quantity: number; minQuantity: number; skuText: string; note: string;
   nguoiThem: string; createdAt: string;
@@ -125,9 +125,10 @@ export default function GioMuaHoClient({ items, tyGia, isAdmin }: { items: Item[
                     </td>
                     <td style={{ maxWidth: 320 }}>
                       <div style={{ fontWeight: 600, lineHeight: 1.3 }}>
-                        {it.title}
+                        {it.titleVi || it.title}
                         {it.productUrl && <a href={it.productUrl} target="_blank" className="icon-inline" style={{ color: 'var(--primary)', marginLeft: 6 }}><FiExternalLink /></a>}
                       </div>
+                      {it.titleVi && <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 1 }}>{it.title}</div>}
                       {it.note && <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: 2 }}>“{it.note}”</div>}
                     </td>
                     <td><span className="role-badge" style={{ background: badge.bg, color: badge.color }}>{badge.label}</span></td>

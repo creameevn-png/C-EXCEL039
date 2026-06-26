@@ -54,6 +54,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "MH_TEST") { handleTest().then(sendResponse); return true; }
   if (msg.type === "MH_GET_CART") { handleGetCart().then(sendResponse); return true; }
   if (msg.type === "MH_GET_ORDERS") { handleGetOrders().then(sendResponse); return true; }
+  if (msg.type === "MH_TRANSLATE") { handleTranslate(msg.texts).then(sendResponse); return true; }
   if (msg.type === "MH_RESET_BADGE") {
     chrome.storage.local.set({ mhAdded: 0 });
     chrome.action.setBadgeText({ text: "" });
@@ -125,6 +126,37 @@ async function handleGetCart() {
   }
   if (res.status === 401) return { ok: false, needSetup: true, message: "Chưa đăng nhập." };
   return { ok: false, message: res.message || "Không lấy được giỏ hàng." };
+}
+
+/* ---- Dịch tiếng Trung -> tiếng Việt (Google free endpoint, không cần API key) ---- */
+async function translateOne(text) {
+  const q = String(text || "").trim();
+  if (!q) return "";
+  // Chỉ dịch khi có ký tự CJK (tránh dịch thừa tên đã là tiếng Việt/Anh)
+  if (!/[一-鿿]/.test(q)) return q;
+  try {
+    const url =
+      "https://translate.googleapis.com/translate_a/single?client=gtx&sl=zh-CN&tl=vi&dt=t&q=" +
+      encodeURIComponent(q.slice(0, 1800));
+    const resp = await fetch(url);
+    if (!resp.ok) return "";
+    const data = await resp.json();
+    // data[0] = mảng các đoạn [bảnDịch, bảnGốc, ...]
+    if (Array.isArray(data) && Array.isArray(data[0])) {
+      return data[0].map((seg) => (seg && seg[0]) || "").join("");
+    }
+  } catch (_) { /* lỗi mạng -> trả rỗng, content giữ nguyên bản gốc */ }
+  return "";
+}
+
+async function handleTranslate(texts) {
+  const list = Array.isArray(texts) ? texts.slice(0, 12) : [texts];
+  try {
+    const out = await Promise.all(list.map(translateOne));
+    return { ok: true, translations: out };
+  } catch (e) {
+    return { ok: false, message: "Dịch thất bại.", translations: [] };
+  }
 }
 
 async function handleGetOrders() {

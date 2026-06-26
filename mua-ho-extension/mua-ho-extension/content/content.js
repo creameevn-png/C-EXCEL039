@@ -43,9 +43,28 @@
   }
   function removeButton() { const f = document.getElementById(PREFIX + "-fab"); if (f) f.remove(); }
 
+  /* ---------- Dịch tiếng Trung -> tiếng Việt ---------- */
+  function translateTexts(texts) {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage({ type: "MH_TRANSLATE", texts }, (res) => {
+          if (chrome.runtime.lastError || !res || !res.ok) return resolve([]);
+          resolve(res.translations || []);
+        });
+      } catch (_) { resolve([]); }
+    });
+  }
+  function getAutoTranslate() {
+    return new Promise((resolve) => {
+      try { chrome.storage.local.get(["autoTranslate"], (s) => resolve(s.autoTranslate !== false)); }
+      catch (_) { resolve(true); }
+    });
+  }
+
   /* ---------- Modal ---------- */
   function openModal(product) {
     closeModal();
+    let viTitle = "";
     const overlay = el("div", "mh-overlay");
     overlay.id = PREFIX + "-overlay";
 
@@ -73,6 +92,7 @@
             <div class="mh-thumb">${product.image ? `<img src="${product.image}" alt="">` : "🧶"}</div>
             <div class="mh-prod-meta">
               <textarea class="mh-field mh-name" rows="2" placeholder="Tên sản phẩm">${escapeHtml(product.title)}</textarea>
+              <div class="mh-vi" style="display:none;font-size:12px;color:#0a7d33;margin:2px 0 4px;line-height:1.3"></div>
               <div class="mh-price">${escapeHtml(priceLine)}</div>
               <div class="mh-id">Mã: ${product.productId || "—"}</div>
             </div>
@@ -102,8 +122,28 @@
       const qty = Math.max(1, parseInt(overlay.querySelector(".mh-qty").value, 10) || 1);
       const note = overlay.querySelector(".mh-note").value.trim();
       const title = overlay.querySelector(".mh-name").value.trim();
-      submit({ ...product, title, quantity: qty, note }, overlay);
+      submit({ ...product, title, titleVi: viTitle, quantity: qty, note }, overlay);
     });
+
+    // Tự dịch tiếng Trung -> tiếng Việt (tên SP + phân loại) nếu bật trong cấu hình.
+    (async () => {
+      if (!(await getAutoTranslate())) return;
+      const viBox = overlay.querySelector(".mh-vi");
+      const skuBox = overlay.querySelector(".mh-sku");
+      if (viBox) { viBox.style.display = "block"; viBox.textContent = "🇻🇳 Đang dịch…"; }
+      const [tTitle, tSku] = await translateTexts([product.title || "", product.skuText || ""]);
+      if (!document.getElementById(PREFIX + "-overlay")) return; // modal đã đóng
+      if (viBox) {
+        if (tTitle && tTitle !== product.title) { viTitle = tTitle; viBox.textContent = "🇻🇳 " + tTitle; }
+        else { viBox.style.display = "none"; }
+      }
+      if (skuBox && tSku && tSku !== product.skuText) {
+        const add = el("div", "mh-sku-vi");
+        add.style.cssText = "font-size:12px;color:#0a7d33;margin-top:2px";
+        add.textContent = "🇻🇳 " + tSku;
+        skuBox.appendChild(add);
+      }
+    })();
   }
   function closeModal() { const o = document.getElementById(PREFIX + "-overlay"); if (o) o.remove(); }
 

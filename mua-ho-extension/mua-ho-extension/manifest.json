@@ -1,9 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Mua Hộ Cừ - 1688, Taobao & Tmall",
-  "version": "2.6.0",
+  "version": "2.6.1",
   "description": "Khách mua hộ từ 1688 / Taobao / Tmall: bấm 'Tôi muốn đặt sản phẩm này' để gửi yêu cầu đặt hàng về hệ thống. Xem giá VNĐ (tỉ giá hệ thống), tự dịch tiếng Trung sang tiếng Việt, chọn danh mục, ghi chú; xem 'Yêu cầu của tôi'.",
-  "default_locale": "vi",
   "permissions": ["storage", "scripting", "activeTab"],
   "host_permissions": [
     "https://*.1688.com/*",

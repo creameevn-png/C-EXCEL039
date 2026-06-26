@@ -51,35 +51,39 @@ export async function POST(req: Request) {
   };
 
   // Tìm yêu cầu đang mở của khách (theo SĐT) để gộp; không có thì tạo mới.
-  const open = await prisma.yeuCauMua.findFirst({
-    where: { sdt, trangThai: 'ChoXuLy' },
-    orderBy: { ngayTao: 'desc' }
-  });
-
-  if (open) {
-    let arr: any[] = [];
-    try { arr = JSON.parse(open.sanPham || '[]'); } catch { arr = []; }
-    arr.push(item);
-    await prisma.yeuCauMua.update({
-      where: { id: open.id },
-      data: { sanPham: JSON.stringify(arr), hoTen, email: b.email ? String(b.email).trim() : open.email, maKH: maKH || open.maKH }
+  // Bọc đọc→ghi trong 1 transaction để 2 lần bấm nhanh không ghi đè mất nhau.
+  const emailIn = b.email ? String(b.email).trim() : null;
+  const tuyenIn = normTuyen(b.tuyen);
+  const result = await prisma.$transaction(async (tx) => {
+    const open = await tx.yeuCauMua.findFirst({
+      where: { sdt, trangThai: 'ChoXuLy' },
+      orderBy: { ngayTao: 'desc' }
     });
-    return corsJson({ success: true, maYC: open.maYC, count: arr.length, merged: true });
-  }
-
-  const maYC = await nextMaYC();
-  await prisma.yeuCauMua.create({
-    data: {
-      maYC, hoTen, sdt,
-      email: b.email ? String(b.email).trim() : null,
-      maKH,
-      tuyen: normTuyen(b.tuyen),
-      sanPham: JSON.stringify([item]),
-      ghiChu: 'Gửi từ Extension Mua hộ',
-      trangThai: 'ChoXuLy'
+    if (open) {
+      let arr: any[] = [];
+      try { arr = JSON.parse(open.sanPham || '[]'); } catch { arr = []; }
+      arr.push(item);
+      await tx.yeuCauMua.update({
+        where: { id: open.id },
+        data: { sanPham: JSON.stringify(arr), hoTen, email: emailIn || open.email, maKH: maKH || open.maKH }
+      });
+      return { maYC: open.maYC, count: arr.length, merged: true };
     }
+    const maYC = await nextMaYC();
+    await tx.yeuCauMua.create({
+      data: {
+        maYC, hoTen, sdt,
+        email: emailIn,
+        maKH,
+        tuyen: tuyenIn,
+        sanPham: JSON.stringify([item]),
+        ghiChu: 'Gửi từ Extension Mua hộ',
+        trangThai: 'ChoXuLy'
+      }
+    });
+    return { maYC, count: 1, merged: false };
   });
-  return corsJson({ success: true, maYC, count: 1, merged: false });
+  return corsJson({ success: true, ...result });
 }
 
 // GET /api/ext/yeu-cau?sdt=... — "Yêu cầu của tôi": liệt kê yêu cầu gần đây của khách.

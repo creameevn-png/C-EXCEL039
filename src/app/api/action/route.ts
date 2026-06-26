@@ -20,7 +20,7 @@ function allow(role: VaiTro, roles: VaiTro[]): boolean {
 }
 
 function normTuyen(v: any): Tuyen {
-  return (v === 'HCM' || v === 'HCM' || String(v).toUpperCase() === 'HCM') ? 'HCM' : 'HaNoi';
+  return String(v).toUpperCase() === 'HCM' ? 'HCM' : 'HaNoi';
 }
 
 type ChiTietInput = {
@@ -65,6 +65,18 @@ async function recomputeDonHang(maDH: string) {
       conLai: totals.tongTien - o.daTra
     }
   });
+}
+
+// Công nợ phiếu giao tính lại từ các đơn thành viên (tránh stale sau khi KH trả thêm).
+async function recomputePhieuGiao(maPhieu: string | null | undefined) {
+  if (!maPhieu) return;
+  const orders = await prisma.donHang.findMany({ where: { maPhieuGiao: maPhieu } });
+  if (orders.length === 0) return;
+  const tongTien = orders.reduce((s, o) => s + o.tongTien, 0);
+  const daThu = orders.reduce((s, o) => s + o.daTra, 0);
+  await prisma.phieuGiao
+    .update({ where: { maPhieu }, data: { tongTien, daThu, conLai: tongTien - daThu, soDon: orders.length } })
+    .catch(() => { /* phiếu đã xoá: bỏ qua */ });
 }
 
 async function recomputeBao(maBao: string) {
@@ -269,7 +281,13 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         data: { maDH, loai: 'Thu', soTien: coc, ghiChu: 'Đặt cọc', nv: user.email, nvId: user.id }
       })
     ]);
+    await recomputePhieuGiao(o.maPhieuGiao);
     await logActivity(user.email, 'CONFIRM_DEPOSIT', maDH, { tienCoc: coc });
+    await pushNotify({
+      vaiTro: 'GDV', loai: 'info', maDH,
+      tieuDe: `Đơn ${maDH} đã đặt cọc`,
+      noiDung: 'Cần tiến hành mua hàng (nhập mã GD).', link: '/gdv', nguoiTao: user.email
+    });
     return ok({ tienCoc: coc });
   },
 
@@ -295,6 +313,11 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (o.trangThai !== 'DaMuaHang') return err('Đơn không ở trạng thái Đã mua');
     await prisma.donHang.update({ where: { maDH }, data: { maVD, trangThai: 'NccGiaoHang' } });
     await logActivity(user.email, 'UPDATE_MA_VD', maDH, { maVD });
+    await pushNotify({
+      vaiTro: 'KhoTQ', loai: 'info', maDH,
+      tieuDe: `Đơn ${maDH} sắp về kho TQ`,
+      noiDung: `NCC đã giao (VĐ ${maVD}).`, link: '/khotq', nguoiTao: user.email
+    });
     return ok();
   },
 
@@ -337,7 +360,15 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         data: { daTra: newPaid, conLai: newCon, trangThai: newStatus }
       })
     ]);
+    await recomputePhieuGiao(o.maPhieuGiao);
     await logActivity(user.email, 'CONFIRM_PAYMENT', maDH, { amount, newCon, newStatus });
+    if (newStatus === 'GiaoHang') {
+      await pushNotify({
+        vaiTro: ['KhoVN', 'CSKH'], loai: 'success', maDH,
+        tieuDe: `Đơn ${maDH} đã thanh toán đủ`,
+        noiDung: 'Sẵn sàng giao khách.', link: '/khovn', nguoiTao: user.email
+      });
+    }
     return ok({ daTra: newPaid, conLai: newCon, trangThai: newStatus });
   },
 
@@ -429,6 +460,11 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       data: { trangThai: 'DangVanChuyen', anhRoiTQ: imageBase64 || null }
     });
     await logActivity(user.email, 'ROI_TQ', maDH);
+    await pushNotify({
+      vaiTro: 'KhoVN', loai: 'info', maDH,
+      tieuDe: `Đơn ${maDH} đã rời kho TQ`,
+      noiDung: 'Hàng đang vận chuyển về VN.', link: '/khovn', nguoiTao: user.email
+    });
     return ok();
   },
 
@@ -439,12 +475,27 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     const o = await prisma.donHang.findUnique({ where: { maDH } });
     if (!o) return err('Đơn không tồn tại');
     if (o.trangThai !== 'DangVanChuyen') return err('Đơn không đang vận chuyển');
-    const newStatus: TrangThaiDon = o.conLai <= 0.5 ? 'GiaoHang' : 'ChoThanhToan';
+    // Hàng về kho VN: trả đủ → sẵn sàng giao (KhoVnNhan); còn nợ → chờ thanh toán.
+    const newStatus: TrangThaiDon = o.conLai <= 0.5 ? 'KhoVnNhan' : 'ChoThanhToan';
     await prisma.donHang.update({
       where: { maDH },
-      data: { trangThai: newStatus === 'GiaoHang' ? 'KhoVnNhan' : 'ChoThanhToan', anhKhoVN: imageBase64 || null }
+      data: { trangThai: newStatus, anhKhoVN: imageBase64 || null }
     });
     await logActivity(user.email, 'KHO_VN_NHAN', maDH, { newStatus });
+    if (newStatus === 'ChoThanhToan') {
+      await pushNotify({
+        vaiTro: ['KeToan', 'CSKH'], loai: 'warning', maDH,
+        tieuDe: `Đơn ${maDH} chờ thanh toán`,
+        noiDung: `Hàng đã về kho VN, còn nợ ${Math.round(o.conLai).toLocaleString('vi-VN')}đ`,
+        link: '/ketoan', nguoiTao: user.email
+      });
+    } else {
+      await pushNotify({
+        vaiTro: ['CSKH', 'KhoVN'], loai: 'success', maDH,
+        tieuDe: `Đơn ${maDH} đã về kho VN`,
+        noiDung: 'Đã thanh toán đủ — sẵn sàng giao khách', link: '/khovn', nguoiTao: user.email
+      });
+    }
     return ok();
   },
 
@@ -463,7 +514,13 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       where: { maKH: o.maKH },
       data: { tongDon: { increment: 1 }, doanhThu: { increment: o.tongTien } }
     });
+    await recomputePhieuGiao(o.maPhieuGiao);
     await logActivity(user.email, 'DELIVERED', maDH);
+    await pushNotify({
+      vaiTro: ['CSKH', 'KeToan'], loai: 'success', maDH,
+      tieuDe: `Đơn ${maDH} đã hoàn thành`,
+      noiDung: 'Đã giao khách thành công.', link: '/admin/don-hang', nguoiTao: user.email
+    });
     return ok();
   },
 
@@ -615,7 +672,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
   },
 
   async getPhieuGiaoDetail(args, user) {
-    if (!user) return err('Chưa đăng nhập');
+    if (!allow(user.vaiTro, ['CSKH', 'KhoVN', 'KeToan'])) return err('Không có quyền');
     const [maPhieu] = args;
     const p = await prisma.phieuGiao.findUnique({ where: { maPhieu } });
     if (!p) return err('Phiếu không tồn tại');
@@ -646,6 +703,13 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     const d = args[0] || {};
     if (!d.moTa) return err('Vui lòng nhập mô tả');
     if (!d.loai) return err('Vui lòng chọn loại khiếu nại');
+    // Chống gắn khiếu nại vào đơn của người khác: khai maDH thì đơn phải tồn tại,
+    // và nếu khai cả maKH thì đơn phải thuộc đúng khách đó.
+    if (d.maDH) {
+      const od = await prisma.donHang.findUnique({ where: { maDH: String(d.maDH) } });
+      if (!od) return err('Đơn không tồn tại: ' + d.maDH);
+      if (d.maKH && od.maKH !== String(d.maKH).trim().toUpperCase()) return err('Đơn không thuộc khách này');
+    }
     const maKN = await nextMaKN();
     await prisma.khieuNai.create({
       data: {
@@ -709,58 +773,58 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     const kn = await prisma.khieuNai.findUnique({ where: { maKN } });
     if (!kn) return err('Khiếu nại không tồn tại');
 
-    await prisma.khieuNai.update({
-      where: { maKN },
-      data: {
-        duyetCap2By: user.email,
-        duyetCap2At: new Date(),
-        duyetCap2Note: note || '',
-        trangThai: accepted ? 'DaXuLy' : 'TuChoi'
-      }
-    });
-
-    // Đợt 7 — duyệt + chọn hoàn ví + có số tiền + chưa hoàn → nạp tự động vào ví KH.
+    // Gộp đổi trạng thái + hoàn ví + cấn trừ NCC vào MỘT transaction để sổ sách
+    // không bao giờ lệch nửa chừng. Idempotent qua daHoanVi/daTruNCC.
     let hoanVi = 0;
-    if (accepted && kn.hoanVi && !kn.daHoanVi && kn.soTienHoan > 0 && kn.maKH) {
-      const khh = await prisma.khachHang.findUnique({ where: { maKH: kn.maKH } });
-      if (khh) {
-        const newDu = khh.soDuVi + kn.soTienHoan;
-        await prisma.$transaction([
-          prisma.khachHang.update({ where: { maKH: kn.maKH }, data: { soDuVi: newDu } }),
-          prisma.giaoDichVi.create({
+    let truNCC = 0;
+    await prisma.$transaction(async (tx) => {
+      await tx.khieuNai.update({
+        where: { maKN },
+        data: {
+          duyetCap2By: user.email,
+          duyetCap2At: new Date(),
+          duyetCap2Note: note || '',
+          trangThai: accepted ? 'DaXuLy' : 'TuChoi'
+        }
+      });
+
+      // Duyệt + chọn hoàn ví + có số tiền + chưa hoàn → nạp tự động vào ví KH.
+      if (accepted && kn.hoanVi && !kn.daHoanVi && kn.soTienHoan > 0 && kn.maKH) {
+        const khh = await tx.khachHang.findUnique({ where: { maKH: kn.maKH } });
+        if (khh) {
+          const newDu = khh.soDuVi + kn.soTienHoan;
+          await tx.khachHang.update({ where: { maKH: kn.maKH }, data: { soDuVi: newDu } });
+          await tx.giaoDichVi.create({
             data: {
               maKH: kn.maKH, loai: 'Nap', soTien: kn.soTienHoan, soDuSau: newDu,
               quy: kn.quyChiuPhi || 'QuyKho',
               ghiChu: `Hoàn tiền khiếu nại ${maKN}${kn.maDH ? ' (đơn ' + kn.maDH + ')' : ''}`,
               nv: user.email, nvId: user.id
             }
-          }),
-          prisma.khieuNai.update({ where: { maKN }, data: { daHoanVi: true } })
-        ]);
-        hoanVi = kn.soTienHoan;
+          });
+          await tx.khieuNai.update({ where: { maKN }, data: { daHoanVi: true } });
+          hoanVi = kn.soTienHoan;
+        }
       }
-    }
 
-    // Quỹ chịu = NCC → tự cấn trừ khoản bồi thường (tiền hoàn + phí đổi trả) vào
-    // sổ công nợ NCC (giảm nợ phải trả NCC = đòi lại NCC). Idempotent qua daTruNCC.
-    let truNCC = 0;
-    if (accepted && kn.quyChiuPhi === 'NCC' && kn.doiTacNCC && !kn.daTruNCC) {
-      const boiThuong = (kn.soTienHoan || 0) + (kn.phiDoiTra || 0);
-      if (boiThuong > 0) {
-        await prisma.$transaction([
-          prisma.congNoNCC.create({
+      // Quỹ chịu = NCC → cấn trừ khoản bồi thường (tiền hoàn + phí đổi trả) vào
+      // sổ công nợ NCC (giảm nợ phải trả NCC = đòi lại NCC). Idempotent qua daTruNCC.
+      if (accepted && kn.quyChiuPhi === 'NCC' && kn.doiTacNCC && !kn.daTruNCC) {
+        const boiThuong = (kn.soTienHoan || 0) + (kn.phiDoiTra || 0);
+        if (boiThuong > 0) {
+          await tx.congNoNCC.create({
             data: {
               doiTac: kn.doiTacNCC, maDH: kn.maDH || null, loai: 'ThanhToan',
               soTien: boiThuong,
               ghiChu: `NCC bồi thường khiếu nại ${maKN} (cấn trừ công nợ)`,
               nguoiTao: user.email
             }
-          }),
-          prisma.khieuNai.update({ where: { maKN }, data: { daTruNCC: true } })
-        ]);
-        truNCC = boiThuong;
+          });
+          await tx.khieuNai.update({ where: { maKN }, data: { daTruNCC: true } });
+          truNCC = boiThuong;
+        }
       }
-    }
+    });
 
     await logActivity(user.email, 'DUYET_KN_CAP2', maKN, { accepted, hoanVi, quy: kn.quyChiuPhi, truNCC });
     return ok({ hoanVi, truNCC });
@@ -885,6 +949,11 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       }
     });
     if (!o) return err('Đơn không tồn tại');
+    // Chống IDOR: khách chỉ được xem đơn của CHÍNH mình (dò mã đơn tuần tự).
+    if (user?.vaiTro === 'Customer') {
+      const own = await prisma.khachHang.findFirst({ where: { email: user.email } });
+      if (!own || own.maKH !== o.maKH) return err('Không có quyền xem đơn này');
+    }
     const canSeeMoney = ['Admin', 'CSKH', 'KeToan', 'Customer'].includes(user?.vaiTro || 'Customer');
     // Giá vốn & lợi nhuận: CHỈ Admin / Kế toán / GDV được xem (CSKH không thấy).
     const canSeeProfit = ['Admin', 'KeToan', 'GDV'].includes(user?.vaiTro || '');
@@ -1216,10 +1285,16 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       orderBy: { ngayTao: 'desc' },
       take: 50
     });
+    // Công nợ thật = tổng còn lại của các đơn chưa hủy (field congNo trên KH không được ghi).
+    const noAgg = await prisma.donHang.aggregate({
+      where: { maKH: ma, conLai: { gt: 0 }, trangThai: { not: 'Huy' } },
+      _sum: { conLai: true }
+    });
+    const congNo = Math.round(noAgg._sum.conLai || 0);
     return ok({
       customer: {
         maKH: kh.maKH, tenKH: kh.tenKH, sdt: kh.sdt,
-        tuyen: kh.tuyen, soDuVi: kh.soDuVi, congNo: kh.congNo, tongDon: kh.tongDon
+        tuyen: kh.tuyen, soDuVi: kh.soDuVi, congNo, tongDon: kh.tongDon
       },
       orders: dons.map((o) => ({
         maDH: o.maDH, ngayTao: o.ngayTao.toISOString(),

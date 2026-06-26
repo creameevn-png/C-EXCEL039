@@ -13,7 +13,7 @@
   const SELECTORS = {
     "1688": {
       title: ["h1.title-text", ".od-pc-offer-title", ".title-content .title-text", ".mod-detail-title h1", "h1"],
-      price: [".price-now .value", ".price-original .value", ".currency .value", ".price-module__price--current", ".price .value"],
+      price: [".price-now .value", ".currency .value", ".price-module__price--current", ".price .value", ".price-original .value"],
       image: [".detail-gallery-img img", ".od-gallery-img img", "img.preview-img", "#J_Pic img"],
       gallery: ["#J_UlThumb img", ".detail-gallery-turn-wrapper img", ".tab-trigger img", '[class*="thumbnail" i] img'],
     },
@@ -153,7 +153,8 @@
   function cleanUrl(source) {
     const id = getProductId(source);
     if (source === "1688" && id) return `https://detail.1688.com/offer/${id}.html`;
-    if ((source === "taobao" || source === "tmall") && id) return `https://item.taobao.com/item.htm?id=${id}`;
+    if (source === "tmall" && id) return `https://detail.tmall.com/item.htm?id=${id}`;
+    if (source === "taobao" && id) return `https://item.taobao.com/item.htm?id=${id}`;
     return location.href.split("#")[0];
   }
 

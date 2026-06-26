@@ -30,8 +30,11 @@
       m = href.match(/[?&]id=(\d+)/);
       if (m) {
         id = m[1];
-        source = href.includes("tmall.com") ? "tmall" : "taobao";
-        url = `https://item.taobao.com/item.htm?id=${id}`;
+        const isTmall = href.includes("tmall.com");
+        source = isTmall ? "tmall" : "taobao";
+        url = isTmall
+          ? `https://detail.tmall.com/item.htm?id=${id}`
+          : `https://item.taobao.com/item.htm?id=${id}`;
       }
     }
     return id ? { source, productId: id, url } : null;

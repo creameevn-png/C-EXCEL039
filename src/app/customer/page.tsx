@@ -33,6 +33,12 @@ export default async function CustomerPage() {
     orderBy: { ngayTao: 'desc' },
     take: 100
   });
+  // Công nợ thật = tổng còn lại của đơn chưa hủy (field congNo trên KH không được ghi).
+  const noAgg = await prisma.donHang.aggregate({
+    where: { maKH: kh.maKH, conLai: { gt: 0 }, trangThai: { not: 'Huy' } },
+    _sum: { conLai: true }
+  });
+  const congNo = Math.round(noAgg._sum.conLai || 0);
 
   return (
     <AppShell user={user} subtitle={`${kh.maKH} - ${kh.tenKH}`}>
@@ -47,7 +53,7 @@ export default async function CustomerPage() {
         <div className="kpi-row" style={{ marginTop: 18, marginBottom: 0 }}>
           {[
             ['Số dư ví', formatCurrency(kh.soDuVi)],
-            ['Công nợ', formatCurrency(kh.congNo)],
+            ['Công nợ', formatCurrency(congNo)],
             ['Tổng đơn', String(orders.length)],
             ['Doanh thu', formatCurrency(kh.doanhThu)]
           ].map(([label, val]) => (

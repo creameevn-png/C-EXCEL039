@@ -1,4 +1,4 @@
-# 🎬 KỊCH BẢN QUAY CLIP DEMO — Extension Mua Hộ Cừ (v2.4.0)
+# 🎬 KỊCH BẢN QUAY CLIP DEMO — Extension Mua Hộ Cừ (v2.5.0)
 
 > Mục tiêu: clip ~**2–3 phút** quay màn hình, cho khách thấy extension chạy **từng click**.
 > Quay bằng: phần mềm quay màn hình bất kỳ (Loom / OBS / ShareX / Bandicam / hoặc tính năng quay màn hình của Windows: **Win + Alt + R**).
@@ -7,7 +7,7 @@
 ---
 
 ## 0) CHUẨN BỊ TRƯỚC KHI QUAY (không quay phần này)
-- [ ] Đã **cài extension** (giải nén `mua-ho-cu-extension-v2.4.0.zip` → `chrome://extensions` → bật **Developer mode** → **Load unpacked** → chọn thư mục → **ghim icon** lên thanh trình duyệt).
+- [ ] Đã **cài extension** (giải nén `mua-ho-cu-extension-v2.5.0.zip` → `chrome://extensions` → bật **Developer mode** → **Load unpacked** → chọn thư mục → **ghim icon** lên thanh trình duyệt).
 - [ ] Có sẵn **1 tài khoản nhân viên Mua hàng** (email + mật khẩu) đăng nhập được hệ thống.
 - [ ] Mở sẵn **2 tab** để chuyển cho mượt:
   - Tab A: 1 **trang chi tiết sản phẩm** trên **1688** (loại có nhiều phân loại + bậc giá càng tốt).
@@ -22,7 +22,7 @@
 ### CẢNH 1 — Mở đầu (0:00 – 0:10)
 **Hình:** màn hình trình duyệt, con trỏ chỉ vào **icon 🛒 Mua Hộ Cừ** trên thanh.
 **Thoại/caption:**
-> "Đây là extension Mua Hộ — hỗ trợ **1688, Taobao, Tmall, JD.com**. Em demo nhanh từ lúc đăng nhập tới lúc sản phẩm vào hệ thống."
+> "Đây là extension Mua Hộ — hỗ trợ **1688, Taobao, Tmall**. Em demo nhanh từ lúc đăng nhập tới lúc sản phẩm vào hệ thống."
 
 ---
 
@@ -91,7 +91,7 @@
 
 ### CẢNH 7 — Kết (2:50 – 3:00)
 **Thoại/caption:**
-> "Extension hỗ trợ **1688 · Taobao · Tmall · JD**, **xem giá VNĐ**, **dịch tiếng Trung sang tiếng Việt**, chọn danh mục, bắt sản phẩm đẩy thẳng vào hệ thống — không nhập tay."
+> "Extension hỗ trợ **1688 · Taobao · Tmall**, **xem giá VNĐ**, **dịch tiếng Trung sang tiếng Việt**, chọn danh mục, bắt sản phẩm đẩy thẳng vào hệ thống — không nhập tay."
 
 ---
 

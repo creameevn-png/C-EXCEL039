@@ -11,7 +11,7 @@
 
   const normalizeImg = window.MuaHoExtractor.normalizeImg;
   const PRODUCT_LINK =
-    'a[href*="detail.1688.com/offer/"], a[href*="item.taobao.com/item.htm"], a[href*="item.htm?id="], a[href*="detail.tmall.com/item.htm"], a[href*="/offer/"][href*=".html"], a[href*="item.jd.com/"]';
+    'a[href*="detail.1688.com/offer/"], a[href*="item.taobao.com/item.htm"], a[href*="item.htm?id="], a[href*="detail.tmall.com/item.htm"], a[href*="/offer/"][href*=".html"]';
 
   function isListingPage() {
     const h = location.hostname, p = location.pathname, q = location.search;
@@ -26,10 +26,6 @@
     let source = null, id = null, url = href;
     let m = href.match(/detail\.1688\.com\/offer\/(\d+)\.html/) || href.match(/\/offer\/(\d+)\.html/);
     if (m) { source = "1688"; id = m[1]; url = `https://detail.1688.com/offer/${id}.html`; }
-    if (!id && href.includes("item.jd.com/")) {
-      m = href.match(/item\.jd\.com\/(?:product\/)?(\d+)\.html/) || href.match(/\/(\d{6,})\.html/);
-      if (m) { source = "jd"; id = m[1]; url = `https://item.jd.com/${id}.html`; }
-    }
     if (!id) {
       m = href.match(/[?&]id=(\d+)/);
       if (m) {

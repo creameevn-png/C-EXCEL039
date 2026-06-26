@@ -69,22 +69,6 @@
     };
   }
 
-  function fromJD() {
-    // JD nhúng dữ liệu sản phẩm trong window.pageConfig.product (skuid, name…).
-    const root =
-      safe(() => window.pageConfig && window.pageConfig.product) ||
-      safe(() => window.pageConfig) ||
-      safe(() => window.__PRODUCT__) ||
-      safe(() => window.__INITIAL_STATE__);
-    if (!root) return null;
-    return {
-      title: deepFind(root, ["name", "skuName", "title", "wname"], 0),
-      priceText: deepFind(root, ["p", "price", "jdPrice", "priceText"], 0),
-      skuModel: deepFind(root, ["sku", "skuMap", "colorSize", "specs"], 0),
-      mainImage: deepFind(root, ["src", "image", "imageList", "mainImage"], 0),
-    };
-  }
-
   function scanScriptsForJson() {
     // Quét các thẻ <script type="application/ld+json"> hoặc JSON inline có dấu hiệu sản phẩm.
     const out = {};
@@ -107,8 +91,6 @@
     let data = {};
     if (host.includes("1688")) {
       data = from1688() || {};
-    } else if (host.includes("jd.com")) {
-      data = fromJD() || {};
     } else {
       data = fromTaobao() || {};
     }

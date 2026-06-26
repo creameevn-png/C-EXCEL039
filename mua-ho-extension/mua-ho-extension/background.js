@@ -55,6 +55,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "MH_GET_CART") { handleGetCart().then(sendResponse); return true; }
   if (msg.type === "MH_GET_ORDERS") { handleGetOrders().then(sendResponse); return true; }
   if (msg.type === "MH_TRANSLATE") { handleTranslate(msg.texts).then(sendResponse); return true; }
+  if (msg.type === "MH_GET_CONFIG") { handleGetConfig().then(sendResponse); return true; }
   if (msg.type === "MH_RESET_BADGE") {
     chrome.storage.local.set({ mhAdded: 0 });
     chrome.action.setBadgeText({ text: "" });
@@ -126,6 +127,22 @@ async function handleGetCart() {
   }
   if (res.status === 401) return { ok: false, needSetup: true, message: "Chưa đăng nhập." };
   return { ok: false, message: res.message || "Không lấy được giỏ hàng." };
+}
+
+/* ---- Cấu hình hệ thống (tỉ giá VNĐ + danh mục) để extension hiển thị giá Việt ---- */
+let _cfg = null, _cfgAt = 0;
+async function handleGetConfig() {
+  if (_cfg && Date.now() - _cfgAt < 5 * 60 * 1000) return { ok: true, config: _cfg };
+  const res = await apiFetch("/config", { method: "GET" });
+  if (res.ok && res.data && res.data.tyGia) {
+    _cfg = res.data; _cfgAt = Date.now();
+    chrome.storage.local.set({ mhConfig: res.data });
+    return { ok: true, config: res.data };
+  }
+  // Lỗi mạng / chưa đăng nhập -> dùng bản cache gần nhất nếu có
+  const { mhConfig } = await chrome.storage.local.get("mhConfig");
+  if (mhConfig) return { ok: true, config: mhConfig, stale: true };
+  return { ok: false };
 }
 
 /* ---- Dịch tiếng Trung -> tiếng Việt (Google free endpoint, không cần API key) ---- */

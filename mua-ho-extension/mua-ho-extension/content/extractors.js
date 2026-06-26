@@ -25,12 +25,19 @@
     },
   };
   SELECTORS.tmall = SELECTORS.taobao;
+  SELECTORS.jd = {
+    title: [".sku-name", ".itemInfo-wrap .sku-name", ".product-intro .sku-name", "#name h1", "#itemName", "h1"],
+    price: [".summary-price .p-price .price", ".p-price .price", "span.price.J-p-", ".dd .p-price .price", '[class*="p-price" i] .price', "span.price"],
+    image: ["#spec-img", "#spec-n1 img", ".preview-wrap img", ".jqzoom img", ".zoomPic img"],
+    gallery: ["#spec-list img", ".spec-items img", ".lh img", '[class*="thumbnail" i] img'],
+  };
 
   function detectSource() {
     const h = location.hostname;
     if (h.includes("1688.com")) return "1688";
     if (h.includes("tmall.com")) return "tmall";
     if (h.includes("taobao.com")) return "taobao";
+    if (h.includes("jd.com")) return "jd";
     return "unknown";
   }
 
@@ -38,6 +45,10 @@
     const url = location.href;
     if (source === "1688") {
       const m = url.match(/offer\/(\d+)\.html/) || url.match(/[?&]offerId=(\d+)/);
+      return m ? m[1] : null;
+    }
+    if (source === "jd") {
+      const m = url.match(/item\.(?:m\.)?jd\.com\/(?:product\/)?(\d+)\.html/) || url.match(/\/(\d{6,})\.html/) || url.match(/[?&]sku=(\d+)/);
       return m ? m[1] : null;
     }
     const m = url.match(/[?&]id=(\d+)/);
@@ -154,6 +165,7 @@
     const id = getProductId(source);
     if (source === "1688" && id) return `https://detail.1688.com/offer/${id}.html`;
     if ((source === "taobao" || source === "tmall") && id) return `https://item.taobao.com/item.htm?id=${id}`;
+    if (source === "jd" && id) return `https://item.jd.com/${id}.html`;
     return location.href.split("#")[0];
   }
 

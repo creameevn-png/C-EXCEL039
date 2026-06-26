@@ -61,6 +61,28 @@
     });
   }
 
+  /* ---------- Cấu hình tỉ giá + danh mục (giá VNĐ giống gaudonhaphang) ---------- */
+  const DANH_MUC_DEFAULT = ["Thời trang", "Mỹ phẩm", "Điện tử - Phụ kiện", "Gia dụng", "Đồ chơi", "Văn phòng phẩm", "Phụ kiện", "Khác"];
+  function getConfig() {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage({ type: "MH_GET_CONFIG" }, (res) => {
+          if (chrome.runtime.lastError || !res || !res.ok) return resolve(null);
+          resolve(res.config || null);
+        });
+      } catch (_) { resolve(null); }
+    });
+  }
+  function rateFor(config, source) {
+    if (!config) return 0;
+    const byWeb = config.byWeb || {};
+    return Number(byWeb[source] || config.tyGia || 0) || 0;
+  }
+  function fmtVnd(n) {
+    if (!n || isNaN(n)) return "";
+    return Math.round(n).toLocaleString("vi-VN") + "₫";
+  }
+
   /* ---------- Modal ---------- */
   function openModal(product) {
     closeModal();
@@ -93,7 +115,7 @@
             <div class="mh-prod-meta">
               <textarea class="mh-field mh-name" rows="2" placeholder="Tên sản phẩm">${escapeHtml(product.title)}</textarea>
               <div class="mh-vi" style="display:none;font-size:12px;color:#0a7d33;margin:2px 0 4px;line-height:1.3"></div>
-              <div class="mh-price">${escapeHtml(priceLine)}</div>
+              <div class="mh-price">${escapeHtml(priceLine)} <span class="mh-vnd" style="color:#b45309;font-weight:700"></span></div>
               <div class="mh-id">Mã: ${product.productId || "—"}</div>
             </div>
           </div>
@@ -103,8 +125,19 @@
             <label class="mh-lbl">Số lượng ${moqHint}
               <input class="mh-field mh-qty" type="number" min="1" step="1" value="${moq}">
             </label>
-            <label class="mh-lbl mh-grow">Ghi chú (màu, size, yêu cầu...)
+            <label class="mh-lbl mh-grow">Danh mục hàng hoá
+              <select class="mh-field mh-danhmuc">
+                <option value="">— Chọn danh mục —</option>
+                ${DANH_MUC_DEFAULT.map((d) => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join("")}
+              </select>
+            </label>
+          </div>
+          <div class="mh-row">
+            <label class="mh-lbl mh-grow">Ghi chú cho NV mua hàng
               <input class="mh-field mh-note" type="text" placeholder="VD: chọn màu be, size L">
+            </label>
+            <label class="mh-lbl mh-grow">Ghi chú riêng tư
+              <input class="mh-field mh-note2" type="text" placeholder="Ghi chú của riêng bạn">
             </label>
           </div>
         </div>
@@ -121,9 +154,33 @@
     overlay.querySelector(".mh-confirm").addEventListener("click", () => {
       const qty = Math.max(1, parseInt(overlay.querySelector(".mh-qty").value, 10) || 1);
       const note = overlay.querySelector(".mh-note").value.trim();
+      const ghiChuRiengTu = overlay.querySelector(".mh-note2").value.trim();
+      const danhMuc = overlay.querySelector(".mh-danhmuc").value;
       const title = overlay.querySelector(".mh-name").value.trim();
-      submit({ ...product, title, titleVi: viTitle, quantity: qty, note }, overlay);
+      submit({ ...product, title, titleVi: viTitle, quantity: qty, note, ghiChuRiengTu, danhMuc }, overlay);
     });
+
+    // Lấy tỉ giá hệ thống -> hiện giá VNĐ (giá chính + bậc giá) + nạp danh mục gợi ý.
+    (async () => {
+      const config = await getConfig();
+      if (!document.getElementById(PREFIX + "-overlay")) return;
+      const rate = rateFor(config, product.source);
+      if (rate && product.priceValue) {
+        const vEl = overlay.querySelector(".mh-vnd");
+        if (vEl) vEl.textContent = "≈ " + fmtVnd(product.priceValue * rate);
+      }
+      if (rate && tiers.length) {
+        const tEl = overlay.querySelector(".mh-tiers");
+        if (tEl) tEl.innerHTML = "<b>Bậc giá (SL → đơn giá):</b> " +
+          tiers.map((t) => `≥${escapeHtml(String(t.minQty))}: ${escapeHtml(String(t.price))} ${cur} (${fmtVnd(Number(t.price) * rate)})`).join(" · ");
+      }
+      const dmList = (config && Array.isArray(config.danhMucs) && config.danhMucs.length) ? config.danhMucs : null;
+      if (dmList) {
+        const sel = overlay.querySelector(".mh-danhmuc");
+        if (sel) sel.innerHTML = '<option value="">— Chọn danh mục —</option>' +
+          dmList.map((d) => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join("");
+      }
+    })();
 
     // Tự dịch tiếng Trung -> tiếng Việt (tên SP + phân loại) nếu bật trong cấu hình.
     (async () => {

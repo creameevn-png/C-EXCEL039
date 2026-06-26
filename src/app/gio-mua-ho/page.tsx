@@ -35,7 +35,9 @@ export default async function GioMuaHoPage() {
     quantity: r.quantity,
     minQuantity: r.minQuantity,
     skuText: r.skuText || '',
+    danhMuc: r.danhMuc || '',
     note: r.note || '',
+    ghiChuRiengTu: r.ghiChuRiengTu || '',
     nguoiThem: r.nhanVien?.hoTen || '',
     createdAt: r.createdAt.toISOString(),
   }));

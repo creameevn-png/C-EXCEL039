@@ -10,7 +10,7 @@ import { callServer, reload } from '@/lib/client';
 import { showToast } from '@/components/Toast';
 
 type Item = {
-  id: number; source: string; productId: string; productUrl: string; title: string; titleVi?: string;
+  id: number; source: string; productId: string; productUrl: string; title: string; titleVi?: string; danhMuc?: string; ghiChuRiengTu?: string;
   image: string; priceText: string; priceValue: number | null; currency: string;
   quantity: number; minQuantity: number; skuText: string; note: string;
   nguoiThem: string; createdAt: string;
@@ -129,7 +129,9 @@ export default function GioMuaHoClient({ items, tyGia, isAdmin }: { items: Item[
                         {it.productUrl && <a href={it.productUrl} target="_blank" className="icon-inline" style={{ color: 'var(--primary)', marginLeft: 6 }}><FiExternalLink /></a>}
                       </div>
                       {it.titleVi && <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 1 }}>{it.title}</div>}
-                      {it.note && <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: 2 }}>“{it.note}”</div>}
+                      {it.danhMuc && <span className="status-badge s-deposit" style={{ fontSize: 10, marginTop: 3, display: 'inline-block' }}>{it.danhMuc}</span>}
+                      {it.note && <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: 2 }}>NV: “{it.note}”</div>}
+                      {it.ghiChuRiengTu && <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: 1, fontStyle: 'italic' }}>Riêng tư: “{it.ghiChuRiengTu}”</div>}
                     </td>
                     <td><span className="role-badge" style={{ background: badge.bg, color: badge.color }}>{badge.label}</span></td>
                     <td>{it.skuText || '-'}</td>

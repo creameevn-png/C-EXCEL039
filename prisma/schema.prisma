@@ -533,7 +533,9 @@ model GioMuaHo {
   minQuantity Int       @default(1) @map("min_quantity")
   sku         String?   @db.Text // JSON array
   skuText     String?   @map("sku_text") @db.Text
-  note        String?   @db.Text
+  danhMuc     String?   @map("danh_muc") // phân loại danh mục hàng hoá (giống gaudonhaphang)
+  note        String?   @db.Text // ghi chú cho nhân viên mua hàng
+  ghiChuRiengTu String? @map("ghi_chu_rieng_tu") @db.Text // ghi chú riêng tư
   fromListing Boolean   @default(false) @map("from_listing")
   raw         String?   @db.Text // JSON probe gốc
   daXuLy      Boolean   @default(false) @map("da_xu_ly") // đã chuyển thành đơn chưa

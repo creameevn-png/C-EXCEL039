@@ -1,4 +1,4 @@
-# 🎬 KỊCH BẢN QUAY CLIP DEMO — Extension Mua Hộ Cừ (v2.6.0 · mode KHÁCH tự đặt)
+# 🎬 KỊCH BẢN QUAY CLIP DEMO — Extension Mua Hộ Cừ (v2.6.1 · mode KHÁCH tự đặt)
 
 > Mục tiêu: clip ~**2–3 phút** quay màn hình, cho khách thấy: **khách lên 1688 → bấm "Tôi muốn đặt sản phẩm này" → yêu cầu về thẳng hệ thống bên Cừ**.
 > Quay bằng: Loom / OBS / ShareX / Bandicam / hoặc **Win + Alt + R** (Windows).
@@ -7,7 +7,7 @@
 ---
 
 ## 0) CHUẨN BỊ TRƯỚC KHI QUAY (không quay phần này)
-- [ ] Đã **cài extension** (giải nén `mua-ho-cu-extension-v2.6.0.zip` → `chrome://extensions` → bật **Developer mode** → **Load unpacked** → chọn thư mục → **ghim icon**).
+- [ ] Đã **cài extension** (giải nén `mua-ho-cu-extension-v2.6.1.zip` → `chrome://extensions` → bật **Developer mode** → **Load unpacked** → chọn thư mục → **ghim icon**).
 - [ ] Mở sẵn **2 tab**:
   - Tab A: 1 **trang chi tiết sản phẩm** trên **1688** (loại nhiều phân loại + bậc giá càng tốt).
   - Tab B: 1 **trang tìm kiếm** 1688 hoặc Taobao (ra lưới sản phẩm).

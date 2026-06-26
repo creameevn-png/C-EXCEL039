@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   FiCalendar, FiTruck, FiUsers, FiUserCheck, FiTrendingUp, FiTrendingDown, FiInbox,
-  FiMapPin, FiDollarSign, FiAlertTriangle, FiDownload, FiPrinter, FiBarChart2
+  FiMapPin, FiDollarSign, FiAlertTriangle, FiDownload, FiPrinter, FiBarChart2,
+  FiPackage, FiRepeat
 } from 'react-icons/fi';
 import Tabs from '@/components/Tabs';
 import { fmtVND } from '@/lib/format';
@@ -22,6 +23,8 @@ type KnRow = {
   maKN: string; ngayTao: string; maKH: string; maDH: string;
   loai: string; trangThai: string; soTienHoan: number; phiDoiTra: number;
 };
+type CashRow = { ngay: string; maDH: string; loai: string; soTien: number; ghiChu: string; nv: string };
+type TonKhoRow = { maDH: string; maKH: string; tenKH: string; trangThai: string; tongKg: number; tongM3: number };
 
 const LOAI_KN_LABEL: Record<string, string> = {
   HangLoi: 'Hàng lỗi', ThieuHang: 'Thiếu hàng', GiaoSai: 'Giao sai', KhongNhan: 'Không nhận', Khac: 'Khác'
@@ -133,7 +136,7 @@ function ReportTools({ name, headers, rows }: { name: string; headers: string[];
   );
 }
 
-export default function BaoCaoClient({ rows, knRows }: { rows: Row[]; knRows: KnRow[] }) {
+export default function BaoCaoClient({ rows, knRows, cashRows, tonKhoRows }: { rows: Row[]; knRows: KnRow[]; cashRows: CashRow[]; tonKhoRows: TonKhoRow[] }) {
   const [month, setMonth] = useState('');
 
   useEffect(() => {
@@ -412,6 +415,89 @@ export default function BaoCaoClient({ rows, knRows }: { rows: Row[]; knRows: Kn
     </div>
   );
 
+  // ===== 9. Tồn kho TQ & VN (ảnh chụp hiện tại, không lọc tháng) =====
+  const TON_BUCKETS = [
+    { label: 'Kho TQ (đã nhận)', statuses: ['KhoTqNhan'] },
+    { label: 'Đang vận chuyển TQ→VN', statuses: ['DangVanChuyen'] },
+    { label: 'Kho VN (chờ giao / thanh toán)', statuses: ['KhoVnNhan', 'ChoThanhToan', 'GiaoHang'] }
+  ];
+  const TT_LABEL: Record<string, string> = {
+    KhoTqNhan: 'Kho TQ', DangVanChuyen: 'Đang VC', KhoVnNhan: 'Kho VN', ChoThanhToan: 'Chờ TT', GiaoHang: 'Sẵn giao'
+  };
+  const tonByBucket = TON_BUCKETS.map((b) => {
+    const rs = tonKhoRows.filter((r) => b.statuses.includes(r.trangThai));
+    return { label: b.label, soDon: rs.length, kg: rs.reduce((s, r) => s + r.tongKg, 0), m3: rs.reduce((s, r) => s + r.tongM3, 0) };
+  });
+  const tonTongKg = tonKhoRows.reduce((s, r) => s + r.tongKg, 0);
+  const tonTongM3 = tonKhoRows.reduce((s, r) => s + r.tongM3, 0);
+  const tabTonKho = (
+    <div className="form-section">
+      <div className="section-title"><FiPackage /> Tồn kho TQ &amp; VN (hiện tại)</div>
+      <ReportTools name="Ton_kho_TQ_VN" headers={['Khu vực', 'Số đơn', 'Tổng KG', 'Tổng M3']}
+        rows={[...tonByBucket.map((b) => [b.label, b.soDon, b.kg.toFixed(1), b.m3.toFixed(3)]), ['Σ Tổng tồn', tonKhoRows.length, tonTongKg.toFixed(1), tonTongM3.toFixed(3)]]} />
+      <table className="data-table" style={{ marginBottom: 16 }}>
+        <thead><tr><th>Khu vực</th><th className="number">Số đơn</th><th className="number">Tổng KG</th><th className="number">Tổng M³</th></tr></thead>
+        <tbody>
+          {tonByBucket.map((b) => (
+            <tr key={b.label}><td><b>{b.label}</b></td><td className="number">{b.soDon}</td><td className="number">{b.kg.toFixed(1)}</td><td className="number">{b.m3.toFixed(3)}</td></tr>
+          ))}
+          <tr style={{ fontWeight: 700, background: 'var(--surface-2)' }}>
+            <td>Σ Tổng tồn</td><td className="number">{tonKhoRows.length}</td><td className="number">{tonTongKg.toFixed(1)}</td><td className="number">{tonTongM3.toFixed(3)}</td>
+          </tr>
+        </tbody>
+      </table>
+      {tonKhoRows.length === 0 ? <div className="empty-state"><FiInbox /><p>Kho trống.</p></div> : (
+        <table className="data-table">
+          <thead><tr><th>Mã đơn</th><th>Khách</th><th>Khu vực</th><th className="number">KG</th><th className="number">M³</th></tr></thead>
+          <tbody>
+            {tonKhoRows.map((r) => (
+              <tr key={r.maDH}>
+                <td className="ma-don">{r.maDH}</td>
+                <td>{r.tenKH}<br /><span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{r.maKH}</span></td>
+                <td>{TT_LABEL[r.trangThai] || r.trangThai}</td>
+                <td className="number">{r.tongKg.toFixed(1)}</td>
+                <td className="number">{r.tongM3.toFixed(3)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+
+  // ===== 10. Dòng tiền thu – chi (theo tháng chọn) =====
+  const cashCur = cashRows.filter((c) => monthKey(c.ngay) === month);
+  const tongThu = cashCur.filter((c) => c.loai === 'Thu').reduce((s, c) => s + c.soTien, 0);
+  const tongChi = cashCur.filter((c) => c.loai === 'Chi').reduce((s, c) => s + c.soTien, 0);
+  const tabDongTien = (
+    <div className="form-section">
+      <div className="section-title"><FiRepeat /> Dòng tiền thu – chi — tháng {ml}</div>
+      <ReportTools name={`Dong_tien_${ml}`} headers={['Ngày', 'Mã đơn', 'Loại', 'Số tiền', 'Ghi chú']}
+        rows={cashCur.map((c) => [new Date(c.ngay).toLocaleDateString('vi-VN'), c.maDH, c.loai === 'Thu' ? 'Thu' : 'Chi', c.soTien, c.ghiChu])} />
+      <div className="fee-summary" style={{ marginBottom: 14 }}>
+        <div className="fee-row"><span>Tổng THU</span><span className="fee-value" style={{ color: 'var(--success-dark)' }}>{fmtVND(tongThu)}đ</span></div>
+        <div className="fee-row"><span>Tổng CHI</span><span className="fee-value" style={{ color: '#DC2626' }}>{fmtVND(tongChi)}đ</span></div>
+        <div className="fee-row" style={{ fontWeight: 700 }}><span>RÒNG (Thu − Chi)</span><span className="fee-value">{fmtVND(tongThu - tongChi)}đ</span></div>
+      </div>
+      {cashCur.length === 0 ? <div className="empty-state"><FiInbox /><p>Không có giao dịch trong tháng.</p></div> : (
+        <table className="data-table">
+          <thead><tr><th>Ngày</th><th>Mã đơn</th><th>Loại</th><th className="number">Số tiền</th><th>Ghi chú</th></tr></thead>
+          <tbody>
+            {cashCur.map((c, i) => (
+              <tr key={i}>
+                <td>{new Date(c.ngay).toLocaleDateString('vi-VN')}</td>
+                <td className="ma-don">{c.maDH}</td>
+                <td><span style={{ color: c.loai === 'Thu' ? 'var(--success-dark)' : '#DC2626', fontWeight: 700 }}>{c.loai === 'Thu' ? 'Thu' : 'Chi'}</span></td>
+                <td className="number">{fmtVND(c.soTien)}đ</td>
+                <td style={{ fontSize: 12 }}>{c.ghiChu}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+
   return (
     <>
       <div className="form-field" style={{ maxWidth: 220, marginBottom: 14 }}>
@@ -427,6 +513,8 @@ export default function BaoCaoClient({ rows, knRows }: { rows: Row[]; knRows: Kn
         { id: 'kh', label: <><FiUsers /> Theo KH</>, content: tabKh },
         { id: 'congno', label: <><FiDollarSign /> Công nợ KH</>, content: tabCongNo },
         { id: 'loinhuan', label: <><FiBarChart2 /> Lợi nhuận</>, content: tabLoiNhuan },
+        { id: 'tonkho', label: <><FiPackage /> Tồn kho</>, content: tabTonKho },
+        { id: 'dongtien', label: <><FiRepeat /> Dòng tiền</>, content: tabDongTien },
         { id: 'kn', label: <><FiAlertTriangle /> Khiếu nại</>, content: tabKN }
       ]} />
     </>

@@ -12,7 +12,7 @@ export default async function BaoCaoPage() {
   const since = new Date();
   since.setMonth(since.getMonth() - 18);
 
-  const [orders, khieuNai] = await Promise.all([
+  const [orders, khieuNai, thanhToan, tonKhoOrders] = await Promise.all([
     prisma.donHang.findMany({
       where: { ngayTao: { gte: since }, trangThai: { not: 'Huy' } },
       include: { khachHang: true, nv: true },
@@ -21,6 +21,17 @@ export default async function BaoCaoPage() {
     prisma.khieuNai.findMany({
       where: { ngayTao: { gte: since } },
       orderBy: { ngayTao: 'desc' }
+    }),
+    // Dòng tiền thu–chi (item 19): các bút toán thu/chi thực tế.
+    prisma.thanhToan.findMany({
+      where: { ngay: { gte: since } },
+      orderBy: { ngay: 'desc' }
+    }),
+    // Tồn kho TQ & VN (item 17): ảnh chụp hiện tại các đơn còn trong kho/đang về.
+    prisma.donHang.findMany({
+      where: { trangThai: { in: ['KhoTqNhan', 'DangVanChuyen', 'KhoVnNhan', 'ChoThanhToan', 'GiaoHang'] } },
+      include: { khachHang: true },
+      orderBy: { ngayTao: 'asc' }
     })
   ]);
 
@@ -48,9 +59,19 @@ export default async function BaoCaoPage() {
     soTienHoan: k.soTienHoan, phiDoiTra: k.phiDoiTra
   }));
 
+  const cashRows = thanhToan.map((t) => ({
+    ngay: t.ngay.toISOString(), maDH: t.maDH || '',
+    loai: t.loai as string, soTien: t.soTien, ghiChu: t.ghiChu || '', nv: t.nv || ''
+  }));
+
+  const tonKhoRows = tonKhoOrders.map((o) => ({
+    maDH: o.maDH, maKH: o.maKH, tenKH: o.khachHang?.tenKH || o.maKH,
+    trangThai: o.trangThai as string, tongKg: o.tongKg, tongM3: o.tongM3
+  }));
+
   return (
     <AppShell user={user}>
-      <BaoCaoClient rows={rows} knRows={knRows} />
+      <BaoCaoClient rows={rows} knRows={knRows} cashRows={cashRows} tonKhoRows={tonKhoRows} />
     </AppShell>
   );
 }

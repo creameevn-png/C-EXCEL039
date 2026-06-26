@@ -936,6 +936,56 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     return ok();
   },
 
+  // ============== HUY DON (item 8) ==============
+  // Hủy đơn + (tuỳ chọn) hoàn tiền đã thu vào ví KH — vd "Hủy – Khiếu nại NCC".
+  async cancelOrder(args, user) {
+    if (!allow(user.vaiTro, ['CSKH'])) return err('Không có quyền');
+    const [maDH, opt] = args;
+    const lyDo = String(opt?.lyDo || '').trim();
+    const hoanVi = !!opt?.hoanVi;
+    if (!maDH) return err('Thiếu mã đơn');
+    if (!lyDo) return err('Vui lòng nhập lý do hủy');
+    const o = await prisma.donHang.findUnique({ where: { maDH } });
+    if (!o) return err('Đơn không tồn tại');
+    if (o.trangThai === 'Huy') return err('Đơn đã hủy trước đó');
+    if (o.trangThai === 'HoanThanh') return err('Đơn đã hoàn thành, không thể hủy');
+
+    let hoanTien = 0;
+    await prisma.$transaction(async (tx) => {
+      await tx.donHang.update({
+        where: { maDH },
+        data: { trangThai: 'Huy', conLai: 0, ghiChu: (o.ghiChu ? o.ghiChu + ' · ' : '') + 'HỦY: ' + lyDo }
+      });
+      // Hoàn phần đã thu vào ví khách (idempotent tự nhiên: đơn chuyển Huy nên không hủy lại được).
+      if (hoanVi && o.daTra > 0 && o.maKH) {
+        const kh = await tx.khachHang.findUnique({ where: { maKH: o.maKH } });
+        if (kh) {
+          const newDu = kh.soDuVi + o.daTra;
+          await tx.khachHang.update({ where: { maKH: o.maKH }, data: { soDuVi: newDu } });
+          await tx.giaoDichVi.create({
+            data: {
+              maKH: o.maKH, loai: 'Nap', soTien: o.daTra, soDuSau: newDu, quy: 'QuyKho',
+              ghiChu: `Hoàn tiền hủy đơn ${maDH}: ${lyDo}`, nv: user.email, nvId: user.id
+            }
+          });
+          await tx.thanhToan.create({
+            data: { maDH, loai: 'Chi', soTien: o.daTra, ghiChu: `Hoàn tiền hủy đơn (vào ví): ${lyDo}`, nv: user.email, nvId: user.id }
+          });
+          hoanTien = o.daTra;
+        }
+      }
+    });
+    await recomputePhieuGiao(o.maPhieuGiao);
+    await logActivity(user.email, 'CANCEL_ORDER', maDH, { lyDo, hoanTien });
+    await pushNotify({
+      vaiTro: ['CSKH', 'KeToan', 'Admin'], loai: 'danger', maDH,
+      tieuDe: `Đơn ${maDH} đã hủy`,
+      noiDung: `${lyDo}${hoanTien ? ' · hoàn ví ' + Math.round(hoanTien).toLocaleString('vi-VN') + 'đ' : ''}`,
+      link: '/admin/don-hang', nguoiTao: user.email
+    });
+    return ok({ hoanTien });
+  },
+
   // ============== ORDER DETAIL ==============
   async getOrderDetail(args, user) {
     const [maDH] = args;

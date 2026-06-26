@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { FiSearch, FiInbox, FiEdit2, FiX, FiCheck, FiClock, FiFilter, FiDownload } from 'react-icons/fi';
+import { FiSearch, FiInbox, FiEdit2, FiX, FiCheck, FiClock, FiFilter, FiDownload, FiSlash, FiAlertTriangle } from 'react-icons/fi';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { statusToClass, statusToLabel, LINE_LABEL, TRANG_THAI_LABEL, TUYEN_LABEL } from '@/lib/status';
 import { callServer, reload } from '@/lib/client';
@@ -40,6 +40,20 @@ export default function DonHangTable({ orders }: { orders: Row[] }) {
   const [edit, setEdit] = useState<Row | null>(null);
   const [form, setForm] = useState<any>({});
   const [busy, setBusy] = useState(false);
+  const [cancelT, setCancelT] = useState<Row | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelHoanVi, setCancelHoanVi] = useState(true);
+  const [busyC, setBusyC] = useState(false);
+
+  async function doCancel() {
+    if (!cancelT) return;
+    if (!cancelReason.trim()) { showToast('Nhập lý do hủy', 'error'); return; }
+    setBusyC(true);
+    const r = await callServer('cancelOrder', cancelT.maDH, { lyDo: cancelReason.trim(), hoanVi: cancelHoanVi });
+    setBusyC(false);
+    if (r?.success) { showToast(`Đã hủy đơn ${cancelT.maDH}${r.hoanTien ? ' · hoàn ví ' + formatCurrency(r.hoanTien) : ''}`, 'success'); reload(); }
+    else showToast(r?.message || 'Lỗi', 'error');
+  }
 
   function openEdit(o: Row) {
     setEdit(o);
@@ -162,8 +176,12 @@ export default function DonHangTable({ orders }: { orders: Row[] }) {
                   {o.maGD && <div>GD: {o.maGD}</div>}
                   {o.maVD && <div>VĐ: {o.maVD}</div>}
                 </td>
-                <td>
+                <td style={{ whiteSpace: 'nowrap' }}>
                   <button className="erp-iconbtn" title="Sửa đơn (Admin)" onClick={() => openEdit(o)}><FiEdit2 /></button>
+                  {o.trangThai !== 'Huy' && o.trangThai !== 'HoanThanh' && (
+                    <button className="erp-iconbtn" title="Hủy đơn" style={{ color: 'var(--danger-dark)' }}
+                      onClick={() => { setCancelT(o); setCancelReason(''); setCancelHoanVi(true); }}><FiSlash /></button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -212,6 +230,32 @@ export default function DonHangTable({ orders }: { orders: Row[] }) {
           <div className="btn-row">
             <button className="btn btn-secondary" onClick={() => setEdit(null)}>Hủy</button>
             <button className="btn btn-primary" onClick={saveEdit} disabled={busy}>{busy ? <FiClock /> : <><FiCheck /> Lưu</>}</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal hủy đơn */}
+      <div className={`modal-overlay ${cancelT ? 'show' : ''}`} onClick={(e) => { if (e.target === e.currentTarget) setCancelT(null); }}>
+        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <h2><FiAlertTriangle /> Hủy đơn {cancelT?.maDH}</h2>
+            <button className="modal-close" onClick={() => setCancelT(null)}><FiX /></button>
+          </div>
+          <div className="modal-body">
+            <div className="alert alert-warning" style={{ marginBottom: 12 }}>
+              <FiAlertTriangle />
+              <span>Đơn sẽ chuyển sang <b>Hủy</b>. Đã thu của đơn: <b>{formatCurrency((cancelT?.tongTien || 0) - (cancelT?.conLai || 0))}</b>.</span>
+            </div>
+            <div className="form-field"><label>Lý do hủy <span style={{ color: 'var(--danger-dark)' }}>*</span></label>
+              <input value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="VD: Khiếu nại NCC / khách đổi ý..." autoFocus /></div>
+            <label className="icon-inline" style={{ marginTop: 10, cursor: 'pointer' }}>
+              <input type="checkbox" checked={cancelHoanVi} onChange={(e) => setCancelHoanVi(e.target.checked)} />
+              <span>Hoàn phần đã thu vào <b>ví khách</b> (Hủy – Khiếu nại NCC)</span>
+            </label>
+          </div>
+          <div className="btn-row">
+            <button className="btn btn-secondary" onClick={() => setCancelT(null)}>Đóng</button>
+            <button className="btn btn-danger" onClick={doCancel} disabled={busyC}>{busyC ? <FiClock /> : <><FiSlash /> Xác nhận hủy</>}</button>
           </div>
         </div>
       </div>

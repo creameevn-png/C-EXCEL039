@@ -37,7 +37,7 @@
     const fab = el("button", "mh-fab");
     fab.id = PREFIX + "-fab";
     fab.type = "button";
-    fab.innerHTML = `<span class="mh-fab-ico">🛒</span><span class="mh-fab-label">Thêm vào giỏ mua hộ</span>`;
+    fab.innerHTML = `<span class="mh-fab-ico">🛒</span><span class="mh-fab-label">Tôi muốn đặt sản phẩm này</span>`;
     fab.addEventListener("click", onAddClick);
     document.body.appendChild(fab);
   }
@@ -103,10 +103,10 @@
     const moqHint = moq > 1 ? `<span class="mh-moqhint">tối thiểu ${moq}</span>` : "";
 
     overlay.innerHTML = `
-      <div class="mh-modal" role="dialog" aria-label="Xác nhận thêm vào giỏ mua hộ">
+      <div class="mh-modal" role="dialog" aria-label="Gửi yêu cầu đặt hàng">
         <div class="mh-modal-head">
           <span class="mh-badge mh-badge--${product.source}">${(product.source || "").toUpperCase()}</span>
-          <span class="mh-modal-title">Thêm vào giỏ mua hộ</span>
+          <span class="mh-modal-title">Gửi yêu cầu đặt hàng</span>
           <button class="mh-x" type="button" aria-label="Đóng">×</button>
         </div>
         <div class="mh-modal-body">
@@ -143,7 +143,7 @@
         </div>
         <div class="mh-modal-foot">
           <button class="mh-btn mh-btn--ghost mh-cancel" type="button">Huỷ</button>
-          <button class="mh-btn mh-btn--primary mh-confirm" type="button">Xác nhận thêm</button>
+          <button class="mh-btn mh-btn--primary mh-confirm" type="button">Gửi yêu cầu</button>
         </div>
       </div>`;
 
@@ -207,12 +207,13 @@
   function submit(payload, overlay) {
     const btn = overlay.querySelector(".mh-confirm");
     btn.disabled = true; btn.textContent = "Đang gửi...";
-    chrome.runtime.sendMessage({ type: "MH_ADD_TO_CART", payload }, (res) => {
-      btn.disabled = false; btn.textContent = "Xác nhận thêm";
+    chrome.runtime.sendMessage({ type: "MH_PUSH_YEUCAU", product: payload }, (res) => {
+      btn.disabled = false; btn.textContent = "Gửi yêu cầu";
       if (chrome.runtime.lastError) { toast("Extension chưa sẵn sàng, tải lại trang.", "error"); return; }
-      if (res && res.ok) { closeModal(); toast(res.message || "Đã thêm vào giỏ mua hộ.", "success"); }
-      else if (res && res.needSetup) { closeModal(); toast("Chưa cấu hình. Mở extension để nhập API và đăng nhập.", "error"); }
-      else { toast((res && res.message) || "Thêm thất bại. Thử lại sau.", "error"); }
+      if (res && res.ok) { closeModal(); toast(res.message || "Đã gửi yêu cầu đặt hàng.", "success"); }
+      else if (res && res.needCustomer) { closeModal(); toast("Mở extension điền Họ tên + SĐT khách trước khi gửi.", "error"); }
+      else if (res && res.needSetup) { closeModal(); toast("Chưa cấu hình địa chỉ hệ thống. Mở extension để nhập.", "error"); }
+      else { toast((res && res.message) || "Gửi yêu cầu thất bại. Thử lại sau.", "error"); }
     });
   }
 

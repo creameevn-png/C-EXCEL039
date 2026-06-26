@@ -56,6 +56,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "MH_GET_ORDERS") { handleGetOrders().then(sendResponse); return true; }
   if (msg.type === "MH_TRANSLATE") { handleTranslate(msg.texts).then(sendResponse); return true; }
   if (msg.type === "MH_GET_CONFIG") { handleGetConfig().then(sendResponse); return true; }
+  if (msg.type === "MH_PUSH_YEUCAU") { handlePushYeuCau(msg.product).then(sendResponse); return true; }
+  if (msg.type === "MH_GET_YEUCAU") { handleGetYeuCau().then(sendResponse); return true; }
   if (msg.type === "MH_RESET_BADGE") {
     chrome.storage.local.set({ mhAdded: 0 });
     chrome.action.setBadgeText({ text: "" });
@@ -127,6 +129,43 @@ async function handleGetCart() {
   }
   if (res.status === 401) return { ok: false, needSetup: true, message: "Chưa đăng nhập." };
   return { ok: false, message: res.message || "Không lấy được giỏ hàng." };
+}
+
+/* ---- Khách hàng tự đặt: đẩy "yêu cầu đặt hàng" về hệ thống bên Cừ ---- */
+function getCustomer() {
+  return new Promise((resolve) => chrome.storage.local.get("customer", (s) => resolve(s.customer || null)));
+}
+
+async function handlePushYeuCau(product) {
+  const { apiBase } = await getSettings();
+  if (!trimBase(apiBase)) return { ok: false, needSetup: true, message: "Chưa cấu hình địa chỉ hệ thống." };
+  const kh = await getCustomer();
+  if (!kh || !kh.hoTen || !kh.sdt) return { ok: false, needCustomer: true, message: "Chưa nhập thông tin khách. Mở extension điền Họ tên + SĐT." };
+
+  const body = {
+    maKH: kh.maKH || "", hoTen: kh.hoTen, sdt: kh.sdt, email: kh.email || "", tuyen: kh.tuyen || "HaNoi",
+    product: product,
+  };
+  const res = await apiFetch("/yeu-cau", { method: "POST", body });
+  if (res.needSetup) return res;
+  if (res.ok && res.data && res.data.success) {
+    bumpBadge();
+    const c = res.data.count || 1;
+    return { ok: true, message: `Đã gửi yêu cầu ${res.data.maYC} (${c} sản phẩm).`, data: res.data };
+  }
+  return { ok: false, message: (res.data && res.data.message) || res.message || "Gửi yêu cầu thất bại." };
+}
+
+async function handleGetYeuCau() {
+  const kh = await getCustomer();
+  if (!kh || !kh.sdt) return { ok: false, needCustomer: true, message: "Chưa nhập thông tin khách." };
+  const res = await apiFetch("/yeu-cau?sdt=" + encodeURIComponent(kh.sdt), { method: "GET" });
+  if (res.needSetup) return res;
+  if (res.ok) {
+    const items = (res.data && res.data.items) || [];
+    return { ok: true, items };
+  }
+  return { ok: false, message: res.message || "Không lấy được yêu cầu." };
 }
 
 /* ---- Cấu hình hệ thống (tỉ giá VNĐ + danh mục) để extension hiển thị giá Việt ---- */

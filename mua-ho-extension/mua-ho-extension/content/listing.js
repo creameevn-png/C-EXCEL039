@@ -82,8 +82,8 @@
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "mh-card-btn";
-      btn.textContent = "+ Mua hộ";
-      btn.title = "Thêm nhanh vào giỏ mua hộ";
+      btn.textContent = "+ Muốn đặt";
+      btn.title = "Gửi nhanh yêu cầu đặt sản phẩm này";
       btn.addEventListener("click", (e) => {
         e.preventDefault(); e.stopPropagation();
         if (!window.MuaHoUI) return;

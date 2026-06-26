@@ -11,81 +11,70 @@
     <span class="hd-ico">🛒</span>
     <div>
       <div class="hd-title">Mua Hộ Cừ · 1688 / Taobao / Tmall</div>
-      <div class="hd-sub">v2.5 · giá VNĐ · dịch Trung-Việt · ERP mua hộ</div>
+      <div class="hd-sub">v2.6 · gửi yêu cầu đặt hàng về hệ thống</div>
     </div>
   </header>
 
   <nav class="tabs">
-    <button class="tab tab--on" data-tab="setup">Cấu hình</button>
-    <button class="tab" data-tab="cart">Giỏ mua hộ</button>
-    <button class="tab" data-tab="orders">Đơn đã đặt</button>
+    <button class="tab tab--on" data-tab="setup">Khách hàng</button>
+    <button class="tab" data-tab="yeucau">Yêu cầu của tôi</button>
   </nav>
 
   <main class="body">
-    <!-- TAB CẤU HÌNH -->
+    <!-- TAB KHÁCH HÀNG -->
     <div class="pane pane--on" data-pane="setup">
       <section class="card">
-        <label class="lbl" for="apiBase">Địa chỉ API hệ thống mua hộ</label>
+        <label class="lbl" for="apiBase">Địa chỉ hệ thống mua hộ</label>
         <input id="apiBase" class="inp" type="url" placeholder="https://cuexcel.vercel.app/api/ext" autocomplete="off">
         <div class="quickfill">
           <button type="button" class="btn btn--ghost btn--sm" data-base="https://cuexcel.vercel.app/api/ext">Dùng bản chạy thật</button>
           <button type="button" class="btn btn--ghost btn--sm" data-base="http://localhost:3000/api/ext">Local (test)</button>
         </div>
-        <p class="hint">Phải kết thúc bằng <code>/api/ext</code>, không có dấu "/" ở cuối.</p>
         <label class="lbl" style="display:flex;align-items:center;gap:8px;margin-top:10px;cursor:pointer">
           <input id="autoTranslate" type="checkbox" style="width:auto;margin:0">
-          <span>Tự dịch tiếng Trung → tiếng Việt khi thêm sản phẩm</span>
+          <span>Tự dịch tiếng Trung → tiếng Việt</span>
         </label>
       </section>
 
       <section class="card">
-        <div class="card-title">Đăng nhập</div>
-        <label class="lbl" for="username">Tài khoản</label>
-        <input id="username" class="inp" type="text" placeholder="email hoặc tên đăng nhập" autocomplete="username">
-        <label class="lbl" for="password">Mật khẩu</label>
-        <input id="password" class="inp" type="password" placeholder="••••••••" autocomplete="current-password">
-        <button id="loginBtn" class="btn btn--primary">Đăng nhập</button>
-        <details class="adv">
-          <summary>Hoặc dán token thủ công</summary>
-          <label class="lbl" for="token">Access token</label>
-          <input id="token" class="inp" type="text" placeholder="Bearer token" autocomplete="off">
-          <button id="saveTokenBtn" class="btn btn--ghost">Lưu token</button>
-        </details>
+        <div class="card-title">Thông tin khách hàng</div>
+        <label class="lbl" for="hoTen">Họ tên *</label>
+        <input id="hoTen" class="inp" type="text" placeholder="Nguyễn Văn A" autocomplete="name">
+        <label class="lbl" for="sdt">Số điện thoại *</label>
+        <input id="sdt" class="inp" type="tel" placeholder="09xxxxxxxx" autocomplete="tel">
+        <label class="lbl" for="email">Email</label>
+        <input id="email" class="inp" type="email" placeholder="(không bắt buộc)" autocomplete="email">
+        <div style="display:flex;gap:8px">
+          <div style="flex:1">
+            <label class="lbl" for="maKH">Mã KH (nếu là khách cũ)</label>
+            <input id="maKH" class="inp" type="text" placeholder="KHxxx" autocomplete="off">
+          </div>
+          <div style="flex:1">
+            <label class="lbl" for="tuyen">Tuyến</label>
+            <select id="tuyen" class="inp"><option value="HaNoi">Hà Nội</option><option value="HCM">HCM</option></select>
+          </div>
+        </div>
+        <button id="saveKhBtn" class="btn btn--primary">Lưu thông tin</button>
+        <p class="hint">Khách mới: chỉ cần <b>Họ tên + SĐT</b>. Khách cũ: nhập thêm <b>Mã KH</b> (phải khớp SĐT).</p>
       </section>
 
       <section class="status" id="status" hidden></section>
-      <div class="actions">
-        <button id="testBtn" class="btn btn--ghost">Kiểm tra kết nối</button>
-        <button id="logoutBtn" class="btn btn--ghost">Đăng xuất</button>
-      </div>
     </div>
 
-    <!-- TAB GIỎ MUA HỘ -->
-    <div class="pane" data-pane="cart">
+    <!-- TAB YÊU CẦU CỦA TÔI -->
+    <div class="pane" data-pane="yeucau">
       <div class="cart-bar">
-        <span id="cartCount" class="cart-count">—</span>
-        <button id="refreshCart" class="btn btn--ghost btn--sm">Tải lại giỏ</button>
-        <button id="resetBadge" class="btn btn--ghost btn--sm">Xoá số đếm</button>
+        <span id="ycCount" class="cart-count">—</span>
+        <button id="refreshYc" class="btn btn--ghost btn--sm">Tải lại</button>
       </div>
-      <div id="cartList" class="cart-list">
-        <p class="empty">Bấm "Tải lại giỏ" để xem các sản phẩm đã thêm.</p>
-      </div>
-    </div>
-
-    <!-- TAB ĐƠN ĐÃ ĐẶT -->
-    <div class="pane" data-pane="orders">
-      <div class="cart-bar">
-        <span id="orderCount" class="cart-count">—</span>
-        <button id="refreshOrders" class="btn btn--ghost btn--sm">Tải lại đơn</button>
-      </div>
-      <div id="orderList" class="cart-list">
-        <p class="empty">Bấm "Tải lại đơn" để xem các đơn đã đặt trong hệ thống.</p>
+      <div id="ycList" class="cart-list">
+        <p class="empty">Bấm "Tải lại" để xem các yêu cầu đặt hàng bạn đã gửi.</p>
       </div>
     </div>
   </main>
 
   <footer class="ft">
-    Mở trang sản phẩm hoặc trang tìm kiếm 1688 / Taobao → bấm <b>Thêm vào giỏ mua hộ</b>.
+    Mở trang sản phẩm 1688 / Taobao / Tmall → bấm <b>Tôi muốn đặt sản phẩm này</b>.
   </footer>
 
   <script src="popup.js"></script>

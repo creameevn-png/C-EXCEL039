@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getSession } from '@/lib/auth';
-import { computeOrderTotals } from '@/lib/shipping-fee';
+import { computeOrderTotals, calcPhiMua } from '@/lib/shipping-fee';
 import { nextMaDH, nextMaKH, nextMaSP, nextMaKN, nextMaYC, nextMaNCC } from '@/lib/codes';
 import { logActivity } from '@/lib/audit';
 import { pushNotify } from '@/lib/notify';
 import { getNumber } from '@/lib/settings';
+import { rateLimit, clientIp } from '@/lib/ratelimit';
 import type { VaiTro, TrangThaiDon, Tuyen, LineVC, LoaiKN, TrangThaiKN, TrangThaiYC } from '@prisma/client';
 
 type Ok<T = any> = { success: true } & T;
@@ -43,13 +44,16 @@ async function recomputeDonHang(maDH: string) {
   const tongGiaHang = ct.reduce((s, c) => s + c.thanhTien, 0);
   const tongKg = ct.reduce((s, c) => s + c.kg * c.soLuong, 0);
   const tongM3 = ct.reduce((s, c) => s + c.m3 * c.soLuong, 0);
+  // Phí mua theo từng sàn (per-web); fallback % chung khi sàn chưa cấu hình.
+  const phiMuaPerWeb = await calcPhiMua(ct.map((c) => ({ webNguon: c.webNguon, thanhTien: c.thanhTien })));
 
   const totals = await computeOrderTotals({
     giaHang: tongGiaHang,
     kg: tongKg, m3: tongM3,
     tuyen: o.tuyen,
     phiShipND: o.shipND, phiDongGoi: o.dongGo, phiPhuThu: o.phuThu,
-    phiPhatSinh: o.phiBH,
+    phiPhatSinh: o.phiPhatSinh,
+    phiMuaOverride: phiMuaPerWeb,
     thueNK: o.thueNK, vat: o.vat, phiKiemHoa: o.phiKiemHoa, phiLuuKho: o.phiLuuKho,
     pctCoc: o.pctCoc,
     lineVC: o.lineVC, loaiHang: o.loaiHang
@@ -59,7 +63,7 @@ async function recomputeDonHang(maDH: string) {
     where: { maDH },
     data: {
       tongGiaHang, tongKg, tongM3,
-      phiMua: totals.phiMua, phiBH: totals.phiBH, phiVC: totals.phiVC,
+      phiMua: totals.phiMua, phiBH: totals.phiBH, phiPhatSinh: totals.phiPhatSinh, phiVC: totals.phiVC,
       tongTien: totals.tongTien,
       tienCoc: totals.coc,
       conLai: totals.tongTien - o.daTra
@@ -128,7 +132,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         shipND: Number(d.phiShipND) || 0,
         dongGo: Number(d.phiDongGoi) || 0,
         phuThu: Number(d.phiPhuThu) || 0,
-        phiBH: Number(d.phiPhatSinh) || 0,
+        phiPhatSinh: Number(d.phiPhatSinh) || 0,
         ngachHQ: d.ngachHQ || 'Tiểu ngạch',
         thueNK: Number(d.thueNK) || 0,
         vat: Number(d.vat) || 0,
@@ -1035,6 +1039,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         tongGiaHang: canSeeMoney ? o.tongGiaHang : 0,
         phiMua: canSeeMoney ? o.phiMua : 0,
         phiBH: canSeeMoney ? o.phiBH : 0,
+        phiPhatSinh: canSeeMoney ? o.phiPhatSinh : 0,
         phiVC: canSeeMoney ? o.phiVC : 0,
         shipND: canSeeMoney ? o.shipND : 0,
         dongGo: canSeeMoney ? o.dongGo : 0,
@@ -1367,6 +1372,17 @@ export async function POST(req: Request) {
     const PUBLIC = new Set(['lookupCustomer', 'createKhieuNai', 'createYeuCauMua']);
     if (!user && !PUBLIC.has(action)) {
       return NextResponse.json(err('Phiên đăng nhập đã hết'), { status: 401 });
+    }
+    // Rate-limit hành động công khai (chống dò 4-số-cuối SĐT / spam khiếu nại, yêu cầu).
+    if (!user && PUBLIC.has(action)) {
+      const limits: Record<string, [number, number]> = {
+        lookupCustomer: [12, 60_000],
+        createKhieuNai: [6, 60_000],
+        createYeuCauMua: [20, 60_000]
+      };
+      const [lim, win] = limits[action] || [30, 60_000];
+      const rl = rateLimit(`act:${action}:${clientIp(req)}`, lim, win);
+      if (!rl.ok) return NextResponse.json(err(`Thao tác quá nhanh. Thử lại sau ${rl.retryAfter}s.`), { status: 429 });
     }
     const res = await h(args, user as any);
     return NextResponse.json(res);

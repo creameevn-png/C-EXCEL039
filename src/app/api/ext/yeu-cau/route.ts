@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db';
 import { corsJson, corsPreflight } from '@/lib/cors';
 import { nextMaYC } from '@/lib/codes';
+import { rateLimit, clientIp } from '@/lib/ratelimit';
 import type { Tuyen } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
@@ -26,6 +27,8 @@ function packGhiChu(p: any): string {
 // đẩy thành YÊU CẦU ĐẶT HÀNG về hệ thống. Gộp các SP cùng phiên của 1 khách
 // (cùng SĐT, còn "Chờ xử lý") vào 1 yêu cầu; chưa có thì tạo mới.
 export async function POST(req: Request) {
+  const rl = rateLimit(`yc:post:${clientIp(req)}`, 20, 60_000);
+  if (!rl.ok) return corsJson({ message: `Thao tác quá nhanh. Thử lại sau ${rl.retryAfter}s.` }, { status: 429 });
   const b = await req.json().catch(() => ({} as any));
   const hoTen = String(b.hoTen || '').trim();
   const sdt = String(b.sdt || '').trim();
@@ -88,6 +91,8 @@ export async function POST(req: Request) {
 
 // GET /api/ext/yeu-cau?sdt=... — "Yêu cầu của tôi": liệt kê yêu cầu gần đây của khách.
 export async function GET(req: Request) {
+  const rl = rateLimit(`yc:get:${clientIp(req)}`, 30, 60_000);
+  if (!rl.ok) return corsJson({ items: [], message: `Thao tác quá nhanh. Thử lại sau ${rl.retryAfter}s.` }, { status: 429 });
   const sdt = new URL(req.url).searchParams.get('sdt')?.trim() || '';
   if (!sdt) return corsJson({ items: [] });
   const rows = await prisma.yeuCauMua.findMany({

@@ -14,7 +14,7 @@ type Row = {
   maDH: string; ngayTao: string; maKH: string; tenKH: string; nv: string;
   lineVC: string; tuyen: string; trangThai: string;
   tongKg: number; tongM3: number; tongGiaHang: number;
-  phiMua: number; phiBH: number; phiVC: number;
+  phiMua: number; phiBH: number; phiPhatSinh: number; phiVC: number;
   shipND: number; dongGo: number; phuThu: number;
   vonNDT: number; loiNhuanNDT: number;
   tongTien: number; daTra: number; conLai: number;
@@ -64,6 +64,7 @@ function agg(rows: Row[]) {
       tongGiaHang: a.tongGiaHang + r.tongGiaHang,
       phiMua: a.phiMua + r.phiMua,
       phiBH: a.phiBH + r.phiBH,
+      phiPhatSinh: a.phiPhatSinh + r.phiPhatSinh,
       phiVC: a.phiVC + r.phiVC,
       shipND: a.shipND + r.shipND,
       dongGo: a.dongGo + r.dongGo,
@@ -74,7 +75,7 @@ function agg(rows: Row[]) {
       daTra: a.daTra + r.daTra,
       conLai: a.conLai + r.conLai
     }),
-    { soDon: 0, tongKg: 0, tongM3: 0, tongGiaHang: 0, phiMua: 0, phiBH: 0, phiVC: 0, shipND: 0, dongGo: 0, phuThu: 0, vonNDT: 0, loiNhuanNDT: 0, tongTien: 0, daTra: 0, conLai: 0 }
+    { soDon: 0, tongKg: 0, tongM3: 0, tongGiaHang: 0, phiMua: 0, phiBH: 0, phiPhatSinh: 0, phiVC: 0, shipND: 0, dongGo: 0, phuThu: 0, vonNDT: 0, loiNhuanNDT: 0, tongTien: 0, daTra: 0, conLai: 0 }
   );
 }
 
@@ -165,7 +166,8 @@ export default function BaoCaoClient({ rows, knRows, cashRows, tonKhoRows }: { r
     { k: 'Công nợ còn lại', now: aCur.conLai, prev: aPrev.conLai, money: true },
     { k: 'Tiền hàng', now: aCur.tongGiaHang, prev: aPrev.tongGiaHang, money: true },
     { k: 'Phí mua hàng', now: aCur.phiMua, prev: aPrev.phiMua, money: true },
-    { k: 'Phí phát sinh khác', now: aCur.phiBH, prev: aPrev.phiBH, money: true },
+    { k: 'Phí bảo hiểm (1%)', now: aCur.phiBH, prev: aPrev.phiBH, money: true },
+    { k: 'Phí phát sinh khác', now: aCur.phiPhatSinh, prev: aPrev.phiPhatSinh, money: true },
     { k: 'Phí vận chuyển', now: aCur.phiVC, prev: aPrev.phiVC, money: true },
     { k: 'Phí ship VN + đóng gỗ + phụ thu', now: aCur.shipND + aCur.dongGo + aCur.phuThu, prev: aPrev.shipND + aPrev.dongGo + aPrev.phuThu, money: true }
   ];

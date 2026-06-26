@@ -46,7 +46,7 @@ export default async function BaoCaoPage() {
     trangThai: o.trangThai as string,
     tongKg: o.tongKg, tongM3: o.tongM3,
     tongGiaHang: o.tongGiaHang,
-    phiMua: o.phiMua, phiBH: o.phiBH, phiVC: o.phiVC,
+    phiMua: o.phiMua, phiBH: o.phiBH, phiPhatSinh: o.phiPhatSinh, phiVC: o.phiVC,
     shipND: o.shipND, dongGo: o.dongGo, phuThu: o.phuThu,
     vonNDT: o.vonNDT, loiNhuanNDT: o.loiNhuanNDT,
     tongTien: o.tongTien, daTra: o.daTra, conLai: o.conLai

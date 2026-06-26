@@ -3,10 +3,8 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import type { VaiTro } from '@prisma/client';
 import { prisma } from './db';
+import { getSessionSecret } from './secret';
 
-const SECRET = new TextEncoder().encode(
-  process.env.SESSION_SECRET || 'dev-secret-change-me-please-now-32+chars'
-);
 const COOKIE = 'session';
 const MAX_AGE = 60 * 60 * 24 * 7;
 
@@ -22,7 +20,7 @@ export async function signSession(user: SessionUser) {
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(`${MAX_AGE}s`)
-    .sign(SECRET);
+    .sign(getSessionSecret());
 }
 
 export async function setSessionCookie(user: SessionUser) {
@@ -41,7 +39,7 @@ export async function getSession(): Promise<SessionUser | null> {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, SECRET);
+    const { payload } = await jwtVerify(token, getSessionSecret());
     return {
       id: payload.id as number,
       email: payload.email as string,

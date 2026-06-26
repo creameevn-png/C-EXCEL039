@@ -187,6 +187,7 @@ model DonHang {
   tongGiaHang Float        @default(0) @map("tong_gia_hang")
   phiMua      Float        @default(0) @map("phi_mua")
   phiBH       Float        @default(0) @map("phi_bh")
+  phiPhatSinh Float        @default(0) @map("phi_phat_sinh")
   phiVC       Float        @default(0) @map("phi_vc")
   shipND      Float        @default(0) @map("ship_nd")
   dongGo      Float        @default(0) @map("dong_go")

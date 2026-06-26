@@ -35,6 +35,7 @@ type OrderDetail = {
   tongGiaHang: number;
   phiMua: number;
   phiBH: number;
+  phiPhatSinh: number;
   phiVC: number;
   shipND: number;
   dongGo: number;
@@ -162,7 +163,8 @@ export default function OrderDetailModalHost({ canSeeMoney, canSeeProfit = false
                   <div className="fee-row"><span>Phí ship VN</span><span className="fee-value">{fmtVND(data.shipND)}đ</span></div>
                   {data.dongGo > 0 && <div className="fee-row"><span>Phí đóng gói</span><span className="fee-value">{fmtVND(data.dongGo)}đ</span></div>}
                   {data.phuThu > 0 && <div className="fee-row"><span>Phí phụ thu</span><span className="fee-value">{fmtVND(data.phuThu)}đ</span></div>}
-                  {data.phiBH > 0 && <div className="fee-row"><span>Phí phát sinh khác</span><span className="fee-value">{fmtVND(data.phiBH)}đ</span></div>}
+                  {data.phiBH > 0 && <div className="fee-row"><span>Phí bảo hiểm</span><span className="fee-value">{fmtVND(data.phiBH)}đ</span></div>}
+                  {data.phiPhatSinh > 0 && <div className="fee-row"><span>Phí phát sinh khác</span><span className="fee-value">{fmtVND(data.phiPhatSinh)}đ</span></div>}
                   {data.thueNK > 0 && <div className="fee-row"><span>Thuế nhập khẩu</span><span className="fee-value">{fmtVND(data.thueNK)}đ</span></div>}
                   {data.vat > 0 && <div className="fee-row"><span>VAT</span><span className="fee-value">{fmtVND(data.vat)}đ</span></div>}
                   {data.phiKiemHoa > 0 && <div className="fee-row"><span>Phí kiểm hóa</span><span className="fee-value">{fmtVND(data.phiKiemHoa)}đ</span></div>}

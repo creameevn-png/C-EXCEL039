@@ -201,13 +201,15 @@ export default function CskhClient({ initial }: Props) {
     const tongSL = items.reduce((s, it) => s + (Number(it.soLuong) || 0), 0);
     const totalKg = items.reduce((s, it) => s + (Number(it.kg) || 0) * (Number(it.soLuong) || 0), 0);
     const totalM3 = items.reduce((s, it) => s + (Number(it.m3) || 0) * (Number(it.soLuong) || 0), 0);
+    // Tạm tính: phí mua 2% chung (server có thể tính theo từng sàn), bảo hiểm 1% giá hàng.
     const phiMua = Math.round((tongGiaHang * 0.02) / 1000) * 1000;
-    const phiBH = Math.round(Number(phiPhatSinh) || 0);
+    const phiBH = Math.round((tongGiaHang * 0.01) / 1000) * 1000;
+    const phiPS = Math.round(Number(phiPhatSinh) || 0);
     const phiVC = calcPhiVCPanama(totalKg, totalM3, tuyen);
     const phiThue = (Number(thueNK) || 0) + (Number(vat) || 0) + (Number(phiKiemHoa) || 0) + (Number(phiLuuKho) || 0);
-    const tong = tongGiaHang + phiMua + phiBH + phiVC + (Number(shipND) || 0) + (Number(dongGoi) || 0) + (Number(phuThu) || 0) + phiThue;
+    const tong = tongGiaHang + phiMua + phiBH + phiPS + phiVC + (Number(shipND) || 0) + (Number(dongGoi) || 0) + (Number(phuThu) || 0) + phiThue;
     const coc = Math.round((tong * pctCoc) / 100 / 1000) * 1000;
-    return { tongGiaHang, tongNDT, tongSL, totalKg, totalM3, phiMua, phiBH, phiVC, phiThue, tong, coc };
+    return { tongGiaHang, tongNDT, tongSL, totalKg, totalM3, phiMua, phiBH, phiPS, phiVC, phiThue, tong, coc };
   }, [items, tuyen, shipND, dongGoi, phuThu, phiPhatSinh, thueNK, vat, phiKiemHoa, phiLuuKho, pctCoc]);
 
   function resetCreateForm() {
@@ -574,9 +576,10 @@ export default function CskhClient({ initial }: Props) {
             <div style={{ marginTop: 14 }}>
               <div className="erp-fee-row"><span className="lbl">Tổng giá hàng</span><span className="v">{fmtVND(totals.tongGiaHang)}đ <small style={{ color: 'var(--text-faint)', fontWeight: 500 }}>≈ {formatNDT(totals.tongNDT)}</small></span></div>
               <div className="erp-fee-row"><span className="lbl">Tổng KG / M³</span><span className="v">{totals.totalKg.toFixed(2)} kg / {totals.totalM3.toFixed(4)} m³</span></div>
-              <div className="erp-fee-row"><span className="lbl">Phí mua (2%)</span><span className="v">{fmtVND(totals.phiMua)}đ</span></div>
+              <div className="erp-fee-row"><span className="lbl">Phí mua (tạm tính 2%)</span><span className="v">{fmtVND(totals.phiMua)}đ</span></div>
+              <div className="erp-fee-row"><span className="lbl">Phí bảo hiểm (1%)</span><span className="v">{fmtVND(totals.phiBH)}đ</span></div>
               <div className="erp-fee-row"><span className="lbl">Phí vận chuyển (Panama)</span><span className="v">{fmtVND(totals.phiVC)}đ</span></div>
-              {totals.phiBH > 0 && <div className="erp-fee-row"><span className="lbl">Phí phát sinh khác</span><span className="v">{fmtVND(totals.phiBH)}đ</span></div>}
+              {totals.phiPS > 0 && <div className="erp-fee-row"><span className="lbl">Phí phát sinh khác</span><span className="v">{fmtVND(totals.phiPS)}đ</span></div>}
               {totals.phiThue > 0 && <div className="erp-fee-row"><span className="lbl">Thuế / VAT / kiểm hóa / lưu kho ({ngachHQ})</span><span className="v">{fmtVND(totals.phiThue)}đ</span></div>}
               <div className="erp-fee-row total"><span className="lbl">Tổng tiền</span><span className="v">{fmtVND(totals.tong)}đ</span></div>
               <div className="erp-fee-row coc"><span className="lbl">Cọc ({pctCoc}%)</span><span className="v">{fmtVND(totals.coc)}đ</span></div>

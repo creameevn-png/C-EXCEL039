@@ -1,102 +1,99 @@
-# 🎬 KỊCH BẢN QUAY CLIP DEMO — Extension Mua Hộ Cừ (v2.5.0)
+# 🎬 KỊCH BẢN QUAY CLIP DEMO — Extension Mua Hộ Cừ (v2.6.0 · mode KHÁCH tự đặt)
 
-> Mục tiêu: clip ~**2–3 phút** quay màn hình, cho khách thấy extension chạy **từng click**.
-> Quay bằng: phần mềm quay màn hình bất kỳ (Loom / OBS / ShareX / Bandicam / hoặc tính năng quay màn hình của Windows: **Win + Alt + R**).
-> Mẹo: bật con trỏ chuột to + click highlight nếu phần mềm có (để khách thấy rõ đang bấm đâu).
+> Mục tiêu: clip ~**2–3 phút** quay màn hình, cho khách thấy: **khách lên 1688 → bấm "Tôi muốn đặt sản phẩm này" → yêu cầu về thẳng hệ thống bên Cừ**.
+> Quay bằng: Loom / OBS / ShareX / Bandicam / hoặc **Win + Alt + R** (Windows).
+> Mẹo: bật con trỏ chuột to + click highlight (để thấy rõ bấm đâu).
 
 ---
 
 ## 0) CHUẨN BỊ TRƯỚC KHI QUAY (không quay phần này)
-- [ ] Đã **cài extension** (giải nén `mua-ho-cu-extension-v2.5.0.zip` → `chrome://extensions` → bật **Developer mode** → **Load unpacked** → chọn thư mục → **ghim icon** lên thanh trình duyệt).
-- [ ] Có sẵn **1 tài khoản nhân viên Mua hàng** (email + mật khẩu) đăng nhập được hệ thống.
-- [ ] Mở sẵn **2 tab** để chuyển cho mượt:
-  - Tab A: 1 **trang chi tiết sản phẩm** trên **1688** (loại có nhiều phân loại + bậc giá càng tốt).
-  - Tab B: 1 **trang tìm kiếm** 1688 hoặc Taobao (gõ 1 từ khoá, ra lưới sản phẩm).
-- [ ] Mở sẵn tab C: web hệ thống `https://cuexcel.vercel.app` (chưa cần đăng nhập).
-- [ ] Đăng **xuất** extension trước (để quay được cảnh đăng nhập) — hoặc giữ nguyên nếu muốn bỏ qua cảnh login.
+- [ ] Đã **cài extension** (giải nén `mua-ho-cu-extension-v2.6.0.zip` → `chrome://extensions` → bật **Developer mode** → **Load unpacked** → chọn thư mục → **ghim icon**).
+- [ ] Mở sẵn **2 tab**:
+  - Tab A: 1 **trang chi tiết sản phẩm** trên **1688** (loại nhiều phân loại + bậc giá càng tốt).
+  - Tab B: 1 **trang tìm kiếm** 1688 hoặc Taobao (ra lưới sản phẩm).
+- [ ] Tab C (để khoe phía hệ thống): web bên Cừ `https://cuexcel.vercel.app` → đăng nhập **tài khoản nhân viên** → mở sẵn trang **Yêu cầu mua hàng** (`/admin/yeu-cau`).
+- [ ] Xoá thông tin khách cũ trong extension (nếu muốn quay cảnh nhập từ đầu).
 
 ---
 
-## 🎞️ PHÂN CẢNH (quay liên tục 1 lần, hoặc cắt ghép từng cảnh)
+## 🎞️ PHÂN CẢNH
 
 ### CẢNH 1 — Mở đầu (0:00 – 0:10)
-**Hình:** màn hình trình duyệt, con trỏ chỉ vào **icon 🛒 Mua Hộ Cừ** trên thanh.
-**Thoại/caption:**
-> "Đây là extension Mua Hộ — hỗ trợ **1688, Taobao, Tmall**. Em demo nhanh từ lúc đăng nhập tới lúc sản phẩm vào hệ thống."
+**Hình:** màn hình trình duyệt, con trỏ chỉ vào **icon 🛒 Mua Hộ Cừ**.
+**Thoại:**
+> "Đây là extension Mua Hộ cho **khách hàng** — lên 1688/Taobao/Tmall, chọn sản phẩm, gửi yêu cầu thẳng về hệ thống bên mình. Em demo từ phía khách tới lúc yêu cầu vào hệ thống."
 
 ---
 
-### CẢNH 2 — Đăng nhập extension (0:10 – 0:35)
+### CẢNH 2 — Khách nhập thông tin 1 lần (0:10 – 0:35)
 **Click từng bước:**
-1. Bấm **icon 🛒** trên thanh → popup mở ra, đang ở tab **"Cấu hình"**.
-2. Bấm nút **"Dùng bản chạy thật"** → ô địa chỉ API tự điền `https://cuexcel.vercel.app/api/ext` (caption: *"1 chạm là xong địa chỉ"*).
-3. Gõ **Tài khoản** (email) + **Mật khẩu** nhân viên.
-4. Bấm **"Đăng nhập"** → hiện dòng xanh **"Đã có phiên đăng nhập."**
+1. Bấm **icon 🛒** → popup mở, tab **"Khách hàng"**.
+2. Bấm **"Dùng bản chạy thật"** → ô địa chỉ tự điền `https://cuexcel.vercel.app/api/ext`.
+3. Nhập **Họ tên** + **Số điện thoại** (khách cũ thì nhập thêm **Mã KH**).
+4. Bấm **"Lưu thông tin"** → hiện dòng xanh *"Đang đặt với tên: … · SĐT…"*.
 
 **Thoại:**
-> "Bấm *Dùng bản chạy thật* là tự điền địa chỉ hệ thống, nhập tài khoản nhân viên rồi đăng nhập — xong."
+> "Khách chỉ cần nhập **họ tên + số điện thoại** một lần. Là khách cũ thì thêm Mã KH. Xong, bắt đầu chọn hàng."
 
 ---
 
-### CẢNH 3 — Thêm sản phẩm từ TRANG CHI TIẾT (0:35 – 1:25) ⭐ *quan trọng nhất*
+### CẢNH 3 — Khách chọn sản phẩm từ TRANG CHI TIẾT (0:35 – 1:30) ⭐ *quan trọng nhất*
 **Click từng bước:**
-1. Chuyển sang **Tab A** (trang chi tiết 1688). Trỏ chuột vào nút nổi **"Thêm vào giỏ mua hộ"** (góc phải trang).
-2. Bấm nút đó → hiện hộp **"Xác nhận thêm vào giỏ mua hộ"**. Dừng 2–3 giây cho khách thấy phần mềm **tự bắt**:
-   - **Tên sản phẩm** (tiếng Trung) + ngay dưới là **🇻🇳 tên tiếng Việt** (tự dịch)
+1. Sang **Tab A** (trang chi tiết 1688). Trỏ vào nút nổi **"Tôi muốn đặt sản phẩm này"** (góc phải).
+2. Bấm → hiện hộp **"Gửi yêu cầu đặt hàng"**. Dừng 2–3 giây cho thấy:
+   - **Tên tiếng Trung** + ngay dưới **🇻🇳 tên tiếng Việt** (tự dịch)
    - **Giá** + **≈ giá VNĐ** (theo tỉ giá hệ thống) + **bậc giá theo số lượng**
-   - **Phân loại / SKU** (màu, size…) + bản dịch tiếng Việt
-   - **Số lượng tối thiểu (MOQ)** — dòng gợi ý nhỏ
-3. **Chọn 1 phân loại** (vd màu/size).
-4. **Chọn Danh mục hàng hoá** (vd "Thời trang").
-5. Sửa **Số lượng** (vd 10).
-6. Gõ **Ghi chú cho NV mua hàng** (vd "chọn màu be, size L") + **Ghi chú riêng tư** (vd "khách VIP").
-7. Bấm **"Xác nhận thêm"** → thông báo **"Đã thêm vào giỏ mua hộ."** → **icon 🛒** badge nhảy lên **1**.
+   - **Phân loại / SKU** + bản dịch
+   - **Số lượng tối thiểu (MOQ)**
+3. **Chọn phân loại** + **Danh mục hàng hoá** (vd "Thời trang") + **Số lượng**.
+4. Gõ **Ghi chú cho NV mua hàng** + **Ghi chú riêng tư** (nếu cần).
+5. Bấm **"Gửi yêu cầu"** → thông báo **"Đã gửi yêu cầu YC-… (1 sản phẩm)."**
 
 **Thoại:**
-> "Vào trang sản phẩm bất kỳ, bấm *Thêm vào giỏ mua hộ*. Extension **tự dịch tên sang tiếng Việt**, **hiện luôn giá VNĐ** theo tỉ giá công ty, lấy sẵn **phân loại**, **bậc giá**, **số lượng tối thiểu** — mình chỉ chọn **danh mục**, nhập số lượng, ghi chú rồi xác nhận. Không gõ tay gì cả."
+> "Khách bấm *Tôi muốn đặt sản phẩm này*. Extension **tự dịch tên sang tiếng Việt**, **hiện giá VNĐ** theo tỉ giá công ty, lấy sẵn phân loại + bậc giá + số lượng tối thiểu. Khách chọn danh mục, ghi chú rồi **Gửi yêu cầu** — là xong, không cần gọi điện nhắn tin."
 
 ---
 
-### CẢNH 4 — Thêm NHANH từ TRANG TÌM KIẾM (1:25 – 1:55)
+### CẢNH 4 — Gửi nhanh từ TRANG TÌM KIẾM (1:30 – 1:55)
 **Click từng bước:**
-1. Chuyển sang **Tab B** (trang tìm kiếm / lưới sản phẩm).
-2. Rê chuột lên 1 ô sản phẩm → xuất hiện nút **"Thêm nhanh vào giỏ mua hộ"** (góc ô).
-3. Bấm nút đó ở **2–3 sản phẩm** liên tiếp → mỗi lần **badge tăng** (2, 3, 4…).
+1. Sang **Tab B** (trang tìm kiếm).
+2. Rê chuột lên 1 ô sản phẩm → hiện nút **"+ Muốn đặt"** → bấm ở **2–3 sản phẩm**.
+3. Mỗi lần gửi, các sản phẩm **gộp chung vào 1 yêu cầu** của khách (cùng SĐT).
 
 **Thoại:**
-> "Ngay ở trang tìm kiếm, mỗi sản phẩm có nút *Thêm nhanh* — gom cả rổ chỉ vài cú click."
+> "Ngay ở trang tìm kiếm cũng có nút *Muốn đặt* — khách gom nhiều món, hệ thống tự gộp vào **một yêu cầu**."
 
 ---
 
-### CẢNH 5 — Xem lại Giỏ & Đơn trong popup (1:55 – 2:20)
+### CẢNH 5 — "Yêu cầu của tôi" trong popup (1:55 – 2:20)
 **Click từng bước:**
-1. Bấm **icon 🛒** → bấm tab **"Giỏ mua hộ"** → bấm **"Tải lại giỏ"** → hiện danh sách sản phẩm vừa thêm.
-2. Bấm tab **"Đơn đã đặt"** → bấm **"Tải lại đơn"** → hiện các đơn trong hệ thống.
+1. Bấm **icon 🛒** → tab **"Yêu cầu của tôi"** → bấm **"Tải lại"**.
+2. Hiện danh sách yêu cầu đã gửi: **mã YC · số sản phẩm · trạng thái** (Chờ xử lý…).
 
 **Thoại:**
-> "Trong popup xem lại ngay **giỏ mua hộ** và **đơn đã đặt** — không cần mở web."
+> "Khách theo dõi yêu cầu của mình ngay trong extension — mã yêu cầu, số sản phẩm, trạng thái xử lý."
 
 ---
 
-### CẢNH 6 — Sản phẩm đã vào HỆ THỐNG (2:20 – 2:50) ⭐ *chốt giá trị*
+### CẢNH 6 — Yêu cầu đã vào HỆ THỐNG bên Cừ (2:20 – 2:50) ⭐ *chốt giá trị*
 **Click từng bước:**
-1. Chuyển sang **Tab C** → đăng nhập web hệ thống (nếu chưa) → vào menu **"Giỏ mua hộ"** (`/gio-mua-ho`).
-2. Chỉ vào các sản phẩm vừa đẩy từ extension — **đúng tên, ảnh, giá, phân loại** đã bắt.
-3. (Tuỳ chọn) cho thấy nhân viên Mua hàng **chuyển sản phẩm thành đơn** từ đây.
+1. Sang **Tab C** (đã đăng nhập nhân viên) → trang **Yêu cầu mua hàng** (`/admin/yeu-cau`) → bấm **Tải lại / F5**.
+2. Chỉ vào yêu cầu **YC-…** vừa gửi — đúng **tên khách, SĐT, danh sách sản phẩm** (tên Việt, link, số lượng, giá, danh mục, ghi chú).
+3. (Tuỳ chọn) cho thấy nhân viên **xử lý → tạo đơn** từ yêu cầu này.
 
 **Thoại:**
-> "Và đây — sản phẩm từ extension đã **nằm sẵn trong hệ thống**, nhân viên Mua hàng xử lý thành đơn ngay. Không nhập tay, không sai sót."
+> "Và đây — yêu cầu của khách đã **nằm sẵn trong hệ thống bên mình**, đầy đủ thông tin sản phẩm. Nhân viên chỉ việc báo giá, tạo đơn. Không nhập tay, không sót."
 
 ---
 
 ### CẢNH 7 — Kết (2:50 – 3:00)
 **Thoại/caption:**
-> "Extension hỗ trợ **1688 · Taobao · Tmall**, **xem giá VNĐ**, **dịch tiếng Trung sang tiếng Việt**, chọn danh mục, bắt sản phẩm đẩy thẳng vào hệ thống — không nhập tay."
+> "Extension cho khách tự đặt từ **1688 · Taobao · Tmall**: **giá VNĐ**, **dịch tiếng Trung sang tiếng Việt**, chọn danh mục, ghi chú → **yêu cầu về thẳng hệ thống**. Đúng kiểu chuyên nghiệp."
 
 ---
 
 ## 📝 GHI CHÚ KHI QUAY
-- Nếu một sản phẩm bắt **thiếu vài trường** (do trang đặc thù) → **đừng quay sản phẩm đó**, chọn sản phẩm khác. (Bắt sai trường lẻ = bảo hành, nhưng demo nên chọn hàng "đẹp".)
-- Che bớt **tài khoản/mật khẩu** lúc gõ nếu không muốn lộ (hoặc làm mờ khi dựng).
-- Độ dài lý tưởng: **2–3 phút**. Nếu khách bận, cắt riêng **Cảnh 3** (40 giây) là đủ thuyết phục.
-- Xuất video **1080p**, gửi khách qua Zalo/Drive.
+- Sản phẩm bắt **thiếu vài trường** (trang đặc thù) → chọn sản phẩm khác cho demo "đẹp" (bắt sai trường lẻ = bảo hành).
+- Che/làm mờ **SĐT thật** nếu không muốn lộ.
+- Độ dài lý tưởng **2–3 phút**. Khách bận → cắt riêng **Cảnh 3 + Cảnh 6** (~70 giây) là đủ thuyết phục.
+- Xuất **1080p**, gửi Zalo/Drive.

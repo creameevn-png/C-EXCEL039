@@ -58,18 +58,25 @@ export async function calcPhiVCByLine(
 export async function calcPhiMua(lines: { webNguon?: string | null; thanhTien: number }[]): Promise<number> {
   const pctGlobal = await getNumber('phi_mua_pct', 2);
   const webs = await prisma.bangGiaWeb.findMany({ where: { hoatDong: true } });
-  const byWeb = new Map<string, { pct: number; min: number }>();
-  for (const w of webs) {
-    const key = w.web.toLowerCase().replace(/\s+/g, '').replace(/\.com.*$/, '');
-    byWeb.set(key, { pct: w.phiMuaPct, min: w.phiMuaMin });
+  const normKey = (s: any) => String(s || '').toLowerCase().replace(/\s+/g, '').replace(/\.com.*$/, '');
+  const cfgByKey = new Map<string, { pct: number; min: number }>();
+  for (const w of webs) cfgByKey.set(normKey(w.web), { pct: w.phiMuaPct, min: w.phiMuaMin });
+
+  // Gom giá hàng theo từng sàn → phí mua tối thiểu áp 1 lần / sàn / đơn (không nhân số dòng).
+  const sumByKey = new Map<string, number>();
+  for (const ln of lines) {
+    const key = normKey(ln.webNguon);
+    sumByKey.set(key, (sumByKey.get(key) || 0) + (Number(ln.thanhTien) || 0));
   }
   let total = 0;
-  for (const ln of lines) {
-    const key = String(ln.webNguon || '').toLowerCase().replace(/\s+/g, '').replace(/\.com.*$/, '');
-    const cfg = byWeb.get(key);
-    const pct = cfg ? cfg.pct : pctGlobal;
-    const min = cfg ? cfg.min : 0;
-    total += Math.max(((Number(ln.thanhTien) || 0) * pct) / 100, min);
+  for (const [key, sum] of sumByKey) {
+    const cfg = cfgByKey.get(key);
+    // Có cấu hình VÀ pct>0 → dùng % + min của sàn; còn lại (chưa cấu hình, hoặc dòng
+    // BangGiaWeb chỉ để đặt tỉ giá nên pct=0) → dùng % chung, min 0 (giữ hành vi cũ).
+    const usePerWeb = !!cfg && cfg.pct > 0;
+    const pct = usePerWeb ? cfg!.pct : pctGlobal;
+    const min = usePerWeb ? cfg!.min : 0;
+    total += Math.max((sum * pct) / 100, min);
   }
   return Math.round(total / 1000) * 1000;
 }

@@ -1,9 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
-
-const SECRET = new TextEncoder().encode(
-  process.env.SESSION_SECRET || 'dev-secret-change-me-please-now-32+chars'
-);
+import { getSessionSecret } from '@/lib/secret';
 
 const PROTECTED = [
   '/cskh', '/gdv', '/ketoan', '/mua-hang',
@@ -23,7 +20,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
   try {
-    await jwtVerify(token, SECRET);
+    await jwtVerify(token, getSessionSecret());
     return NextResponse.next();
   } catch {
     const url = req.nextUrl.clone();

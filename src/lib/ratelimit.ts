@@ -28,9 +28,15 @@ export function rateLimit(key: string, limit: number, windowMs: number): { ok: b
   return { ok: true, retryAfter: 0 };
 }
 
-/** Lấy IP client từ header proxy (Vercel/Nginx). */
+/**
+ * Lấy IP client. Ưu tiên `x-real-ip` (Vercel/Nginx tự set = IP thật, khó giả hơn)
+ * rồi mới tới `x-forwarded-for` (client có thể chèn token trái → kém tin cậy).
+ * Lưu ý: rate-limit theo IP chỉ là lớp 1; với tấn công dò có chủ đích nên kèm
+ * giới hạn theo định danh bị dò (vd Mã KH) — xem lookupCustomer.
+ */
 export function clientIp(req: Request): string {
+  const realIp = (req.headers.get('x-real-ip') || '').trim();
+  if (realIp) return realIp;
   const xff = req.headers.get('x-forwarded-for') || '';
-  const first = xff.split(',')[0].trim();
-  return first || req.headers.get('x-real-ip') || 'unknown';
+  return xff.split(',')[0].trim() || 'unknown';
 }

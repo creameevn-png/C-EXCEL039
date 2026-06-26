@@ -1305,7 +1305,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (patch?.shipND !== undefined) { data.shipND = Number(patch.shipND) || 0; changes.shipND = data.shipND; }
     if (patch?.dongGo !== undefined) { data.dongGo = Number(patch.dongGo) || 0; changes.dongGo = data.dongGo; }
     if (patch?.phuThu !== undefined) { data.phuThu = Number(patch.phuThu) || 0; changes.phuThu = data.phuThu; }
-    if (patch?.phiPhatSinh !== undefined) { data.phiBH = Number(patch.phiPhatSinh) || 0; changes.phiPhatSinh = data.phiBH; }
+    if (patch?.phiPhatSinh !== undefined) { data.phiPhatSinh = Number(patch.phiPhatSinh) || 0; changes.phiPhatSinh = data.phiPhatSinh; }
     if (patch?.ngachHQ !== undefined) { data.ngachHQ = patch.ngachHQ || 'Tiểu ngạch'; changes.ngachHQ = data.ngachHQ; }
     if (patch?.thueNK !== undefined) { data.thueNK = Number(patch.thueNK) || 0; changes.thueNK = data.thueNK; }
     if (patch?.vat !== undefined) { data.vat = Number(patch.vat) || 0; changes.vat = data.vat; }
@@ -1328,6 +1328,10 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (!maKH || !maKH.trim()) return err('Vui lòng nhập Mã KH');
     if (!sdtLast4 || sdtLast4.length < 4) return err('Vui lòng nhập 4 số cuối SĐT');
     const ma = String(maKH).trim().toUpperCase();
+    // Chặn brute-force 4 số cuối SĐT (10^4) theo TỪNG Mã KH — không phụ thuộc IP
+    // nên không né được bằng cách đổi/giả IP.
+    const rlMa = rateLimit(`lookup:makh:${ma}`, 8, 300_000);
+    if (!rlMa.ok) return err(`Thử quá nhiều lần với mã này. Đợi ${rlMa.retryAfter}s rồi thử lại.`);
     const kh = await prisma.khachHang.findUnique({ where: { maKH: ma } });
     if (!kh) return err('Không tìm thấy Mã KH: ' + ma);
     if ((kh.sdt || '').slice(-4) !== String(sdtLast4).trim()) {

@@ -1,4 +1,4 @@
-# 🎬 KỊCH BẢN QUAY CLIP DEMO — Extension Mua Hộ Cừ (v2.2.0)
+# 🎬 KỊCH BẢN QUAY CLIP DEMO — Extension Mua Hộ Cừ (v2.4.0)
 
 > Mục tiêu: clip ~**2–3 phút** quay màn hình, cho khách thấy extension chạy **từng click**.
 > Quay bằng: phần mềm quay màn hình bất kỳ (Loom / OBS / ShareX / Bandicam / hoặc tính năng quay màn hình của Windows: **Win + Alt + R**).
@@ -7,7 +7,7 @@
 ---
 
 ## 0) CHUẨN BỊ TRƯỚC KHI QUAY (không quay phần này)
-- [ ] Đã **cài extension** (giải nén `mua-ho-cu-extension-v2.2.0.zip` → `chrome://extensions` → bật **Developer mode** → **Load unpacked** → chọn thư mục → **ghim icon** lên thanh trình duyệt).
+- [ ] Đã **cài extension** (giải nén `mua-ho-cu-extension-v2.4.0.zip` → `chrome://extensions` → bật **Developer mode** → **Load unpacked** → chọn thư mục → **ghim icon** lên thanh trình duyệt).
 - [ ] Có sẵn **1 tài khoản nhân viên Mua hàng** (email + mật khẩu) đăng nhập được hệ thống.
 - [ ] Mở sẵn **2 tab** để chuyển cho mượt:
   - Tab A: 1 **trang chi tiết sản phẩm** trên **1688** (loại có nhiều phân loại + bậc giá càng tốt).
@@ -22,7 +22,7 @@
 ### CẢNH 1 — Mở đầu (0:00 – 0:10)
 **Hình:** màn hình trình duyệt, con trỏ chỉ vào **icon 🛒 Mua Hộ Cừ** trên thanh.
 **Thoại/caption:**
-> "Đây là extension Mua Hộ — hỗ trợ **1688, Taobao, Tmall**. Em demo nhanh từ lúc đăng nhập tới lúc sản phẩm vào hệ thống."
+> "Đây là extension Mua Hộ — hỗ trợ **1688, Taobao, Tmall, JD.com**. Em demo nhanh từ lúc đăng nhập tới lúc sản phẩm vào hệ thống."
 
 ---
 
@@ -42,20 +42,18 @@
 **Click từng bước:**
 1. Chuyển sang **Tab A** (trang chi tiết 1688). Trỏ chuột vào nút nổi **"Thêm vào giỏ mua hộ"** (góc phải trang).
 2. Bấm nút đó → hiện hộp **"Xác nhận thêm vào giỏ mua hộ"**. Dừng 2–3 giây cho khách thấy phần mềm **tự bắt**:
-   - **Tên sản phẩm** (tiếng Trung) + **ảnh**
-   - **Giá** + **bậc giá theo số lượng** (nếu có)
-   - **Phân loại / SKU** (màu, size…)
+   - **Tên sản phẩm** (tiếng Trung) + ngay dưới là **🇻🇳 tên tiếng Việt** (tự dịch)
+   - **Giá** + **≈ giá VNĐ** (theo tỉ giá hệ thống) + **bậc giá theo số lượng**
+   - **Phân loại / SKU** (màu, size…) + bản dịch tiếng Việt
    - **Số lượng tối thiểu (MOQ)** — dòng gợi ý nhỏ
-3. **Chọn 1 phân loại** (vd màu/size) trong danh sách.
-4. Sửa **Số lượng** (vd 10).
-5. Gõ vào ô ghi chú: vd **"chọn màu be, size L"**.
-6. Bấm **"Xác nhận thêm"** → hiện thông báo **"Đã thêm vào giỏ mua hộ."**
-7. Chỉ vào **icon 🛒** → có **số đếm (badge)** nhảy lên **1**.
+3. **Chọn 1 phân loại** (vd màu/size).
+4. **Chọn Danh mục hàng hoá** (vd "Thời trang").
+5. Sửa **Số lượng** (vd 10).
+6. Gõ **Ghi chú cho NV mua hàng** (vd "chọn màu be, size L") + **Ghi chú riêng tư** (vd "khách VIP").
+7. Bấm **"Xác nhận thêm"** → thông báo **"Đã thêm vào giỏ mua hộ."** → **icon 🛒** badge nhảy lên **1**.
 
 **Thoại:**
-> "Vào trang sản phẩm bất kỳ, bấm *Thêm vào giỏ mua hộ*. Extension **tự lấy** tên, ảnh, giá, **bậc giá theo số lượng**, **phân loại** và **số lượng tối thiểu** — mình chỉ chọn phân loại, nhập số lượng, ghi chú rồi xác nhận. Không phải gõ tay gì cả."
-
-> ⭐ **Dịch tiếng Trung (nếu bật):** ngay khi modal mở, dưới tên tiếng Trung hiện dòng **🇻🇳 tên tiếng Việt** (và bản dịch phân loại). Dừng 2 giây cho khách thấy. *(Bật/tắt ở tab Cấu hình — ô "Tự dịch tiếng Trung → tiếng Việt".)*
+> "Vào trang sản phẩm bất kỳ, bấm *Thêm vào giỏ mua hộ*. Extension **tự dịch tên sang tiếng Việt**, **hiện luôn giá VNĐ** theo tỉ giá công ty, lấy sẵn **phân loại**, **bậc giá**, **số lượng tối thiểu** — mình chỉ chọn **danh mục**, nhập số lượng, ghi chú rồi xác nhận. Không gõ tay gì cả."
 
 ---
 
@@ -93,7 +91,7 @@
 
 ### CẢNH 7 — Kết (2:50 – 3:00)
 **Thoại/caption:**
-> "Extension hỗ trợ **1688 · Taobao · Tmall**, **tự dịch tiếng Trung sang tiếng Việt**, bắt sản phẩm đẩy thẳng vào hệ thống — không nhập tay."
+> "Extension hỗ trợ **1688 · Taobao · Tmall · JD**, **xem giá VNĐ**, **dịch tiếng Trung sang tiếng Việt**, chọn danh mục, bắt sản phẩm đẩy thẳng vào hệ thống — không nhập tay."
 
 ---
 

@@ -11,6 +11,7 @@ public/uploads/*
 
 # File lam viec / thu nghiem - khong day len repo (video, audio, script demo, ban thu nghiem cu)
 _demo/
+_ops/
 apps-script/
 version2/
 excel-app/

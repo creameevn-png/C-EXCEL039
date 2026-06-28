@@ -2,6 +2,7 @@ import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import AppShell from '@/components/AppShell';
 import BaoCaoClient from './BaoCaoClient';
+import OrderDetailModalHost from '@/components/OrderDetailModal';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,6 +73,7 @@ export default async function BaoCaoPage() {
   return (
     <AppShell user={user}>
       <BaoCaoClient rows={rows} knRows={knRows} cashRows={cashRows} tonKhoRows={tonKhoRows} />
+      <OrderDetailModalHost canSeeMoney={['Admin', 'CSKH', 'KeToan'].includes(user.vaiTro)} canSeeProfit={['Admin', 'KeToan', 'GDV'].includes(user.vaiTro)} />
     </AppShell>
   );
 }

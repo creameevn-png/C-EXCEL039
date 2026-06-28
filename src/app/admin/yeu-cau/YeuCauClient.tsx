@@ -91,7 +91,7 @@ export default function YeuCauClient({ list }: { list: YC[] }) {
             <span className={`status-badge ${YC_CLASS[y.trangThai] || 's-new'}`}>{YC_LABEL[y.trangThai] || y.trangThai}</span>
           </div>
           <div className="ac-meta icon-inline"><FiUser /> {y.hoTen} · <FiPhone /> {y.sdt}{y.maKH && <> · KH: <b>{y.maKH}</b></>} · {y.tuyen === 'HCM' ? 'HCM' : 'Hà Nội'}</div>
-          <div className="ac-meta" style={{ marginTop: 6 }}>{formatDateTime(y.ngayTao)} · <b>{y.sanPham.length} sản phẩm</b>{y.maDH && <> · Đơn: <b>{y.maDH}</b></>}</div>
+          <div className="ac-meta" style={{ marginTop: 6 }}>{formatDateTime(y.ngayTao)} · <b>{y.sanPham.length} sản phẩm</b>{y.maDH && <> · Đơn: <b style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={(e) => { e.stopPropagation(); (window as any).openOrderDetail?.(y.maDH); }}>{y.maDH}</b></>}</div>
           {y.ghiChu && <div className="ac-meta icon-inline" style={{ marginTop: 4, color: '#334155' }}><FiFileText /> {y.ghiChu.slice(0, 160)}</div>}
           <div className="ac-actions">
             <button className="btn btn-primary btn-sm" onClick={(e) => { e.stopPropagation(); convertToOrder(y); }}>

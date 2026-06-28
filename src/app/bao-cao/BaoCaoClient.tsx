@@ -454,7 +454,7 @@ export default function BaoCaoClient({ rows, knRows, cashRows, tonKhoRows }: { r
           <tbody>
             {tonKhoRows.map((r) => (
               <tr key={r.maDH}>
-                <td className="ma-don">{r.maDH}</td>
+                <td className="ma-don" style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => (window as any).openOrderDetail?.(r.maDH)}>{r.maDH}</td>
                 <td>{r.tenKH}<br /><span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{r.maKH}</span></td>
                 <td>{TT_LABEL[r.trangThai] || r.trangThai}</td>
                 <td className="number">{r.tongKg.toFixed(1)}</td>
@@ -488,7 +488,7 @@ export default function BaoCaoClient({ rows, knRows, cashRows, tonKhoRows }: { r
             {cashCur.map((c, i) => (
               <tr key={i}>
                 <td>{new Date(c.ngay).toLocaleDateString('vi-VN')}</td>
-                <td className="ma-don">{c.maDH}</td>
+                <td className="ma-don">{c.maDH ? <span style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => (window as any).openOrderDetail?.(c.maDH)}>{c.maDH}</span> : ''}</td>
                 <td><span style={{ color: c.loai === 'Thu' ? 'var(--success-dark)' : '#DC2626', fontWeight: 700 }}>{c.loai === 'Thu' ? 'Thu' : 'Chi'}</span></td>
                 <td className="number">{fmtVND(c.soTien)}đ</td>
                 <td style={{ fontSize: 12 }}>{c.ghiChu}</td>

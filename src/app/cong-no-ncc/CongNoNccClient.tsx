@@ -174,7 +174,7 @@ export default function CongNoNccClient({ ledger, partners, webs }:
                 <td style={{ fontSize: 12 }}>{formatDate(e.ngay)}</td>
                 <td><b>{e.doiTac}</b></td>
                 <td>{e.web}</td>
-                <td className="ma-don">{e.maDH}</td>
+                <td className="ma-don">{e.maDH ? <span style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => (window as any).openOrderDetail?.(e.maDH)}>{e.maDH}</span> : ''}</td>
                 <td>{e.loai === 'ThanhToan'
                   ? <span className="icon-inline" style={{ color: '#059669' }}><FiArrowDownCircle /> Trả NCC</span>
                   : <span className="icon-inline" style={{ color: '#DC2626' }}><FiArrowUpCircle /> Phát sinh</span>}</td>

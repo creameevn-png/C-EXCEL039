@@ -122,7 +122,7 @@ export default function KnClient({ userVaiTro, list }: { userVaiTro: string; lis
             </div>
             <div className="ac-meta">
               {formatDateTime(k.ngayTao)} · Loại: <b>{LOAI_LABEL[k.loai] || k.loai}</b>
-              {k.maDH && <> · Đơn: <b>{k.maDH}</b></>}
+              {k.maDH && <> · Đơn: <b style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={(e) => { e.stopPropagation(); (window as any).openOrderDetail?.(k.maDH); }}>{k.maDH}</b></>}
               {k.maKH && <> · KH: <b>{k.maKH}</b></>}
             </div>
             <div className="ac-meta icon-inline" style={{ marginTop: 6, color: '#334155' }}>
@@ -145,7 +145,7 @@ export default function KnClient({ userVaiTro, list }: { userVaiTro: string; lis
                 <div style={{ marginBottom: 10, fontSize: 13 }}>
                   <b>Loại:</b> {LOAI_LABEL[editing.loai]} · <b>Ngày:</b> {formatDateTime(editing.ngayTao)}
                   <br />
-                  {editing.maDH && <><b>Đơn:</b> {editing.maDH} · </>}
+                  {editing.maDH && <><b>Đơn:</b> <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openOrderDetail?.(editing.maDH)}>{editing.maDH}</span> · </>}
                   {editing.maKH && <><b>KH:</b> {editing.maKH}</>}
                 </div>
                 <div className="icon-inline" style={{ background: '#F8FAFC', padding: 10, borderRadius: 6, marginBottom: 10, fontSize: 13 }}>

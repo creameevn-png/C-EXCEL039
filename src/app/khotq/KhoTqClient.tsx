@@ -207,7 +207,7 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
             {atWarehouse.map((o) => (
               <tr key={o.maDH}>
                 <td className="ma-don">{o.maVD}</td>
-                <td>{o.maDH}</td>
+                <td><span className="ma-don" style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => (window as any).openOrderDetail?.(o.maDH)}>{o.maDH}</span></td>
                 <td>{o.tenHang}</td>
                 <td>{o.kg} / {o.m3}</td>
                 <td>{o.nguoiPhuTrachTQ || '-'}</td>
@@ -302,7 +302,7 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
         <div className="ac-actions"><button className="btn btn-success" onClick={createBao} disabled={busy.bao}><FiPlus /> Tạo bao</button></div>
       </div>
 
-      <div className="hint" style={{ margin: '8px 0' }}>Đơn ở kho TQ chưa vào bao: <b>{unbagged.length ? unbagged.map((o) => o.maDH).join(', ') : 'không có'}</b></div>
+      <div className="hint" style={{ margin: '8px 0' }}>Đơn ở kho TQ chưa vào bao: <b>{unbagged.length ? unbagged.map((o, i) => <span key={o.maDH}>{i > 0 ? ', ' : ''}<span style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => (window as any).openOrderDetail?.(o.maDH)}>{o.maDH}</span></span>) : 'không có'}</b></div>
 
       {openBaos.length === 0 ? <div className="empty-state"><FiBox /><p>Chưa có bao đang mở.</p></div> :
         openBaos.map((b) => (
@@ -311,7 +311,7 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
               <div className="ac-title"><FiBox /> {b.maBao} · Line {LINE_LABEL[b.line] || b.line}</div>
               <span className="status-badge s-tq">Đang đóng</span>
             </div>
-            <div className="ac-meta">{b.soKien} kiện · {b.tongKg}kg · {b.tongM3}m³ · Đơn: <b>{b.orders.length ? b.orders.join(', ') : '(trống)'}</b></div>
+            <div className="ac-meta">{b.soKien} kiện · {b.tongKg}kg · {b.tongM3}m³ · Đơn: <b>{b.orders.length ? b.orders.map((m, i) => <span key={m}>{i > 0 ? ', ' : ''}<span style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => (window as any).openOrderDetail?.(m)}>{m}</span></span>) : '(trống)'}</b></div>
             <div className="form-grid" style={{ margin: '10px 0' }}>
               <div className="form-field"><label>Gán đơn vào bao (nhập / quét mã đơn)</label>
                 <input value={addBaoInput[b.maBao] || ''} onChange={(e) => setAddBaoInput((p) => ({ ...p, [b.maBao]: e.target.value }))} placeholder="DH-..." /></div>

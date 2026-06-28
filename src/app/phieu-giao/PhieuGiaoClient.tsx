@@ -128,7 +128,7 @@ export default function PhieuGiaoClient({ user, candidates, phieus }:
               {orders.map((o) => (
                 <tr key={o.maDH}>
                   <td><input type="checkbox" checked={!!picked[o.maDH]} onChange={() => toggle(o.maDH)} /></td>
-                  <td className="ma-don">{o.maDH}</td>
+                  <td className="ma-don" style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => (window as any).openOrderDetail?.(o.maDH)}>{o.maDH}</td>
                   <td>{o.hang}</td>
                   <td className="number">{fmtVND(o.tongTien)}</td>
                   <td className="number" style={{ color: o.conLai > 0 ? '#DC2626' : '#059669' }}>{fmtVND(o.conLai)}</td>

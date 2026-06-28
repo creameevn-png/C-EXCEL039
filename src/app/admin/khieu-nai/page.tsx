@@ -2,6 +2,7 @@ import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import AppShell from '@/components/AppShell';
 import KnClient from './KnClient';
+import OrderDetailModalHost from '@/components/OrderDetailModal';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +23,7 @@ export default async function AdminKhieuNaiPage() {
         doiTacNCC: k.doiTacNCC || '', daTruNCC: k.daTruNCC,
         ghiChuXuLy: k.ghiChuXuLy || ''
       }))} />
+      <OrderDetailModalHost canSeeMoney={['Admin', 'CSKH', 'KeToan'].includes(user.vaiTro)} canSeeProfit={['Admin', 'KeToan', 'GDV'].includes(user.vaiTro)} />
     </AppShell>
   );
 }

@@ -2,6 +2,7 @@ import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import AppShell from '@/components/AppShell';
 import CongNoNccClient from './CongNoNccClient';
+import OrderDetailModalHost from '@/components/OrderDetailModal';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +26,7 @@ export default async function CongNoNccPage() {
         partners={nccs.map((n) => n.tenNCC)}
         webs={webs.map((w) => w.web)}
       />
+      <OrderDetailModalHost canSeeMoney={['Admin', 'CSKH', 'KeToan'].includes(user.vaiTro)} canSeeProfit={['Admin', 'KeToan', 'GDV'].includes(user.vaiTro)} />
     </AppShell>
   );
 }

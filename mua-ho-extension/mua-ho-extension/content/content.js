@@ -148,10 +148,13 @@
       </div>`;
 
     document.body.appendChild(overlay);
+    const confirmBtn = overlay.querySelector(".mh-confirm");
+    const confirmLabel = confirmBtn.textContent;
     overlay.querySelector(".mh-x").addEventListener("click", closeModal);
     overlay.querySelector(".mh-cancel").addEventListener("click", closeModal);
     overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
-    overlay.querySelector(".mh-confirm").addEventListener("click", () => {
+    confirmBtn.addEventListener("click", () => {
+      if (confirmBtn.disabled) return; // đang chờ dịch xong -> không cho gửi tên tiếng Trung
       const qty = Math.max(1, parseInt(overlay.querySelector(".mh-qty").value, 10) || 1);
       const note = overlay.querySelector(".mh-note").value.trim();
       const ghiChuRiengTu = overlay.querySelector(".mh-note2").value.trim();
@@ -184,11 +187,24 @@
 
     // Tự dịch tiếng Trung -> tiếng Việt (tên SP + phân loại) nếu bật trong cấu hình.
     (async () => {
-      if (!(await getAutoTranslate())) return;
+      if (!(await getAutoTranslate())) return; // dịch tắt -> nút vẫn bật bình thường, không khoá.
+      if (!document.getElementById(PREFIX + "-overlay")) return; // modal đã đóng khi chờ storage
       const viBox = overlay.querySelector(".mh-vi");
       const skuBox = overlay.querySelector(".mh-sku");
       if (viBox) { viBox.style.display = "block"; viBox.textContent = "🇻🇳 Đang dịch…"; }
-      const [tTitle, tSku] = await translateTexts([product.title || "", product.skuText || ""]);
+      // Khoá nút "Thêm vào giỏ" tới khi dịch xong để không gửi tên tiếng Trung.
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = "Đang dịch…";
+      // Mở khoá nút dù dịch thành công / lỗi / hết giờ (background đã có timeout 5s).
+      const reenable = () => {
+        if (!document.getElementById(PREFIX + "-overlay")) return; // modal đã đóng
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = confirmLabel;
+      };
+      let tTitle = "", tSku = "";
+      try { [tTitle, tSku] = await translateTexts([product.title || "", product.skuText || ""]); }
+      catch (_) { /* translateTexts đã tự nuốt lỗi, phòng hờ */ }
+      reenable();
       if (!document.getElementById(PREFIX + "-overlay")) return; // modal đã đóng
       if (viBox) {
         if (tTitle && tTitle !== product.title) { viTitle = tTitle; viBox.textContent = "🇻🇳 " + tTitle; }

@@ -49,7 +49,7 @@ export default async function BaoCaoPage() {
     tongGiaHang: o.tongGiaHang,
     phiMua: o.phiMua, phiBH: o.phiBH, phiPhatSinh: o.phiPhatSinh, phiVC: o.phiVC,
     shipND: o.shipND, dongGo: o.dongGo, phuThu: o.phuThu,
-    vonNDT: o.vonNDT, loiNhuanNDT: o.loiNhuanNDT,
+    vonNDT: o.vonNDT, shipNDTQ: o.shipNDTQ, loiNhuanNDT: o.loiNhuanNDT,
     tongTien: o.tongTien, daTra: o.daTra, conLai: o.conLai
   }));
 

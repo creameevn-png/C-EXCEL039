@@ -228,7 +228,7 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
                 <div className="ac-title"><FiBox /> {b.maBao} · Line {LINE_LABEL[b.line] || b.line}</div>
                 <span className={`status-badge ${thieu > 0 ? 's-waiting' : 's-vn'}`}>{b.trangThai === 'DaVeVN' ? 'Đang nhận' : 'Đã xuất'}</span>
               </div>
-              <div className="ac-meta">{b.soKien} kiện · {b.tongKg}kg · {b.tongM3}m³ · Đã nhận: <b>{b.daNhan}/{b.tong}</b></div>
+              <div className="ac-meta">{b.soKien} đơn · {b.tongKg}kg · {b.tongM3}m³ · Đã nhận: <b>{b.daNhan}/{b.tong}</b></div>
               {thieu > 0 && (
                 <div className="icon-inline" style={{ background: '#FEF3C7', padding: 8, borderRadius: 6, marginTop: 8, fontSize: 12, color: '#92400E' }}>
                   <FiAlertCircle /> Còn <b>{thieu}</b> đơn trong bao chưa về VN — bao chưa hoàn thành.

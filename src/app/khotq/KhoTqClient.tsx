@@ -311,7 +311,7 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
               <div className="ac-title"><FiBox /> {b.maBao} · Line {LINE_LABEL[b.line] || b.line}</div>
               <span className="status-badge s-tq">Đang đóng</span>
             </div>
-            <div className="ac-meta">{b.soKien} kiện · {b.tongKg}kg · {b.tongM3}m³ · Đơn: <b>{b.orders.length ? b.orders.map((m, i) => <span key={m}>{i > 0 ? ', ' : ''}<span style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => (window as any).openOrderDetail?.(m)}>{m}</span></span>) : '(trống)'}</b></div>
+            <div className="ac-meta">{b.soKien} đơn · {b.tongKg}kg · {b.tongM3}m³ · Đơn: <b>{b.orders.length ? b.orders.map((m, i) => <span key={m}>{i > 0 ? ', ' : ''}<span style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => (window as any).openOrderDetail?.(m)}>{m}</span></span>) : '(trống)'}</b></div>
             <div className="form-grid" style={{ margin: '10px 0' }}>
               <div className="form-field"><label>Gán đơn vào bao (nhập / quét mã đơn)</label>
                 <input value={addBaoInput[b.maBao] || ''} onChange={(e) => setAddBaoInput((p) => ({ ...p, [b.maBao]: e.target.value }))} placeholder="DH-..." /></div>
@@ -325,7 +325,7 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
 
       {exportedBaos.length > 0 && <>
         <div className="section-title" style={{ marginTop: 16 }}><FiTruck /> Bao đã xuất (đang về VN)</div>
-        <table className="data-table"><thead><tr><th>Mã bao</th><th>Line</th><th>Kiện</th><th>Kg/M³</th></tr></thead>
+        <table className="data-table"><thead><tr><th>Mã bao</th><th>Line</th><th>Số đơn</th><th>Kg/M³</th></tr></thead>
           <tbody>{exportedBaos.map((b) => (<tr key={b.maBao}><td className="ma-don">{b.maBao}</td><td>{LINE_LABEL[b.line] || b.line}</td><td>{b.soKien}</td><td>{b.tongKg}/{b.tongM3}</td></tr>))}</tbody></table>
       </>}
     </div>

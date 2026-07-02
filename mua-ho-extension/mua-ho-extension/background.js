@@ -8,8 +8,17 @@
 
 const SETTINGS_KEYS = ["apiBase", "token"];
 
+// Địa chỉ API bản chạy thật (prod) — dùng làm mặc định để extension chạy được ngay
+// sau khi cài, không cần khách tự cấu hình. Khách vẫn có thể đổi ở popup.
+const DEFAULT_API_BASE = "https://cuexcel.vercel.app/api/ext";
+
 function getSettings() {
-  return new Promise((resolve) => chrome.storage.local.get(SETTINGS_KEYS, (s) => resolve(s || {})));
+  return new Promise((resolve) => chrome.storage.local.get(SETTINGS_KEYS, (s) => {
+    s = s || {};
+    // Fresh service worker: nếu chưa có apiBase, dùng mặc định prod để không trả needSetup.
+    if (!s.apiBase || !String(s.apiBase).trim()) s.apiBase = DEFAULT_API_BASE;
+    resolve(s);
+  }));
 }
 function trimBase(base) { return (base || "").trim().replace(/\/+$/, ""); }
 
@@ -20,14 +29,19 @@ async function apiFetch(path, { method = "GET", body, token } = {}) {
   const headers = { "Content-Type": "application/json" };
   const useToken = token || storedToken;
   if (useToken) headers["Authorization"] = "Bearer " + useToken;
+  // Timeout 5s để endpoint treo không làm UI kẹt vô hạn (fetch tự abort -> vào catch).
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 5000);
   try {
-    const resp = await fetch(base + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+    const resp = await fetch(base + path, { method, headers, body: body ? JSON.stringify(body) : undefined, signal: ctrl.signal });
     const text = await resp.text();
     let data = {};
     try { data = text ? JSON.parse(text) : {}; } catch (_) { data = { raw: text }; }
     return { ok: resp.ok, status: resp.status, data };
   } catch (e) {
     return { ok: false, message: "Không kết nối được tới API. Kiểm tra địa chỉ và mạng." };
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -41,6 +55,12 @@ async function bumpBadge() {
 }
 chrome.runtime.onInstalled.addListener(() => {
   chrome.action.setBadgeBackgroundColor({ color: "#f0512b" });
+  // Seed apiBase mặc định (prod) nếu khách chưa cấu hình -> extension dùng được ngay.
+  chrome.storage.local.get("apiBase", (s) => {
+    if (!s || !s.apiBase || !String(s.apiBase).trim()) {
+      chrome.storage.local.set({ apiBase: DEFAULT_API_BASE });
+    }
+  });
   refreshCartBadge();
 });
 chrome.runtime.onStartup && chrome.runtime.onStartup.addListener(() => {
@@ -235,15 +255,24 @@ async function handleCartSubmit() {
   let maYC = null;
   let sent = 0;
   const failed = [];
+  const sentIds = new Set();
+  // Xoá khỏi giỏ những SP đã gửi thành công (giữ lại SP chưa gửi / gửi lỗi) rồi lưu.
+  // Gọi trước mọi early-return để retry KHÔNG gửi lại SP đã giao -> tránh trùng đơn.
+  async function persistUnsent() {
+    const remain = cart.filter((it) => !sentIds.has(it.cartId));
+    await setCart(remain);
+    await refreshCartBadge();
+  }
   for (const product of cart) {
     const body = {
       maKH: kh.maKH || "", hoTen: kh.hoTen, sdt: kh.sdt, email: kh.email || "", tuyen: kh.tuyen || "HaNoi",
       product,
     };
     const res = await apiFetch("/yeu-cau", { method: "POST", body });
-    if (res.needSetup) return res;
+    if (res.needSetup) { await persistUnsent(); return res; }
     if (res.ok && res.data && res.data.success) {
       sent++;
+      sentIds.add(product.cartId);
       if (res.data.maYC) maYC = res.data.maYC;
     } else {
       failed.push({ cartId: product.cartId, message: (res.data && res.data.message) || res.message || "Gửi thất bại." });
@@ -251,14 +280,12 @@ async function handleCartSubmit() {
   }
 
   if (sent === 0) {
+    // Không SP nào đi được: giữ nguyên giỏ (persistUnsent giữ lại tất cả vì sentIds rỗng).
     return { ok: false, message: (failed[0] && failed[0].message) || "Gửi yêu cầu thất bại." };
   }
 
   // Giữ lại các SP gửi lỗi trong giỏ để khách thử lại; xoá các SP đã gửi thành công.
-  const failedIds = new Set(failed.map((f) => f.cartId));
-  const remain = cart.filter((it) => failedIds.has(it.cartId));
-  await setCart(remain);
-  await refreshCartBadge();
+  await persistUnsent();
 
   const partial = failed.length > 0;
   const message = partial
@@ -289,19 +316,24 @@ async function translateOne(text) {
   if (!q) return "";
   // Chỉ dịch khi có ký tự CJK (tránh dịch thừa tên đã là tiếng Việt/Anh)
   if (!/[一-鿿]/.test(q)) return q;
+  // Timeout 5s: endpoint dịch treo -> abort -> trả bản gốc để không kẹt UI khi thêm SP.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 5000);
   try {
     const url =
       "https://translate.googleapis.com/translate_a/single?client=gtx&sl=zh-CN&tl=vi&dt=t&q=" +
       encodeURIComponent(q.slice(0, 1800));
-    const resp = await fetch(url);
-    if (!resp.ok) return "";
+    const resp = await fetch(url, { signal: ctrl.signal });
+    if (!resp.ok) return q;
     const data = await resp.json();
     // data[0] = mảng các đoạn [bảnDịch, bảnGốc, ...]
     if (Array.isArray(data) && Array.isArray(data[0])) {
       return data[0].map((seg) => (seg && seg[0]) || "").join("");
     }
-  } catch (_) { /* lỗi mạng -> trả rỗng, content giữ nguyên bản gốc */ }
-  return "";
+  } catch (_) { /* lỗi mạng / timeout -> trả bản gốc, content giữ nguyên */ } finally {
+    clearTimeout(timer);
+  }
+  return q;
 }
 
 async function handleTranslate(texts) {

@@ -581,6 +581,9 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       prisma.donHang.updateMany({ where: { maBao, trangThai: 'KhoTqNhan' }, data: { trangThai: 'DangVanChuyen' } }),
       prisma.baoTong.update({ where: { maBao }, data: { trangThai: 'DaXuat', xuatAt: new Date() } }),
     ]);
+    // Chốt lại tổng kg/m³ của bao theo các đơn thành viên tại thời điểm xuất
+    // (phòng khi đơn được cân lại sau khi thêm vào bao).
+    await recomputeBao(maBao);
     await logActivity(user.email, 'XUAT_BAO', maBao, { soDon: orders.length });
     await pushNotify({
       vaiTro: ['KhoVN'], loai: 'info',
@@ -613,6 +616,8 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       where: { maBao },
       data: { trangThai: allIn ? 'HoanThanh' : 'DaVeVN', veVNAt: new Date(), nguoiNhanVN: user.hoTen || user.email }
     });
+    // Đồng bộ lại tổng kg/m³ của bao theo đơn thành viên (đơn có thể được cân lại ở VN).
+    await recomputeBao(maBao);
     await logActivity(user.email, 'NHAN_BAO_VN', maBao, { received });
     return ok({ received, total: orders.length, conChua: Math.max(0, conChua) });
   },
@@ -758,6 +763,13 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
   async duyetKhieuNaiCap1(args, user) {
     if (!allow(user.vaiTro, ['KeToan', 'CSKH'])) return err('Không có quyền');
     const [maKN, note] = args;
+    // Chốt trạng thái server-side: chỉ duyệt cấp 1 khi KN đang chờ/đang xử lý,
+    // tránh duyệt lại đơn đã qua cấp 2 / đã xử lý / đã từ chối bằng lệnh trực tiếp.
+    const kn = await prisma.khieuNai.findUnique({ where: { maKN } });
+    if (!kn) return err('Khiếu nại không tồn tại');
+    if (!['ChoXuLy', 'DangXuLy'].includes(kn.trangThai)) {
+      return err('Khiếu nại không ở trạng thái chờ duyệt cấp 1');
+    }
     await prisma.khieuNai.update({
       where: { maKN },
       data: {
@@ -776,6 +788,11 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     const [maKN, accepted, note] = args;
     const kn = await prisma.khieuNai.findUnique({ where: { maKN } });
     if (!kn) return err('Khiếu nại không tồn tại');
+    // Chốt 2 cấp: chỉ duyệt cấp 2 khi đã qua cấp 1 (đang chờ duyệt cấp 2). Chặn
+    // gọi API trực tiếp bỏ qua cấp 1, và chặn duyệt lại KN đã xử lý/từ chối.
+    if (kn.trangThai !== 'DangDuyetCap2') {
+      return err('Khiếu nại chưa qua duyệt cấp 1 (hoặc đã xử lý xong)');
+    }
 
     // Gộp đổi trạng thái + hoàn ví + cấn trừ NCC vào MỘT transaction để sổ sách
     // không bao giờ lệch nửa chừng. Idempotent qua daHoanVi/daTruNCC.

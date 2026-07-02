@@ -116,12 +116,13 @@
     return vals;
   }
 
-  /* ----- v2: số lượng đặt tối thiểu (MOQ) cho 1688 (起订量 / 件起批) ----- */
+  /* ----- v2: số lượng đặt tối thiểu (MOQ) — quét cho MỌI nguồn (1688/Taobao/Tmall) -----
+   * Trước đây chỉ đọc cho 1688; Taobao/Tmall cũng có "起订量 / 件起批 / ≥N件 / N件起". */
   function readMoq(source) {
-    if (source !== "1688") return 1;
     try {
       const txt = document.body.innerText || "";
-      let m = txt.match(/起订量[^\d]*(\d+)/) || txt.match(/(\d+)\s*件起批/) || txt.match(/≥\s*(\d+)\s*件/);
+      let m = txt.match(/起订量[^\d]*(\d+)/) || txt.match(/(\d+)\s*件起批/) ||
+        txt.match(/≥\s*(\d+)\s*件/) || txt.match(/(\d+)\s*件起/);
       if (m) { const n = parseInt(m[1], 10); if (n >= 1 && n <= 100000) return n; }
     } catch (e) { /* ignore */ }
     return 1;

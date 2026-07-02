@@ -16,7 +16,7 @@ type Row = {
   tongKg: number; tongM3: number; tongGiaHang: number;
   phiMua: number; phiBH: number; phiPhatSinh: number; phiVC: number;
   shipND: number; dongGo: number; phuThu: number;
-  vonNDT: number; loiNhuanNDT: number;
+  vonNDT: number; shipNDTQ: number; loiNhuanNDT: number;
   tongTien: number; daTra: number; conLai: number;
 };
 type KnRow = {
@@ -353,6 +353,15 @@ export default function BaoCaoClient({ rows, knRows, cashRows, tonKhoRows }: { r
 
   // ===== 7. Lợi nhuận (giá vốn GDV, đơn vị tệ NDT) =====
   const lnData = [...nvGroups.entries()].map(([nv, rs]) => ({ nv, a: agg(rs) })).filter((d) => d.a.vonNDT || d.a.loiNhuanNDT).sort((a, b) => b.a.loiNhuanNDT - a.a.loiNhuanNDT);
+  // Lãi/lỗ TỪNG ĐƠN (PL02 #18): mỗi đơn có nhập giá vốn → thu¥ = vốn + ship nội địa TQ + lợi nhuận.
+  const lnOrders = cur
+    .filter((r) => r.vonNDT || r.loiNhuanNDT || r.shipNDTQ)
+    .map((r) => ({ ...r, thuNDT: r.vonNDT + r.shipNDTQ + r.loiNhuanNDT }))
+    .sort((a, b) => b.loiNhuanNDT - a.loiNhuanNDT);
+  const lnOrdTong = lnOrders.reduce(
+    (s, r) => ({ thu: s.thu + r.thuNDT, von: s.von + r.vonNDT, ship: s.ship + r.shipNDTQ, ln: s.ln + r.loiNhuanNDT }),
+    { thu: 0, von: 0, ship: 0, ln: 0 }
+  );
   const tabLoiNhuan = (
     <div className="form-section">
       <div className="section-title"><FiBarChart2 /> Lợi nhuận theo nhân viên (giá vốn GDV — tệ NDT) — tháng {ml}</div>
@@ -376,6 +385,34 @@ export default function BaoCaoClient({ rows, knRows, cashRows, tonKhoRows }: { r
               <td>Σ Tổng</td><td className="number">{lnData.reduce((s, d) => s + d.a.soDon, 0)}</td>
               <td className="number">{lnData.reduce((s, d) => s + d.a.vonNDT, 0).toLocaleString()} ¥</td>
               <td className="number">{lnData.reduce((s, d) => s + d.a.loiNhuanNDT, 0).toLocaleString()} ¥</td><td></td>
+            </tr>
+          </tbody>
+        </table>
+      )}
+
+      <div className="section-title" style={{ marginTop: 20 }}><FiBarChart2 /> Lãi/lỗ TỪNG ĐƠN (giá vốn GDV — tệ NDT) — tháng {ml}</div>
+      <ReportTools name={`Lai_lo_tung_don_${ml}`} headers={['Mã đơn', 'Khách', 'NV', 'Thu (¥)', 'Vốn (¥)', 'Ship nội địa TQ (¥)', 'Lãi/lỗ (¥)']}
+        rows={lnOrders.map((r) => [r.maDH, r.tenKH, r.nv, r.thuNDT.toFixed(1), r.vonNDT.toFixed(1), r.shipNDTQ.toFixed(1), r.loiNhuanNDT.toFixed(1)])} />
+      {lnOrders.length === 0 ? <div className="empty-state"><FiInbox /><p>Chưa có đơn nào nhập giá vốn trong tháng.</p></div> : (
+        <table className="data-table">
+          <thead><tr><th>Mã đơn</th><th>Khách</th><th className="number">Thu (¥)</th><th className="number">Vốn (¥)</th><th className="number">Ship TQ (¥)</th><th className="number">Lãi/lỗ (¥)</th></tr></thead>
+          <tbody>
+            {lnOrders.map((r) => (
+              <tr key={r.maDH}>
+                <td className="ma-don" style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => (window as any).openOrderDetail?.(r.maDH)}>{r.maDH}</td>
+                <td>{r.tenKH}</td>
+                <td className="number">{r.thuNDT.toLocaleString()} ¥</td>
+                <td className="number">{r.vonNDT.toLocaleString()} ¥</td>
+                <td className="number">{r.shipNDTQ.toLocaleString()} ¥</td>
+                <td className="number" style={{ color: r.loiNhuanNDT >= 0 ? 'var(--success-dark)' : 'var(--danger-dark)', fontWeight: 700 }}>{r.loiNhuanNDT.toLocaleString()} ¥</td>
+              </tr>
+            ))}
+            <tr style={{ fontWeight: 700, background: 'var(--surface-2)' }}>
+              <td colSpan={2}>Σ Tổng ({lnOrders.length} đơn)</td>
+              <td className="number">{lnOrdTong.thu.toLocaleString()} ¥</td>
+              <td className="number">{lnOrdTong.von.toLocaleString()} ¥</td>
+              <td className="number">{lnOrdTong.ship.toLocaleString()} ¥</td>
+              <td className="number" style={{ color: lnOrdTong.ln >= 0 ? 'var(--success-dark)' : 'var(--danger-dark)' }}>{lnOrdTong.ln.toLocaleString()} ¥</td>
             </tr>
           </tbody>
         </table>
@@ -473,7 +510,8 @@ export default function BaoCaoClient({ rows, knRows, cashRows, tonKhoRows }: { r
   const tongChi = cashCur.filter((c) => c.loai === 'Chi').reduce((s, c) => s + c.soTien, 0);
   const tabDongTien = (
     <div className="form-section">
-      <div className="section-title"><FiRepeat /> Dòng tiền thu – chi — tháng {ml}</div>
+      <div className="section-title"><FiRepeat /> Dòng tiền thu – chi (sổ thu–chi) — tháng {ml}</div>
+      <div className="alert alert-info" style={{ marginBottom: 12 }}><FiRepeat /><span>Báo cáo phản ánh <b>bút toán Thu/Chi đã ghi trong sổ thu–chi</b> (chủ yếu là tiền khách nạp cọc/thanh toán, và khoản Chi khi hoàn tiền huỷ đơn). Khoản <b>chi trả nhà cung cấp</b> được theo dõi riêng ở báo cáo <b>Công nợ NCC</b>; biến động <b>ví khách</b> ở sổ ví — không gộp vào đây để tránh trùng.</span></div>
       <ReportTools name={`Dong_tien_${ml}`} headers={['Ngày', 'Mã đơn', 'Loại', 'Số tiền', 'Ghi chú']}
         rows={cashCur.map((c) => [new Date(c.ngay).toLocaleDateString('vi-VN'), c.maDH, c.loai === 'Thu' ? 'Thu' : 'Chi', c.soTien, c.ghiChu])} />
       <div className="fee-summary" style={{ marginBottom: 14 }}>

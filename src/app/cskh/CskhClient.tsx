@@ -42,6 +42,7 @@ type Props = {
     user: SessionUser;
     appName: string;
     tyGia: number;
+    tyGiaByWeb?: Record<string, number>;
     customers: Customer[];
     products: Product[];
     myOrders: MyOrder[];
@@ -62,6 +63,13 @@ function mkLine(p?: Partial<LineItem>, tyGia = 3650): LineItem {
 
 export default function CskhClient({ initial }: Props) {
   const { user, customers: customersInit, products: productsInit, myOrders, kpi, tyGia } = initial;
+  const tyGiaByWeb = initial.tyGiaByWeb || {};
+  // Tỷ giá riêng theo sàn: có cấu hình cho sàn → trả về, không thì null (giữ tỷ giá đang có).
+  const webRateOrNull = (web: string): number | null => {
+    const key = String(web || '').toLowerCase().replace(/\s+/g, '').replace(/\.com.*$/, '');
+    const r = tyGiaByWeb[key];
+    return typeof r === 'number' && r > 0 ? r : null;
+  };
   const [customers, setCustomers] = useState<Customer[]>(customersInit);
   const [products, setProducts] = useState<Product[]>(productsInit);
 
@@ -183,13 +191,15 @@ export default function CskhClient({ initial }: Props) {
     if (spId === '__custom__') { updateItem(itemId, { spId: '__custom__', tenSP: '' }); return; }
     const p = products.find((x) => x.maSP === spId);
     if (!p) return;
+    const rate = webRateOrNull(p.webNguon) ?? tyGia;
     updateItem(itemId, {
       spId,
       tenSP: p.tenSP,
       kg: p.kgGoiY || 0,
       m3: p.m3GoiY || 0,
-      donGiaNDT: p.giaThamKhao && tyGia ? Math.round(p.giaThamKhao / tyGia * 100) / 100 : 0,
-      webNguon: p.webNguon
+      donGiaNDT: p.giaThamKhao && rate ? Math.round(p.giaThamKhao / rate * 100) / 100 : 0,
+      webNguon: p.webNguon,
+      tyGia: rate
     });
   }
 
@@ -497,7 +507,7 @@ export default function CskhClient({ initial }: Props) {
                             onChange={(e) => updateItem(it.tempId, { m3: parseFloat(e.target.value) || 0 })} />
                         </td>
                         <td>
-                          <select className="erp-cell" value={it.webNguon} onChange={(e) => updateItem(it.tempId, { webNguon: e.target.value })}>
+                          <select className="erp-cell" value={it.webNguon} onChange={(e) => { const w = e.target.value; const r = webRateOrNull(w); updateItem(it.tempId, r != null ? { webNguon: w, tyGia: r } : { webNguon: w }); }}>
                             <option value="">—</option><option value="Taobao">Taobao</option>
                             <option value="1688">1688</option><option value="Tmall">Tmall</option>
                           </select>

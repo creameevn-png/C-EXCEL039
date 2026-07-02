@@ -8,6 +8,7 @@ const els = {
   ycList: $("ycList"), ycCount: $("ycCount"), refreshYc: $("refreshYc"),
   cartList: $("cartList"), cartCount: $("cartCount"), cartBadge: $("cartBadge"),
   clearCart: $("clearCart"), sendAllBtn: $("sendAllBtn"), cartStatus: $("cartStatus"),
+  tyGiaVal: $("tyGiaVal"),
 };
 
 /* ---- Tabs ---- */
@@ -41,6 +42,19 @@ function load() {
     els.maKH.value = c.maKH || "";
     els.tuyen.value = c.tuyen || "HaNoi";
     if (c.hoTen && c.sdt) showStatus(`Đang đặt với tên: ${c.hoTen} · ${c.sdt}`, true);
+  });
+}
+
+/* ---- Hiển thị tỷ giá hiện tại (VNĐ/¥) — chỉ đọc, lấy từ cấu hình hệ thống ---- */
+function loadTyGia() {
+  if (!els.tyGiaVal) return;
+  chrome.runtime.sendMessage({ type: "MH_GET_CONFIG" }, (res) => {
+    if (chrome.runtime.lastError || !res || !res.ok || !res.config || !res.config.tyGia) {
+      els.tyGiaVal.textContent = "—";
+      return;
+    }
+    const n = Number(res.config.tyGia);
+    els.tyGiaVal.textContent = isNaN(n) ? "—" : n.toLocaleString("vi-VN");
   });
 }
 
@@ -177,6 +191,7 @@ els.sendAllBtn.addEventListener("click", () => {
 });
 
 load();
+loadTyGia();
 // Hiện số SP trong giỏ trên tab ngay khi mở popup (không cần bấm vào tab).
 chrome.runtime.sendMessage({ type: "MH_CART_LIST" }, (res) => {
   if (!chrome.runtime.lastError && res && res.ok) updateCartBadge((res.items || []).length);

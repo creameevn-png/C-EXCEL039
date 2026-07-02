@@ -10,7 +10,9 @@ export default async function CskhPage() {
 
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
 
-  const [customers, products, myOrders, kpiMyToday, kpiCompleted, kpiInProgress, kpiCustomers, tyGia] = await Promise.all([
+  const normWeb = (s: string) => String(s || '').toLowerCase().replace(/\s+/g, '').replace(/\.com.*$/, '');
+
+  const [customers, products, myOrders, kpiMyToday, kpiCompleted, kpiInProgress, kpiCustomers, tyGia, bangGiaWebs] = await Promise.all([
     prisma.khachHang.findMany({ orderBy: { maKH: 'asc' } }),
     prisma.sanPham.findMany({ orderBy: { maSP: 'asc' } }),
     prisma.donHang.findMany({
@@ -23,13 +25,20 @@ export default async function CskhPage() {
     prisma.donHang.count({ where: { nvId: user.id, trangThai: 'HoanThanh' } }),
     prisma.donHang.count({ where: { nvId: user.id, trangThai: { notIn: ['HoanThanh', 'Huy'] } } }),
     prisma.khachHang.count(),
-    getNumber('ty_gia_ndt_vnd', 3650)
+    getNumber('ty_gia_ndt_vnd', 3650),
+    prisma.bangGiaWeb.findMany({ where: { hoatDong: true } })
   ]);
+
+  // Tỷ giá riêng theo từng sàn (PL02 #10): CSKH chọn "Nguồn" nào thì dòng đó tự lấy
+  // tỷ giá của sàn đó; sàn chưa cấu hình → dùng tỷ giá chung.
+  const tyGiaByWeb: Record<string, number> = {};
+  for (const w of bangGiaWebs) if (w.tyGia > 0) tyGiaByWeb[normWeb(w.web)] = w.tyGia;
 
   const initial = {
     user,
     appName: process.env.APP_NAME || 'Quản Lý Ship Trung Việt',
     tyGia,
+    tyGiaByWeb,
     customers: customers.map((c) => ({
       maKH: c.maKH, tenKH: c.tenKH, sdt: c.sdt || '', diaChi: c.diaChi || '',
       pctCoc: c.pctCoc, soDuVi: c.soDuVi, congNo: c.congNo

@@ -31,19 +31,21 @@ async function apiFetch(path, { method = "GET", body, token } = {}) {
   }
 }
 
-/* ---- Badge đếm số sản phẩm đã thêm trong phiên ---- */
+/* ---- Badge = số sản phẩm đang trong GIỎ (EXT-7) ----
+ * Trước đây badge đếm "số SP đã gửi trong phiên"; nay giỏ là nguồn duy nhất.
+ * Giữ bumpBadge() cho các luồng cũ (MH_PUSH_YEUCAU / MH_ADD_TO_CART) nhưng chỉ
+ * đồng bộ lại badge theo giỏ để không ghi đè số lượng giỏ.
+ */
 async function bumpBadge() {
-  const { mhAdded = 0 } = await chrome.storage.local.get("mhAdded");
-  const n = mhAdded + 1;
-  await chrome.storage.local.set({ mhAdded: n });
-  chrome.action.setBadgeText({ text: String(n) });
+  await refreshCartBadge();
 }
 chrome.runtime.onInstalled.addListener(() => {
   chrome.action.setBadgeBackgroundColor({ color: "#f0512b" });
+  refreshCartBadge();
 });
 chrome.runtime.onStartup && chrome.runtime.onStartup.addListener(() => {
-  chrome.storage.local.set({ mhAdded: 0 });
-  chrome.action.setBadgeText({ text: "" });
+  // Badge = số SP đang trong giỏ (giỏ được giữ qua các phiên).
+  refreshCartBadge();
 });
 
 /* ---- Message router ---- */
@@ -58,6 +60,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "MH_GET_CONFIG") { handleGetConfig().then(sendResponse); return true; }
   if (msg.type === "MH_PUSH_YEUCAU") { handlePushYeuCau(msg.product).then(sendResponse); return true; }
   if (msg.type === "MH_GET_YEUCAU") { handleGetYeuCau().then(sendResponse); return true; }
+  if (msg.type === "MH_CART_ADD") { handleCartAdd(msg.product).then(sendResponse); return true; }
+  if (msg.type === "MH_CART_LIST") { handleCartList().then(sendResponse); return true; }
+  if (msg.type === "MH_CART_REMOVE") { handleCartRemove(msg.cartId).then(sendResponse); return true; }
+  if (msg.type === "MH_CART_CLEAR") { handleCartClear().then(sendResponse); return true; }
+  if (msg.type === "MH_CART_SUBMIT") { handleCartSubmit().then(sendResponse); return true; }
   if (msg.type === "MH_RESET_BADGE") {
     chrome.storage.local.set({ mhAdded: 0 });
     chrome.action.setBadgeText({ text: "" });
@@ -166,6 +173,98 @@ async function handleGetYeuCau() {
     return { ok: true, items };
   }
   return { ok: false, message: res.message || "Không lấy được yêu cầu." };
+}
+
+/* =========================================================================
+ * GIỎ YÊU CẦU (client-side) — EXT-7
+ * Khách gom NHIỀU sản phẩm vào giỏ, xem/sửa/xoá trong popup, rồi bấm
+ * "Gửi tất cả (N SP)" -> tất cả dồn vào 1 YÊU CẦU.
+ * Backend /api/ext/yeu-cau tự GỘP các SP cùng SĐT (còn "Chờ xử lý") vào 1 yêu
+ * cầu, nên gửi tuần tự từng SP vẫn cho ra đúng 1 mã yêu cầu — không cần sửa backend.
+ * ======================================================================= */
+function getCart() {
+  return new Promise((resolve) => chrome.storage.local.get("mhCart", (s) => resolve(Array.isArray(s.mhCart) ? s.mhCart : [])));
+}
+function setCart(cart) {
+  return new Promise((resolve) => chrome.storage.local.set({ mhCart: cart }, resolve));
+}
+async function refreshCartBadge() {
+  const cart = await getCart();
+  const n = cart.length;
+  chrome.action.setBadgeText({ text: n ? String(n) : "" });
+}
+
+async function handleCartAdd(product) {
+  if (!product || (!product.url && !product.title)) return { ok: false, message: "Thiếu thông tin sản phẩm." };
+  const cart = await getCart();
+  const item = { ...product, cartId: "c" + Date.now() + "_" + Math.random().toString(36).slice(2, 7), addedAt: Date.now() };
+  cart.push(item);
+  await setCart(cart);
+  await refreshCartBadge();
+  return { ok: true, count: cart.length, message: `Đã thêm vào giỏ (${cart.length} sản phẩm).` };
+}
+
+async function handleCartList() {
+  const cart = await getCart();
+  return { ok: true, items: cart, count: cart.length };
+}
+
+async function handleCartRemove(cartId) {
+  const cart = (await getCart()).filter((it) => it.cartId !== cartId);
+  await setCart(cart);
+  await refreshCartBadge();
+  return { ok: true, items: cart, count: cart.length };
+}
+
+async function handleCartClear() {
+  await setCart([]);
+  await refreshCartBadge();
+  return { ok: true, items: [], count: 0 };
+}
+
+// Gửi tất cả SP trong giỏ -> dồn vào 1 yêu cầu (backend gộp theo SĐT).
+// Gửi TUẦN TỰ để backend đọc→ghi an toàn trong transaction (không đè mất nhau).
+async function handleCartSubmit() {
+  const { apiBase } = await getSettings();
+  if (!trimBase(apiBase)) return { ok: false, needSetup: true, message: "Chưa cấu hình địa chỉ hệ thống." };
+  const kh = await getCustomer();
+  if (!kh || !kh.hoTen || !kh.sdt) return { ok: false, needCustomer: true, message: "Chưa nhập thông tin khách. Mở extension điền Họ tên + SĐT." };
+  const cart = await getCart();
+  if (!cart.length) return { ok: false, message: "Giỏ đang trống." };
+
+  let maYC = null;
+  let sent = 0;
+  const failed = [];
+  for (const product of cart) {
+    const body = {
+      maKH: kh.maKH || "", hoTen: kh.hoTen, sdt: kh.sdt, email: kh.email || "", tuyen: kh.tuyen || "HaNoi",
+      product,
+    };
+    const res = await apiFetch("/yeu-cau", { method: "POST", body });
+    if (res.needSetup) return res;
+    if (res.ok && res.data && res.data.success) {
+      sent++;
+      if (res.data.maYC) maYC = res.data.maYC;
+    } else {
+      failed.push({ cartId: product.cartId, message: (res.data && res.data.message) || res.message || "Gửi thất bại." });
+    }
+  }
+
+  if (sent === 0) {
+    return { ok: false, message: (failed[0] && failed[0].message) || "Gửi yêu cầu thất bại." };
+  }
+
+  // Giữ lại các SP gửi lỗi trong giỏ để khách thử lại; xoá các SP đã gửi thành công.
+  const failedIds = new Set(failed.map((f) => f.cartId));
+  const remain = cart.filter((it) => failedIds.has(it.cartId));
+  await setCart(remain);
+  await refreshCartBadge();
+
+  const partial = failed.length > 0;
+  const message = partial
+    ? `Đã gửi ${sent}/${cart.length} sản phẩm vào yêu cầu ${maYC || ""}. Còn ${failed.length} SP gửi lỗi, thử lại sau.`
+    : `Đã gửi ${sent} sản phẩm vào yêu cầu ${maYC || ""}.`;
+  return { ok: true, partial, sent, failed: failed.length, maYC, message };
 }
 
 /* ---- Cấu hình hệ thống (tỉ giá VNĐ + danh mục) để extension hiển thị giá Việt ---- */

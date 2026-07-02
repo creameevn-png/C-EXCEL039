@@ -2,12 +2,14 @@
 
 import { useMemo, useState } from 'react';
 import {
-  FiTruck, FiPlus, FiSave, FiTrash2, FiInfo, FiInbox, FiArrowUpCircle, FiArrowDownCircle, FiSearch
+  FiTruck, FiPlus, FiSave, FiTrash2, FiInfo, FiInbox, FiArrowUpCircle, FiArrowDownCircle, FiSearch,
+  FiDownload, FiPrinter
 } from 'react-icons/fi';
 import Tabs from '@/components/Tabs';
 import { callServer, reload } from '@/lib/client';
 import { showToast } from '@/components/Toast';
 import { fmtVND, formatDate } from '@/lib/format';
+import { exportToCSV } from '@/lib/export';
 
 type Entry = {
   id: number; ngay: string; doiTac: string; web: string; maDH: string;
@@ -64,6 +66,68 @@ export default function CongNoNccClient({ ledger, partners, webs }:
     const r = await callServer('deleteCongNoNCC', id);
     if (r?.success) { showToast('Đã xoá', 'success'); reload(); }
     else showToast(r?.message || 'Lỗi', 'error');
+  }
+
+  // ===== In báo cáo (mở cửa sổ in) =====
+  function printTable(title: string, headers: string[], rows: (string | number)[][]) {
+    if (!rows.length) return showToast('Không có dữ liệu để in', 'error');
+    const esc = (v: any) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const th = headers.map((h) => `<th>${esc(h)}</th>`).join('');
+    const tr = rows.map((r) => '<tr>' + r.map((c, i) => `<td${i === 0 ? '' : ' class="n"'}>${esc(c)}</td>`).join('') + '</tr>').join('');
+    const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>${esc(title)}</title>
+      <style>body{font-family:Arial,sans-serif;padding:20px;color:#111;font-size:12px}
+      h1{font-size:17px;margin:0 0 10px}table{width:100%;border-collapse:collapse}
+      th,td{border:1px solid #999;padding:5px 7px;text-align:left}th{background:#f1f5f9}
+      td.n{text-align:right}</style></head><body>
+      <h1>${esc(title)}</h1><table><thead><tr>${th}</tr></thead><tbody>${tr}</tbody></table>
+      <script>window.onload=function(){window.print()}</script></body></html>`;
+    const w = window.open('', '_blank', 'width=1000,height=720');
+    if (!w) return showToast('Trình duyệt chặn cửa sổ in. Cho phép popup rồi thử lại.', 'error');
+    w.document.write(html); w.document.close();
+  }
+
+  // ----- Xuất / In: Tổng hợp công nợ theo đối tác -----
+  function exportSummary() {
+    const ok = exportToCSV(
+      summary.map((r) => ({
+        doiTac: r.doiTac, n: r.n, phatSinh: r.phatSinh, thanhToan: r.thanhToan, conNo: r.conNo
+      })),
+      'cong-no-ncc-tong-hop.csv',
+      { doiTac: 'Shop / NCC', n: 'Số bút toán', phatSinh: 'Phát sinh', thanhToan: 'Đã trả', conNo: 'Còn nợ' }
+    );
+    if (!ok) showToast('Chưa có dữ liệu công nợ.', 'error');
+  }
+  function printSummary() {
+    printTable(
+      'Tổng hợp công nợ NCC / shop',
+      ['Shop / NCC', 'Số bút toán', 'Phát sinh', 'Đã trả', 'Còn nợ'],
+      summary.map((r) => [r.doiTac, r.n, fmtVND(r.phatSinh), fmtVND(r.thanhToan), fmtVND(r.conNo)])
+    );
+  }
+
+  // ----- Xuất / In: Sổ chi tiết -----
+  function exportLedger() {
+    const ok = exportToCSV(
+      filteredLedger.map((e) => ({
+        ngay: formatDate(e.ngay), doiTac: e.doiTac, web: e.web, maDH: e.maDH,
+        loai: e.loai === 'ThanhToan' ? 'Trả NCC' : 'Phát sinh',
+        soTienNDT: e.soTienNDT || '', soTien: e.soTien, ghiChu: e.ghiChu
+      })),
+      'cong-no-ncc-so-chi-tiet.csv',
+      { ngay: 'Ngày', doiTac: 'Shop / NCC', web: 'Web', maDH: 'Đơn', loai: 'Loại', soTienNDT: 'Tệ', soTien: 'Số tiền', ghiChu: 'Ghi chú' }
+    );
+    if (!ok) showToast('Không có bút toán.', 'error');
+  }
+  function printLedger() {
+    printTable(
+      'Sổ chi tiết công nợ NCC / shop',
+      ['Ngày', 'Shop / NCC', 'Web', 'Đơn', 'Loại', 'Tệ', 'Số tiền', 'Ghi chú'],
+      filteredLedger.map((e) => [
+        formatDate(e.ngay), e.doiTac, e.web, e.maDH,
+        e.loai === 'ThanhToan' ? 'Trả NCC' : 'Phát sinh',
+        e.soTienNDT ? e.soTienNDT.toLocaleString() : '', fmtVND(e.soTien) + 'đ', e.ghiChu
+      ])
+    );
   }
 
   const tabAdd = (
@@ -126,6 +190,10 @@ export default function CongNoNccClient({ ledger, partners, webs }:
   const tabSummary = (
     <div className="form-section">
       <div className="section-title"><FiTruck /> Công nợ theo shop / NCC</div>
+      <div className="btn-row" style={{ justifyContent: 'flex-end', marginBottom: 10 }}>
+        <button className="btn btn-secondary btn-sm" onClick={exportSummary} disabled={!summary.length}><FiDownload /> Xuất Excel (CSV)</button>
+        <button className="btn btn-secondary btn-sm" onClick={printSummary} disabled={!summary.length}><FiPrinter /> In</button>
+      </div>
       <div className="fee-summary" style={{ marginBottom: 14 }}>
         <div className="fee-row"><span>Tổng phát sinh</span><span className="fee-value">{fmtVND(tongPhatSinh)}đ</span></div>
         <div className="fee-row"><span>Tổng đã thanh toán</span><span className="fee-value" style={{ color: '#059669' }}>{fmtVND(tongThanhToan)}đ</span></div>
@@ -156,6 +224,10 @@ export default function CongNoNccClient({ ledger, partners, webs }:
   const tabLedger = (
     <div className="form-section">
       <div className="section-title"><FiInbox /> Sổ chi tiết ({filteredLedger.length})</div>
+      <div className="btn-row" style={{ justifyContent: 'flex-end', marginBottom: 10 }}>
+        <button className="btn btn-secondary btn-sm" onClick={exportLedger} disabled={!filteredLedger.length}><FiDownload /> Xuất Excel (CSV)</button>
+        <button className="btn btn-secondary btn-sm" onClick={printLedger} disabled={!filteredLedger.length}><FiPrinter /> In</button>
+      </div>
       <div className="form-field" style={{ marginBottom: 12, maxWidth: 360 }}>
         <div style={{ position: 'relative' }}>
           <FiSearch style={{ position: 'absolute', left: 10, top: 10, color: 'var(--text-faint)' }} />

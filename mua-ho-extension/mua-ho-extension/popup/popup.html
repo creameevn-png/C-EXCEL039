@@ -11,12 +11,13 @@
     <span class="hd-ico">🛒</span>
     <div>
       <div class="hd-title">Mua Hộ Cừ · 1688 / Taobao / Tmall</div>
-      <div class="hd-sub">v2.6 · gửi yêu cầu đặt hàng về hệ thống</div>
+      <div class="hd-sub">v2.7 · gom nhiều SP vào giỏ → gửi 1 yêu cầu</div>
     </div>
   </header>
 
   <nav class="tabs">
     <button class="tab tab--on" data-tab="setup">Khách hàng</button>
+    <button class="tab" data-tab="gio">Giỏ hàng <span id="cartBadge" class="tab-badge" hidden>0</span></button>
     <button class="tab" data-tab="yeucau">Yêu cầu của tôi</button>
   </nav>
 
@@ -61,6 +62,20 @@
       <section class="status" id="status" hidden></section>
     </div>
 
+    <!-- TAB GIỎ HÀNG -->
+    <div class="pane" data-pane="gio">
+      <div class="cart-bar">
+        <span id="cartCount" class="cart-count">Giỏ trống</span>
+        <button id="clearCart" class="btn btn--ghost btn--sm" hidden>Xoá hết</button>
+      </div>
+      <div id="cartList" class="cart-list">
+        <p class="empty">Chưa có sản phẩm. Mở trang 1688 / Taobao / Tmall, bấm "Tôi muốn đặt sản phẩm này" rồi "Thêm vào giỏ".</p>
+      </div>
+      <button id="sendAllBtn" class="btn btn--primary" disabled>Gửi tất cả</button>
+      <p class="hint">Tất cả sản phẩm trong giỏ sẽ gom vào <b>1 yêu cầu</b>. Cần khai <b>Họ tên + SĐT</b> ở tab Khách hàng trước khi gửi.</p>
+      <section class="status" id="cartStatus" hidden></section>
+    </div>
+
     <!-- TAB YÊU CẦU CỦA TÔI -->
     <div class="pane" data-pane="yeucau">
       <div class="cart-bar">
@@ -74,7 +89,7 @@
   </main>
 
   <footer class="ft">
-    Mở trang sản phẩm 1688 / Taobao / Tmall → bấm <b>Tôi muốn đặt sản phẩm này</b>.
+    Mở trang 1688 / Taobao / Tmall → <b>Tôi muốn đặt sản phẩm này</b> → <b>Thêm vào giỏ</b> → tab <b>Giỏ hàng</b> → <b>Gửi tất cả</b>.
   </footer>
 
   <script src="popup.js"></script>

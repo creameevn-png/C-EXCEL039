@@ -23,3 +23,4 @@ _hd*.html
 _hopdong_tmp.html
 # File khoa tam cua Office (~$...)
 ~$*
+.vercel

@@ -143,7 +143,7 @@
         </div>
         <div class="mh-modal-foot">
           <button class="mh-btn mh-btn--ghost mh-cancel" type="button">Huỷ</button>
-          <button class="mh-btn mh-btn--primary mh-confirm" type="button">Gửi yêu cầu</button>
+          <button class="mh-btn mh-btn--primary mh-confirm" type="button">Thêm vào giỏ</button>
         </div>
       </div>`;
 
@@ -204,16 +204,21 @@
   }
   function closeModal() { const o = document.getElementById(PREFIX + "-overlay"); if (o) o.remove(); }
 
+  // EXT-7: "Thêm vào giỏ" — gom nhiều SP vào giỏ, gửi tất cả 1 lần ở popup.
+  // Giỏ nằm client-side (chrome.storage) nên không cần đã nhập thông tin khách
+  // ở bước này; khách chỉ cần khai Họ tên + SĐT khi bấm "Gửi tất cả".
   function submit(payload, overlay) {
     const btn = overlay.querySelector(".mh-confirm");
-    btn.disabled = true; btn.textContent = "Đang gửi...";
-    chrome.runtime.sendMessage({ type: "MH_PUSH_YEUCAU", product: payload }, (res) => {
-      btn.disabled = false; btn.textContent = "Gửi yêu cầu";
+    btn.disabled = true; btn.textContent = "Đang thêm...";
+    chrome.runtime.sendMessage({ type: "MH_CART_ADD", product: payload }, (res) => {
+      btn.disabled = false; btn.textContent = "Thêm vào giỏ";
       if (chrome.runtime.lastError) { toast("Extension chưa sẵn sàng, tải lại trang.", "error"); return; }
-      if (res && res.ok) { closeModal(); toast(res.message || "Đã gửi yêu cầu đặt hàng.", "success"); }
-      else if (res && res.needCustomer) { closeModal(); toast("Mở extension điền Họ tên + SĐT khách trước khi gửi.", "error"); }
-      else if (res && res.needSetup) { closeModal(); toast("Chưa cấu hình địa chỉ hệ thống. Mở extension để nhập.", "error"); }
-      else { toast((res && res.message) || "Gửi yêu cầu thất bại. Thử lại sau.", "error"); }
+      if (res && res.ok) {
+        closeModal();
+        toast((res.message || "Đã thêm vào giỏ.") + " Mở extension › tab Giỏ hàng để gửi tất cả.", "success");
+      } else {
+        toast((res && res.message) || "Thêm vào giỏ thất bại. Thử lại sau.", "error");
+      }
     });
   }
 

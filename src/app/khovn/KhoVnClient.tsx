@@ -14,7 +14,7 @@ import { showToast } from '@/components/Toast';
 import { callServer, reload } from '@/lib/client';
 import { fmtVND, formatDate } from '@/lib/format';
 
-type WeighLine = { stt: number; tenSP: string; soLuong: number; kg: string; m3: string };
+type WeighLine = { stt: number; tenSP: string; soLuong: number; kg: string; dai: string; rong: string; cao: string; m3: string };
 
 type Row = {
   maDH: string; maVD: string; maBao: string; tenKH: string;
@@ -60,21 +60,34 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
   const [weighLines, setWeighLines] = useState<WeighLine[]>([]);
   const [weighBusy, setWeighBusy] = useState(false);
 
+  const soHoacRong = (v: any) => (Number(v) > 0 ? String(v) : '');
+
   async function openWeigh(maDH: string) {
     setWeighMaDH(maDH); setWeighLines([]);
     const r = await callServer('getOrderDetail', maDH);
     if (r?.success) {
-      setWeighLines(r.data.chiTiet.map((c: any) => ({ stt: c.stt, tenSP: c.tenSP, soLuong: c.soLuong, kg: String(c.kg), m3: String(c.m3) })));
+      setWeighLines(r.data.chiTiet.map((c: any) => ({
+        stt: c.stt, tenSP: c.tenSP, soLuong: c.soLuong,
+        kg: String(c.kg ?? ''),
+        dai: soHoacRong(c.dai), rong: soHoacRong(c.rong), cao: soHoacRong(c.cao),
+        m3: String(c.m3 ?? '')
+      })));
     } else { showToast(r?.message || 'Lỗi tải đơn', 'error'); setWeighMaDH(null); }
   }
   function patchWeigh(stt: number, p: Partial<WeighLine>) {
     setWeighLines((ls) => ls.map((l) => (l.stt === stt ? { ...l, ...p } : l)));
   }
+  // Góp ý NV #33: nhập đủ dài×rộng×cao thì m³ do server tính theo hệ số trong Cài đặt.
   async function saveWeigh() {
     if (!weighMaDH) return;
     setWeighBusy(true);
     for (const l of weighLines) {
-      await callServer('updateChiTietKg', weighMaDH, l.stt, { kg: parseFloat(l.kg) || 0, m3: parseFloat(l.m3) || 0 });
+      const kg = parseFloat(l.kg) || 0;
+      const dai = parseFloat(l.dai) || 0, rong = parseFloat(l.rong) || 0, cao = parseFloat(l.cao) || 0;
+      const hasKT = dai > 0 && rong > 0 && cao > 0;
+      const payload = hasKT ? { kg, dai, rong, cao } : { kg, m3: parseFloat(l.m3) || 0 };
+      const r = await callServer('updateChiTietKg', weighMaDH, l.stt, payload);
+      if (r?.success && r.m3 !== undefined) patchWeigh(l.stt, { m3: String(r.m3) });
     }
     setWeighBusy(false);
     showToast('Đã cập nhật cân nặng (lưu lịch sử sửa)', 'success');
@@ -109,8 +122,10 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
     if (!ma) return showToast('Nhập/quét mã bao', 'error');
     const r = await callServer('receiveBaoAtVN', ma);
     if (r?.success) {
-      const warn = r.conChua > 0 ? ` ⚠ còn ${r.conChua} đơn chưa về` : '';
-      showToast(`Nhận bao ${ma}: ${r.received}/${r.total} đơn${warn}`, r.conChua > 0 ? 'error' : 'success');
+      // #29: đơn còn kiện chưa bắn mã thì KHÔNG được nhận — báo rõ để kho sang tab Kiện hàng.
+      const thieu = r.kienConThieu > 0;
+      const warn = thieu ? ` ⚠ còn ${r.kienConThieu} kiện chưa bắn mã (${r.conChua} đơn) — vào tab "Kiện hàng" để bắn từng mã` : '';
+      showToast(`Nhận bao ${ma}: ${r.received}/${r.total} đơn${warn}`, thieu ? 'error' : 'success');
       reload();
     } else showToast(r?.message || 'Lỗi', 'error');
   }
@@ -367,7 +382,7 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
             </div>
           </div>
         </div>
-        <div className="hint">Nhận bao sẽ xác nhận tất cả đơn trong bao đã về VN. Nếu còn đơn chưa về sẽ cảnh báo.</div>
+        <div className="hint">Chỉ những đơn đã bắn đủ mã kiện mới được xác nhận về VN. Còn kiện chưa bắn thì hệ thống cảnh báo và bao <b>chưa hoàn thành</b> — vào tab “Kiện hàng” bắn từng mã.</div>
       </div>
 
       {baos.length === 0 ? <div className="empty-state"><FiBox /><p>Không có bao nào đang về.</p></div> :
@@ -673,22 +688,33 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
           </div>
           <div className="modal-body">
             <div className="alert alert-warning" style={{ marginBottom: 12 }}>
-              <FiInfo /><span>Kho VN cân lại thực tế. Mỗi thay đổi được <b>lưu lịch sử</b> (Audit log) và tự tính lại phí VC.</span>
+              <FiInfo /><span>Kho VN cân lại thực tế. Mỗi thay đổi được <b>lưu lịch sử</b> (Audit log) và tự tính lại phí VC.
+                Nhập đủ <b>Dài × Rộng × Cao (cm)</b> thì ô <b>M³</b> tự tính theo hệ số trong Cài đặt và bị khoá; bỏ trống kích thước thì gõ M³ tay.</span>
             </div>
             {weighLines.length === 0 ? (
               <div className="empty-state"><FiClock /><p>Đang tải dòng hàng…</p></div>
             ) : (
               <table className="data-table">
-                <thead><tr><th>Sản phẩm</th><th className="number">SL</th><th className="number">KG/sp</th><th className="number">M³/sp</th></tr></thead>
+                <thead><tr>
+                  <th>Sản phẩm</th><th className="number">SL</th><th className="number">KG/sp</th>
+                  <th className="number">Dài</th><th className="number">Rộng</th><th className="number">Cao</th>
+                  <th className="number">M³/sp</th>
+                </tr></thead>
                 <tbody>
-                  {weighLines.map((l) => (
-                    <tr key={l.stt}>
-                      <td>{l.tenSP}</td>
-                      <td className="number">{l.soLuong}</td>
-                      <td className="number"><input type="number" step="0.01" value={l.kg} style={{ width: 90, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { kg: e.target.value })} /></td>
-                      <td className="number"><input type="number" step="0.0001" value={l.m3} style={{ width: 100, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { m3: e.target.value })} /></td>
-                    </tr>
-                  ))}
+                  {weighLines.map((l) => {
+                    const hasKT = (parseFloat(l.dai) || 0) > 0 && (parseFloat(l.rong) || 0) > 0 && (parseFloat(l.cao) || 0) > 0;
+                    return (
+                      <tr key={l.stt}>
+                        <td>{l.tenSP}</td>
+                        <td className="number">{l.soLuong}</td>
+                        <td className="number"><input type="number" step="0.01" value={l.kg} style={{ width: 80, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { kg: e.target.value })} /></td>
+                        <td className="number"><input type="number" value={l.dai} style={{ width: 60, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { dai: e.target.value })} /></td>
+                        <td className="number"><input type="number" value={l.rong} style={{ width: 60, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { rong: e.target.value })} /></td>
+                        <td className="number"><input type="number" value={l.cao} style={{ width: 60, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { cao: e.target.value })} /></td>
+                        <td className="number"><input type="number" step="0.0001" value={l.m3} readOnly={hasKT} style={{ width: 100, textAlign: 'right', background: hasKT ? '#F3F4F6' : undefined }} onChange={(e) => patchWeigh(l.stt, { m3: e.target.value })} /></td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}

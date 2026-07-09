@@ -420,8 +420,14 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (!maVD) return err('Thiếu mã VĐ');
     const o = await prisma.donHang.findUnique({ where: { maDH } });
     if (!o) return err('Đơn không tồn tại');
-    if (o.trangThai !== 'DaMuaHang') return err('Đơn không ở trạng thái Đã mua');
-    await prisma.donHang.update({ where: { maDH }, data: { maVD, trangThai: 'NccGiaoHang' } });
+    // Shop giao làm nhiều đợt → GDV bổ sung mã vận đơn sau (#18, #38). Chỉ lần đầu
+    // mới đẩy trạng thái sang "NCC giao hàng"; các lần sau chỉ thêm kiện.
+    const SUA_DUOC: TrangThaiDon[] = ['DaMuaHang', 'NccGiaoHang', 'KhoTqNhan'];
+    if (!SUA_DUOC.includes(o.trangThai)) return err('Đơn không ở trạng thái nhận mã vận đơn');
+    await prisma.donHang.update({
+      where: { maDH },
+      data: { maVD, ...(o.trangThai === 'DaMuaHang' && { trangThai: 'NccGiaoHang' as TrangThaiDon }) }
+    });
     // Mỗi mã vận đơn là một kiện — kho VN sẽ bắn từng mã để nhận và giao (#28, #37, #38).
     await syncKienTheoMaVD(maDH, maVD);
     await logActivity(user.email, 'UPDATE_MA_VD', maDH, { maVD });
@@ -440,8 +446,10 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (!maDH) return err('Thiếu mã đơn');
     const o = await prisma.donHang.findUnique({ where: { maDH }, include: { chiTiet: true } });
     if (!o) return err('Đơn không tồn tại');
-    const vonNDT = Math.max(0, Number(patch?.vonNDT) || 0);
-    const shipNDTQ = Math.max(0, Number(patch?.shipNDTQ) || 0);
+    // Chỉ ghi đè giá vốn / ship khi client thực sự gửi lên: GDV lưu riêng ô ghi chú (#14)
+    // trước lúc mua hàng thì không được xoá mất số đã nhập.
+    const vonNDT = patch?.vonNDT !== undefined ? Math.max(0, Number(patch.vonNDT) || 0) : o.vonNDT;
+    const shipNDTQ = patch?.shipNDTQ !== undefined ? Math.max(0, Number(patch.shipNDTQ) || 0) : o.shipNDTQ;
     // Tệ khách trả trên đơn = Σ(đơn giá NDT × số lượng) của các dòng hàng.
     const tongThuNDT = o.chiTiet.reduce((s, c) => s + c.donGiaNDT * c.soLuong, 0);
     const loiNhuanNDT = tongThuNDT - (vonNDT + shipNDTQ);
@@ -595,13 +603,17 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (!maDH || !stt) return err('Thiếu thông tin dòng hàng');
     const line = await prisma.chiTietDon.findFirst({ where: { maDH, stt: Number(stt) } });
     if (!line) return err('Không tìm thấy dòng hàng');
-    await prisma.chiTietDon.update({
-      where: { id: line.id },
-      data: {
-        kiemKe: patch?.trangThai === 'Đủ' || patch?.trangThai === 'Thiếu' ? patch.trangThai : null,
-        kiemKeNote: patch?.note ?? line.kiemKeNote,
-      }
-    });
+    // Chỉ đụng vào trường nào client thực sự gửi lên: bấm "Đủ" mà không sửa ghi chú
+    // thì ghi chú cũ phải còn nguyên, và ngược lại.
+    const data: { kiemKe?: string | null; kiemKeNote?: string | null } = {};
+    if (patch?.trangThai !== undefined) {
+      const tt = patch.trangThai;
+      if (tt !== 'Đủ' && tt !== 'Thiếu' && tt !== null && tt !== '') return err('Trạng thái kiểm đếm không hợp lệ');
+      data.kiemKe = tt === 'Đủ' || tt === 'Thiếu' ? tt : null;
+    }
+    if (patch?.note !== undefined) data.kiemKeNote = patch.note || null;
+    if (Object.keys(data).length === 0) return ok();
+    await prisma.chiTietDon.update({ where: { id: line.id }, data });
     await logActivity(user.email, 'KIEM_KE', maDH, { stt, trangThai: patch?.trangThai });
     return ok();
   },
@@ -612,8 +624,8 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     const d = args[0] || {};
     if (!d.maVD || !String(d.maVD).trim()) return err('Vui lòng nhập mã vận đơn');
     const dai = Number(d.dai) || 0, rong = Number(d.rong) || 0, cao = Number(d.cao) || 0;
-    // m3 = dài×rộng×cao (cm) / 1.000.000; nếu nhập m3 trực tiếp thì ưu tiên giá trị đó.
-    const m3 = Number(d.m3) || (dai && rong && cao ? Math.round((dai * rong * cao) / 1000000 * 10000) / 10000 : 0);
+    // m³ theo hệ số quy đổi trong Cài đặt (#33); nhập m³ trực tiếp thì ưu tiên giá trị đó.
+    const m3 = Number(d.m3) || (await calcM3(dai, rong, cao));
     const r = await prisma.hangVoChu.create({
       data: {
         maVD: String(d.maVD).trim(),
@@ -682,6 +694,16 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       where: { maDH },
       data: { trangThai: newStatus, anhKhoVN: imageBase64 || null }
     });
+    // Xác nhận cả đơn = mọi kiện của đơn đã về. Không đồng bộ ở đây thì khối
+    // "Giao khách theo kiện" (#37) sẽ chặn với lý do "kiện chưa về kho VN".
+    if (o.maVD) {
+      const dem = await prisma.kienHang.count({ where: { maDH } });
+      if (dem === 0) await syncKienTheoMaVD(maDH, o.maVD);
+    }
+    await prisma.kienHang.updateMany({
+      where: { maDH, trangThai: 'ChuaVe' },
+      data: { trangThai: 'DaVeVN', ngayVeVN: new Date(), nguoiNhan: user.hoTen || user.email }
+    });
     await logActivity(user.email, 'KHO_VN_NHAN', maDH, { newStatus });
     if (newStatus === 'ChoThanhToan') {
       await pushNotify({
@@ -710,6 +732,11 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     await prisma.donHang.update({
       where: { maDH },
       data: { trangThai: 'HoanThanh', anhGiaoKH: imageBase64 || null }
+    });
+    // Giao cả đơn = mọi kiện đã giao (giữ tab Kiện hàng khớp với trạng thái đơn).
+    await prisma.kienHang.updateMany({
+      where: { maDH, trangThai: { not: 'DaGiao' } },
+      data: { trangThai: 'DaGiao', ngayGiao: new Date(), nguoiGiao: user.hoTen || user.email }
     });
     await prisma.khachHang.update({
       where: { maKH: o.maKH },
@@ -763,6 +790,8 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (!o || !o.maBao) return err('Đơn không thuộc bao nào');
     const maBao = o.maBao;
     await prisma.donHang.update({ where: { maDH }, data: { maBao: null } });
+    // Kiện phải rời bao cùng đơn, nếu không bao vẫn "còn kiện chưa về" mãi (#29).
+    await prisma.kienHang.updateMany({ where: { maDH }, data: { maBao: null } });
     await recomputeBao(maBao);
     await logActivity(user.email, 'REMOVE_FROM_BAO', maBao, { maDH });
     return ok();
@@ -806,29 +835,36 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       const dem = await prisma.kienHang.count({ where: { maDH: o.maDH } });
       if (dem === 0 && o.maVD) await syncKienTheoMaVD(o.maDH, o.maVD);
     }
+    // #29: chỉ đơn nào đã bắn đủ mã kiện mới được coi là về VN. Đơn còn kiện "ChuaVe"
+    // vẫn nằm nguyên trạng thái vận chuyển và bao chưa hoàn thành — không nhận vống.
+    const kienBao = await prisma.kienHang.findMany({ where: { maBao } });
+    const chuaVeTheoDon = new Map<string, number>();
+    for (const k of kienBao) {
+      if (k.trangThai === 'ChuaVe') chuaVeTheoDon.set(k.maDH, (chuaVeTheoDon.get(k.maDH) || 0) + 1);
+    }
+
     let received = 0;
     for (const o of orders) {
-      if (o.trangThai === 'DangVanChuyen') {
-        const next: TrangThaiDon = o.conLai <= 0.5 ? 'KhoVnNhan' : 'ChoThanhToan';
-        await prisma.donHang.update({ where: { maDH: o.maDH }, data: { trangThai: next } });
-        received++;
-      }
+      if (o.trangThai !== 'DangVanChuyen') continue;
+      if (chuaVeTheoDon.get(o.maDH)) continue; // còn kiện chưa bắn mã → chưa nhận đơn này
+      const next: TrangThaiDon = o.conLai <= 0.5 ? 'KhoVnNhan' : 'ChoThanhToan';
+      await prisma.donHang.update({ where: { maDH: o.maDH }, data: { trangThai: next } });
+      received++;
     }
-    const conChua = orders.filter((o) => o.trangThai === 'DangVanChuyen').length - received;
-    const allIn = orders.every((o) => o.trangThai !== 'DangVanChuyen') ;
-    // Nhận nhanh cả bao → mọi kiện trong bao coi như đã về (kho vẫn có thể bắn từng mã ở tab Kiện hàng).
-    await prisma.kienHang.updateMany({
-      where: { maBao, trangThai: 'ChuaVe' },
-      data: { trangThai: 'DaVeVN', ngayVeVN: new Date(), nguoiNhan: user.hoTen || user.email }
-    });
+
+    const kienConThieu = kienBao.filter((k) => k.trangThai === 'ChuaVe').length;
+    const donConThieu = orders.filter((o) => chuaVeTheoDon.get(o.maDH)).length;
     await prisma.baoTong.update({
       where: { maBao },
-      data: { trangThai: allIn ? 'HoanThanh' : 'DaVeVN', veVNAt: new Date(), nguoiNhanVN: user.hoTen || user.email }
+      data: {
+        trangThai: kienConThieu === 0 ? 'HoanThanh' : 'DaVeVN',
+        veVNAt: new Date(), nguoiNhanVN: user.hoTen || user.email
+      }
     });
     // Đồng bộ lại tổng kg/m³ của bao theo đơn thành viên (đơn có thể được cân lại ở VN).
     await recomputeBao(maBao);
-    await logActivity(user.email, 'NHAN_BAO_VN', maBao, { received });
-    return ok({ received, total: orders.length, conChua: Math.max(0, conChua) });
+    await logActivity(user.email, 'NHAN_BAO_VN', maBao, { received, kienConThieu });
+    return ok({ received, total: orders.length, conChua: donConThieu, kienConThieu });
   },
 
   // ============== SO QUY (góp ý NV #22, #42, #43) ==============

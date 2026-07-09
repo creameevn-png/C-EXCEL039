@@ -59,7 +59,10 @@ export default async function CskhPage() {
       gdvId: o.gdvId,
       gdvTen: o.gdv?.hoTen || '',
       phiPhatSinh: o.phiPhatSinh,
-      phiPhatSinhDuyet: o.phiPhatSinhDuyet
+      phiPhatSinhDuyet: o.phiPhatSinhDuyet,
+      // Góp ý NV #36: CSKH cũng cập nhật được phí ship nội địa của đơn đã tạo.
+      shipND: o.shipND,
+      lineNoiDia: o.lineNoiDia || ''
     })),
     kpi: {
       myOrdersToday: kpiMyToday,

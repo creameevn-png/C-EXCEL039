@@ -10,7 +10,11 @@ export default async function KeToanPage() {
   const [orders, customers] = await Promise.all([
     prisma.donHang.findMany({
       where: {
-        trangThai: { in: ['DaMuaHang', 'NccGiaoHang', 'KhoTqNhan', 'DangVanChuyen', 'KhoVnNhan', 'ChoThanhToan'] }
+        // Góp ý NV #47: đổi trả thường xảy ra SAU khi đã giao — đơn "GiaoHang"/"HoanThanh"
+        // mà phí đổi trả làm phát sinh công nợ vẫn phải hiện ở khoản phải thu.
+        trangThai: {
+          in: ['DaMuaHang', 'NccGiaoHang', 'KhoTqNhan', 'DangVanChuyen', 'KhoVnNhan', 'ChoThanhToan', 'GiaoHang', 'HoanThanh']
+        }
       },
       include: { khachHang: true, nv: true },
       orderBy: { ngayTao: 'desc' }
@@ -64,6 +68,7 @@ export default async function KeToanPage() {
       tongTien: o.tongTien,
       daTra: o.daTra,
       conLai: o.conLai,
+      phiKhieuNai: o.phiKhieuNai,
       trangThai: o.trangThai
     }))
     .filter((o) => o.conLai > 0.5);

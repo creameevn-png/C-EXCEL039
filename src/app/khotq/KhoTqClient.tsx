@@ -76,9 +76,10 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
 
   async function markKiemKe(maDH: string, stt: number, trangThai: 'Đủ' | 'Thiếu') {
     const key = `${maDH}-${stt}`;
-    const note = keNote[key] ?? '';
+    // Chỉ gửi ghi chú khi nhân viên thực sự gõ vào ô, kẻo bấm "Đủ" lại xoá mất ghi chú cũ.
+    const note = keNote[key];
     setBusy((p) => ({ ...p, [key]: true }));
-    const r = await callServer('markKiemKe', maDH, stt, { trangThai, note });
+    const r = await callServer('markKiemKe', maDH, stt, { trangThai, ...(note !== undefined && { note }) });
     setBusy((p) => ({ ...p, [key]: false }));
     if (r?.success) { showToast(`Đã đánh dấu link ${stt}: ${trangThai}`, 'success'); reload(); }
     else showToast(r?.message || 'Lỗi', 'error');
@@ -93,10 +94,13 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
     setWeighMaDH(maDH); setWeighLines([]); setWeighBusy({});
     const r = await callServer('getOrderDetail', maDH);
     if (r?.success) {
-      // Server chưa trả dài/rộng/cao → để trống cho kho TQ nhập mới.
+      // Hiện lại kích thước đã đo lần trước để kho sửa, không bắt nhập lại từ đầu.
+      const soHoacRong = (v: any) => (Number(v) > 0 ? String(v) : '');
       setWeighLines(r.data.chiTiet.map((c: any) => ({
         stt: c.stt, tenSP: c.tenSP, soLuong: c.soLuong,
-        kg: String(c.kg ?? ''), dai: '', rong: '', cao: '', m3: String(c.m3 ?? '')
+        kg: String(c.kg ?? ''),
+        dai: soHoacRong(c.dai), rong: soHoacRong(c.rong), cao: soHoacRong(c.cao),
+        m3: String(c.m3 ?? '')
       })));
     } else { showToast(r?.message || 'Lỗi tải đơn', 'error'); setWeighMaDH(null); }
   }

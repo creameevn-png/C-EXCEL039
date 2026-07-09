@@ -18,7 +18,7 @@ import { statusToClass, statusToLabel } from '@/lib/status';
 
 type Pending = {
   maDH: string; tenKH: string; maGD: string; nv: string;
-  tongTien: number; daTra: number; conLai: number; trangThai: string;
+  tongTien: number; daTra: number; conLai: number; phiKhieuNai: number; trangThai: string;
 };
 type Cust = { maKH: string; tenKH: string; soDuVi: number };
 type WalletTxn = {
@@ -181,6 +181,8 @@ export default function KeToanClient({ user, pendingPayments, customers, walletT
           </div>
           <div className="icon-inline" style={{ background: '#FEE2E2', color: '#991b1b', padding: 10, borderRadius: 6, margin: '10px 0', fontSize: 13 }}>
             <FiAlertCircle /> <b>Còn lại cần thu: {fmtVND(o.conLai)}đ</b>
+            {/* Góp ý NV #47: nói rõ vì sao đơn đã giao vẫn còn khoản phải thu. */}
+            {o.phiKhieuNai > 0 && <span style={{ marginLeft: 8 }}>· trong đó phí đổi trả (khiếu nại): <b>{fmtVND(o.phiKhieuNai)}đ</b></span>}
           </div>
           <div className="form-grid" style={{ margin: '12px 0' }}>
             <div className="form-field">

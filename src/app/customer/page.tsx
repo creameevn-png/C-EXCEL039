@@ -2,6 +2,7 @@ import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import AppShell from '@/components/AppShell';
 import OrderDetailModalHost from '@/components/OrderDetailModal';
+import OrderLink from '@/components/OrderLink';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { statusToClass, statusToLabel } from '@/lib/status';
 import { FiInbox, FiShoppingCart, FiAlertTriangle, FiPackage, FiUser } from 'react-icons/fi';
@@ -88,9 +89,7 @@ export default async function CustomerPage() {
             <tbody>
               {orders.map((o) => (
                 <tr key={o.maDH}>
-                  <td className="ma-don" style={{ cursor: 'pointer', textDecoration: 'underline' }}>
-                    <span onClick={() => (window as any).openOrderDetail?.(o.maDH)}>{o.maDH}</span>
-                  </td>
+                  <td className="ma-don"><OrderLink maDH={o.maDH} /></td>
                   <td>{formatDate(o.ngayTao)}</td>
                   <td className="number">{formatCurrency(o.tongTien)}</td>
                   <td className="number text-success">{formatCurrency(o.daTra)}</td>

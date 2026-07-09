@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db';
 import { corsJson, corsPreflight } from '@/lib/cors';
 import { getNumber } from '@/lib/settings';
+import { DANH_MUC_HANG } from '@/lib/danh-muc';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +27,7 @@ export async function GET() {
   return corsJson({
     tyGia,
     byWeb,
-    // Danh mục gợi ý cho extension (phân loại hàng hoá).
-    danhMucs: ['Thời trang', 'Mỹ phẩm', 'Điện tử - Phụ kiện', 'Gia dụng', 'Đồ chơi', 'Văn phòng phẩm', 'Phụ kiện', 'Khác']
+    // Danh mục gợi ý cho extension (phân loại hàng hoá) — dùng chung với web (#23).
+    danhMucs: DANH_MUC_HANG
   });
 }

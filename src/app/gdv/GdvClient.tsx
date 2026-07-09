@@ -73,9 +73,14 @@ export default function GdvClient({ user, pendingOrders, allOrders, khieuNai }: 
     const tongVonDong = o ? o.chiTiet.reduce((s, c) => s + (c.vonNDT || 0), 0) : 0;
     const vonNDT = tongVonDong > 0 ? tongVonDong : (parseFloat(vonInputs[maDH] || '0') || 0);
     const shipNDTQ = parseFloat(shipTqInputs[maDH] || '0') || 0;
-    if (vonNDT <= 0) return showToast('Nhập tổng tệ mua thực tế (¥)', 'error');
+    // Chưa mua hàng thì GDV vẫn phải ghi chú được (#14) — không chặn ở đây; server giữ
+    // nguyên giá vốn cũ khi client không gửi lên.
     setBusy((p) => ({ ...p, [maDH]: true }));
-    const r = await callServer('updateVonGDV', maDH, { vonNDT, shipNDTQ, ghiChuGDV: noteInputs[maDH] ?? '' });
+    const r = await callServer('updateVonGDV', maDH, {
+      ...(vonNDT > 0 && { vonNDT }),
+      shipNDTQ,
+      ghiChuGDV: noteInputs[maDH] ?? ''
+    });
     setBusy((p) => ({ ...p, [maDH]: false }));
     if (r?.success) { showToast(`Đã lưu giá vốn ${maDH} · LN ${fmtNDT(r.loiNhuanNDT)}`, 'success'); reload(); }
     else showToast(r?.message || 'Lỗi', 'error');

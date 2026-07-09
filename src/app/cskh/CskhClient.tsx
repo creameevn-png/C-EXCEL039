@@ -19,6 +19,10 @@ import { callServer, reload } from '@/lib/client';
 import { fmtVND, fmtDateDDMM, formatNDT } from '@/lib/format';
 import { statusToLabel, statusToClass } from '@/lib/status';
 import { calcPhiVCPanama } from '@/lib/shipping-fee';
+import { DANH_MUC_HANG, DANH_MUC_LIST_ID } from '@/lib/danh-muc';
+
+// Góp ý NV #41: cùng danh sách line nội địa với kho VN, để hai bên không lệch nhau.
+const LINE_NOI_DIA = ['Viettel Post', 'GHTK', 'J&T Express', 'Xe khách', 'Xe tải nhà', 'Khách tự lấy'];
 
 type Customer = { maKH: string; tenKH: string; sdt: string; diaChi: string; pctCoc: number; soDuVi: number; congNo: number };
 type Product = { maSP: string; tenSP: string; kgGoiY: number; m3GoiY: number; giaThamKhao: number; webNguon: string };
@@ -28,6 +32,7 @@ type MyOrder = {
   tongTien: number; daTra: number; conLai: number; trangThai: string;
   gdvId: number | null; gdvTen: string;
   phiPhatSinh: number; phiPhatSinhDuyet: boolean;
+  shipND: number; lineNoiDia: string;
 };
 
 type LineItem = {
@@ -111,6 +116,9 @@ export default function CskhClient({ initial }: Props) {
   // Tab "Đơn của tôi": bản sao cục bộ để đổi GDV / phí phát sinh ngay trên bảng.
   const [orders, setOrders] = useState<MyOrder[]>(myOrders);
   const [phiDraft, setPhiDraft] = useState<Record<string, number>>({});
+  // #36: bản nháp phí ship nội địa + line nội địa cho từng đơn trên bảng "Đơn của tôi".
+  const [shipDraft, setShipDraft] = useState<Record<string, number>>({});
+  const [lineDraft, setLineDraft] = useState<Record<string, string>>({});
 
   // ===== Tạo đơn từ "Yêu cầu mua hàng" (điền sẵn) =====
   const [fromYC, setFromYC] = useState('');
@@ -381,19 +389,49 @@ export default function CskhClient({ initial }: Props) {
   }
 
   function phiCell(o: MyOrder) {
-    if (!(o.phiPhatSinh > 0)) return <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>—</span>;
+    // Đơn chưa có phí vẫn phải thêm được: phí phát sinh thường lộ ra sau khi đơn đã chạy.
     const draft = phiDraft[o.maDH] ?? o.phiPhatSinh;
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-        <span className={`status-badge ${o.phiPhatSinhDuyet ? 's-done' : 's-deposit'}`}>
-          {o.phiPhatSinhDuyet ? 'Phí phát sinh đã duyệt' : 'Phí phát sinh chờ duyệt'}
-        </span>
+        {o.phiPhatSinh > 0 && (
+          <span className={`status-badge ${o.phiPhatSinhDuyet ? 's-done' : 's-deposit'}`}>
+            {o.phiPhatSinhDuyet ? 'Phí phát sinh đã duyệt' : 'Phí phát sinh chờ duyệt'}
+          </span>
+        )}
         <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
           <input type="number" className="erp-cell num" style={{ width: 110 }} value={draft}
             onChange={(e) => setPhiDraft((p) => ({ ...p, [o.maDH]: parseFloat(e.target.value) || 0 }))} />
           <button type="button" className="btn btn-sm btn-primary" onClick={() => savePhiPhatSinh(o.maDH)} title="Lưu phí phát sinh"><FiCheck /></button>
         </div>
-        <span className="hint" style={{ fontSize: 10 }}>Sửa số tiền xong sẽ quay về trạng thái chờ Kế toán duyệt lại.</span>
+        <span className="hint" style={{ fontSize: 10 }}>Nhập/sửa xong sẽ về trạng thái chờ Kế toán duyệt; chỉ khi duyệt mới cộng vào tổng tiền.</span>
+      </div>
+    );
+  }
+
+  // ===== #36: CSKH cập nhật phí ship nội địa VN + line nội địa của đơn đã tạo =====
+  async function saveShipND(maDH: string) {
+    const cur = orders.find((o) => o.maDH === maDH);
+    const v = shipDraft[maDH] ?? (cur?.shipND || 0);
+    const line = lineDraft[maDH] ?? (cur?.lineNoiDia || '');
+    const r = await callServer('updateShipVN', maDH, v, line);
+    if (r?.success) { showToast('Đã cập nhật phí ship nội địa', 'success'); reload(); }
+    else showToast(r?.message || 'Có lỗi khi cập nhật phí ship', 'error');
+  }
+
+  function shipCell(o: MyOrder) {
+    const draft = shipDraft[o.maDH] ?? o.shipND;
+    const line = lineDraft[o.maDH] ?? o.lineNoiDia;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+          <input type="number" className="erp-cell num" style={{ width: 100 }} value={draft}
+            onChange={(e) => setShipDraft((p) => ({ ...p, [o.maDH]: parseFloat(e.target.value) || 0 }))} />
+          <button type="button" className="btn btn-sm btn-primary" onClick={() => saveShipND(o.maDH)} title="Lưu phí ship nội địa"><FiCheck /></button>
+        </div>
+        <select className="erp-cell" value={line} onChange={(e) => setLineDraft((p) => ({ ...p, [o.maDH]: e.target.value }))}>
+          <option value="">— Line nội địa —</option>
+          {LINE_NOI_DIA.map((l) => <option key={l} value={l}>{l}</option>)}
+        </select>
       </div>
     );
   }
@@ -697,7 +735,7 @@ export default function CskhClient({ initial }: Props) {
           <thead><tr>
             <th>Mã đơn</th><th>Ngày</th><th>Khách hàng</th><th>Hàng (đầu tiên)</th>
             <th className="number">Tổng tiền</th><th className="number">Đã trả</th><th className="number">Còn lại</th>
-            <th>Trạng thái</th><th>GDV xử lý</th><th>Phí phát sinh</th><th>Thao tác</th>
+            <th>Trạng thái</th><th>GDV xử lý</th><th>Phí phát sinh</th><th>Ship nội địa VN</th><th>Thao tác</th>
           </tr></thead>
           <tbody>
             {orders.map((o) => (
@@ -715,6 +753,7 @@ export default function CskhClient({ initial }: Props) {
                 <td><span className={`status-badge ${statusToClass(o.trangThai)}`}>{statusToLabel(o.trangThai)}</span></td>
                 <td style={{ minWidth: 150 }}>{gdvCell(o)}</td>
                 <td style={{ minWidth: 170 }}>{phiCell(o)}</td>
+                <td style={{ minWidth: 150 }}>{shipCell(o)}</td>
                 <td>
                   {o.trangThai === 'DonMoiTao' ? (
                     <button className="btn btn-success btn-sm" onClick={() => confirmDepositOrder(o.maDH)}>
@@ -853,8 +892,10 @@ export default function CskhClient({ initial }: Props) {
             <div className="form-field"><label className="required">Tên sản phẩm</label>
               <input type="text" value={addSp.tenSP} onChange={(e) => setAddSp({ ...addSp, tenSP: e.target.value })} autoFocus /></div>
             <div className="form-grid" style={{ marginTop: 12 }}>
+              {/* Góp ý NV #23: đề xuất danh mục cố định, vẫn gõ tự do được. */}
               <div className="form-field"><label>Danh mục</label>
-                <input type="text" value={addSp.danhMuc} onChange={(e) => setAddSp({ ...addSp, danhMuc: e.target.value })} /></div>
+                <input type="text" list={DANH_MUC_LIST_ID} value={addSp.danhMuc} onChange={(e) => setAddSp({ ...addSp, danhMuc: e.target.value })} />
+                <datalist id={DANH_MUC_LIST_ID}>{DANH_MUC_HANG.map((d) => <option key={d} value={d} />)}</datalist></div>
               <div className="form-field"><label>Web nguồn</label>
                 <select value={addSp.webNguon} onChange={(e) => setAddSp({ ...addSp, webNguon: e.target.value })}>
                   <option value="">--</option><option value="Taobao">Taobao</option>

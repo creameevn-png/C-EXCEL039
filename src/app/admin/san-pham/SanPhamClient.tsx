@@ -7,6 +7,7 @@ import {
 import { callServer, reload } from '@/lib/client';
 import { showToast } from '@/components/Toast';
 import { formatCurrency } from '@/lib/format';
+import { DANH_MUC_HANG, DANH_MUC_LIST_ID } from '@/lib/danh-muc';
 
 type SP = {
   maSP: string; tenSP: string; danhMuc: string; webNguon: string;
@@ -123,8 +124,10 @@ export default function SanPhamClient({ list, canDelete }: { list: SP[]; canDele
             <div className="form-field"><label className="required">Tên sản phẩm</label>
               <input value={form.tenSP} onChange={(e) => setForm({ ...form, tenSP: e.target.value })} autoFocus /></div>
             <div className="form-grid" style={{ marginTop: 10 }}>
+              {/* Góp ý NV #23: đề xuất danh mục cố định, vẫn gõ tự do được. */}
               <div className="form-field"><label>Danh mục</label>
-                <input value={form.danhMuc} onChange={(e) => setForm({ ...form, danhMuc: e.target.value })} /></div>
+                <input list={DANH_MUC_LIST_ID} value={form.danhMuc} onChange={(e) => setForm({ ...form, danhMuc: e.target.value })} />
+                <datalist id={DANH_MUC_LIST_ID}>{DANH_MUC_HANG.map((d) => <option key={d} value={d} />)}</datalist></div>
               <div className="form-field"><label>Web nguồn</label>
                 <select value={form.webNguon} onChange={(e) => setForm({ ...form, webNguon: e.target.value })}>
                   <option value="">--</option><option value="Taobao">Taobao</option>

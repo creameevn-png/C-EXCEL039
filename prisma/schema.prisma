@@ -325,7 +325,8 @@ model KienHang {
 
   donHang DonHang @relation(fields: [maDH], references: [maDH], onDelete: Cascade)
 
-  @@unique([maDH, maVD], name: "uq_kien_don_vd")
+  // map: đặt đúng tên ràng buộc dưới DB cho khớp 15_gopy_hoan_thien.sql (chống schema drift).
+  @@unique([maDH, maVD], name: "uq_kien_don_vd", map: "uq_kien_don_vd")
   @@index([maVD])
   @@index([trangThai])
   @@map("kien_hang")

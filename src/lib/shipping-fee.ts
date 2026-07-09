@@ -92,8 +92,11 @@ export async function computeOrderTotals(input: {
   pctCoc: number;
   lineVC?: LineVC;
   loaiHang?: string;
-  /** Phí phát sinh khác (CSKH nhập tay) — TÁCH RIÊNG khỏi bảo hiểm. */
+  /** Phí phát sinh khác (CSKH nhập tay) — TÁCH RIÊNG khỏi bảo hiểm.
+   *  Người gọi chỉ truyền vào khi Kế toán ĐÃ duyệt (góp ý NV #9). */
   phiPhatSinh?: number;
+  /** Phí đổi trả khách phải chịu, chuyển từ khiếu nại sang (góp ý NV #47). */
+  phiKhieuNai?: number;
   /** Phí mua tính sẵn theo từng sàn (calcPhiMua). Có thì dùng, không thì tính theo % chung. */
   phiMuaOverride?: number;
   thueNK?: number;
@@ -112,6 +115,8 @@ export async function computeOrderTotals(input: {
   const phiBH = Math.round((giaHang * pctBH) / 100 / 1000) * 1000;
   // Phí phát sinh khác do CSKH nhập tay (lưu ở cột riêng phi_phat_sinh).
   const phiPhatSinh = Math.round(Number(input.phiPhatSinh) || 0);
+  // Phí đổi trả do khách chịu, đẩy sang từ khiếu nại đã duyệt.
+  const phiKhieuNai = Math.round(Number(input.phiKhieuNai) || 0);
 
   let phiVC = 0;
   if (input.lineVC) phiVC = await calcPhiVCByLine(input.kg, input.m3, input.lineVC, input.loaiHang || 'Thường');
@@ -123,9 +128,20 @@ export async function computeOrderTotals(input: {
   const phiLuuKho = Number(input.phiLuuKho) || 0;
 
   const tongTien =
-    giaHang + phiMua + phiBH + phiPhatSinh + phiVC +
+    giaHang + phiMua + phiBH + phiPhatSinh + phiKhieuNai + phiVC +
     (input.phiShipND || 0) + (input.phiDongGoi || 0) + (input.phiPhuThu || 0) +
     thueNK + vat + phiKiemHoa + phiLuuKho;
-  const coc = Math.round((tongTien * input.pctCoc) / 100 / 1000) * 1000;
-  return { giaHang, phiMua, phiBH, phiPhatSinh, phiVC, thueNK, vat, phiKiemHoa, phiLuuKho, tongTien, coc };
+  // Cọc tính trên tiền hàng + phí ban đầu, KHÔNG tính phí đổi trả phát sinh sau khi
+  // khách đã đặt cọc — nếu không, mỗi lần duyệt khiếu nại tiền cọc lại nhảy.
+  const coc = Math.round(((tongTien - phiKhieuNai) * input.pctCoc) / 100 / 1000) * 1000;
+  return { giaHang, phiMua, phiBH, phiPhatSinh, phiKhieuNai, phiVC, thueNK, vat, phiKiemHoa, phiLuuKho, tongTien, coc };
+}
+
+/** Góp ý NV #33 — m³ suy ra từ kích thước thực đo (cm), hệ số quy đổi do admin cài đặt. */
+export async function calcM3(dai: number, rong: number, cao: number): Promise<number> {
+  const d = Number(dai) || 0, r = Number(rong) || 0, c = Number(cao) || 0;
+  if (d <= 0 || r <= 0 || c <= 0) return 0;
+  const chia = await getNumber('m3_chia', 1_000_000);
+  if (!chia) return 0;
+  return Math.round((d * r * c / chia) * 10000) / 10000;
 }

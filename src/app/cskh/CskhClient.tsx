@@ -22,7 +22,13 @@ import { calcPhiVCPanama } from '@/lib/shipping-fee';
 
 type Customer = { maKH: string; tenKH: string; sdt: string; diaChi: string; pctCoc: number; soDuVi: number; congNo: number };
 type Product = { maSP: string; tenSP: string; kgGoiY: number; m3GoiY: number; giaThamKhao: number; webNguon: string };
-type MyOrder = { maDH: string; ngayTao: string; tenKH: string; tenHang: string; tongTien: number; daTra: number; conLai: number; trangThai: string };
+type Gdv = { id: number; hoTen: string };
+type MyOrder = {
+  maDH: string; ngayTao: string; tenKH: string; tenHang: string;
+  tongTien: number; daTra: number; conLai: number; trangThai: string;
+  gdvId: number | null; gdvTen: string;
+  phiPhatSinh: number; phiPhatSinhDuyet: boolean;
+};
 
 type LineItem = {
   tempId: number;
@@ -45,6 +51,7 @@ type Props = {
     tyGiaByWeb?: Record<string, number>;
     customers: Customer[];
     products: Product[];
+    gdvs: Gdv[];
     myOrders: MyOrder[];
     kpi: { myOrdersToday: number; completed: number; inProgress: number; customers: number };
   };
@@ -63,6 +70,7 @@ function mkLine(p?: Partial<LineItem>, tyGia = 3650): LineItem {
 
 export default function CskhClient({ initial }: Props) {
   const { user, customers: customersInit, products: productsInit, myOrders, kpi, tyGia } = initial;
+  const gdvs = initial.gdvs || [];
   // Góp ý NV #10: chỉ Kế toán được nạp ví — CSKH chỉ xem số dư.
   const canTopup = user.vaiTro === 'KeToan' || user.vaiTro === 'Admin';
   const tyGiaByWeb = initial.tyGiaByWeb || {};
@@ -93,11 +101,16 @@ export default function CskhClient({ initial }: Props) {
   const [sdtNhan, setSdtNhan] = useState('');
   const [diaChiNhan, setDiaChiNhan] = useState('');
   const [pctCoc, setPctCoc] = useState(70);
+  const [gdvId, setGdvId] = useState('');
   const [ghiChu, setGhiChu] = useState('');
   const [hintCoc, setHintCoc] = useState('% cọc sẽ tự động lấy từ thông tin KH');
   const [submitting, setSubmitting] = useState(false);
 
   const [items, setItems] = useState<LineItem[]>([mkLine({}, tyGia)]);
+
+  // Tab "Đơn của tôi": bản sao cục bộ để đổi GDV / phí phát sinh ngay trên bảng.
+  const [orders, setOrders] = useState<MyOrder[]>(myOrders);
+  const [phiDraft, setPhiDraft] = useState<Record<string, number>>({});
 
   // ===== Tạo đơn từ "Yêu cầu mua hàng" (điền sẵn) =====
   const [fromYC, setFromYC] = useState('');
@@ -216,17 +229,18 @@ export default function CskhClient({ initial }: Props) {
     // Tạm tính: phí mua 2% chung (server có thể tính theo từng sàn), bảo hiểm 1% giá hàng.
     const phiMua = Math.round((tongGiaHang * 0.02) / 1000) * 1000;
     const phiBH = Math.round((tongGiaHang * 0.01) / 1000) * 1000;
+    // Phí phát sinh (#9) chờ Kế toán duyệt → KHÔNG cộng vào tổng tiền, chỉ hiển thị riêng.
     const phiPS = Math.round(Number(phiPhatSinh) || 0);
     const phiVC = calcPhiVCPanama(totalKg, totalM3, tuyen);
     const phiThue = (Number(thueNK) || 0) + (Number(vat) || 0) + (Number(phiKiemHoa) || 0) + (Number(phiLuuKho) || 0);
-    const tong = tongGiaHang + phiMua + phiBH + phiPS + phiVC + (Number(shipND) || 0) + (Number(dongGoi) || 0) + (Number(phuThu) || 0) + phiThue;
+    const tong = tongGiaHang + phiMua + phiBH + phiVC + (Number(shipND) || 0) + (Number(dongGoi) || 0) + (Number(phuThu) || 0) + phiThue;
     const coc = Math.round((tong * pctCoc) / 100 / 1000) * 1000;
     return { tongGiaHang, tongNDT, tongSL, totalKg, totalM3, phiMua, phiBH, phiPS, phiVC, phiThue, tong, coc };
   }, [items, tuyen, shipND, dongGoi, phuThu, phiPhatSinh, thueNK, vat, phiKiemHoa, phiLuuKho, pctCoc]);
 
   function resetCreateForm() {
     setMaKH(''); setTuyen('HaNoi'); setLineVC('LineThuong'); setLoaiHang('Thường');
-    setShipND(0); setDongGoi(0); setPhuThu(0); setPctCoc(70); setGhiChu('');
+    setShipND(0); setDongGoi(0); setPhuThu(0); setPctCoc(70); setGdvId(''); setGhiChu('');
     setPhiPhatSinh(0); setNgachHQ('Tiểu ngạch'); setThueNK(0); setVat(0); setPhiKiemHoa(0); setPhiLuuKho(0);
     setKiemDem(false); setNguoiNhan(''); setSdtNhan(''); setDiaChiNhan('');
     setItems([mkLine({}, tyGia)]);
@@ -241,6 +255,7 @@ export default function CskhClient({ initial }: Props) {
     const r = await callServer('createOrder', {
       maKH, tuyen, lineVC, loaiHang,
       pctCoc,
+      gdvId: gdvId ? Number(gdvId) : null,
       phiShipND: shipND, phiDongGoi: dongGoi, phiPhuThu: phuThu,
       phiPhatSinh, ngachHQ, thueNK, vat, phiKiemHoa, phiLuuKho,
       kiemDem, nguoiNhan, sdtNhan, diaChiNhan,
@@ -338,6 +353,51 @@ export default function CskhClient({ initial }: Props) {
     } else showToast(r?.message || 'Có lỗi', 'error');
   }
 
+  // ===== #12: CSKH gán GDV xử lý cho đơn (ngay trên bảng) =====
+  async function assignGDVToOrder(maDH: string, val: string) {
+    const gid = val ? Number(val) : null;
+    setOrders((prev) => prev.map((o) => o.maDH === maDH ? { ...o, gdvId: gid } : o));
+    const r = await callServer('assignGDV', maDH, gid);
+    if (r?.success) { showToast(gid ? 'Đã gán GDV xử lý' : 'Đã bỏ gán GDV', 'success'); reload(); }
+    else showToast(r?.message || 'Có lỗi khi gán GDV', 'error');
+  }
+
+  // ===== #9: CSKH sửa phí phát sinh → quay lại trạng thái chờ Kế toán duyệt =====
+  async function savePhiPhatSinh(maDH: string) {
+    const cur = orders.find((o) => o.maDH === maDH);
+    const soTien = phiDraft[maDH] ?? (cur?.phiPhatSinh || 0);
+    const r = await callServer('updatePhiPhatSinh', maDH, soTien);
+    if (r?.success) { showToast('Đã cập nhật phí phát sinh — chờ Kế toán duyệt lại', 'success'); reload(); }
+    else showToast(r?.message || 'Có lỗi khi cập nhật phí', 'error');
+  }
+
+  function gdvCell(o: MyOrder) {
+    return (
+      <select className="erp-cell" value={o.gdvId ?? ''} onChange={(e) => assignGDVToOrder(o.maDH, e.target.value)}>
+        <option value="">— Chưa gán —</option>
+        {gdvs.map((g) => <option key={g.id} value={g.id}>{g.hoTen}</option>)}
+      </select>
+    );
+  }
+
+  function phiCell(o: MyOrder) {
+    if (!(o.phiPhatSinh > 0)) return <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>—</span>;
+    const draft = phiDraft[o.maDH] ?? o.phiPhatSinh;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <span className={`status-badge ${o.phiPhatSinhDuyet ? 's-done' : 's-deposit'}`}>
+          {o.phiPhatSinhDuyet ? 'Phí phát sinh đã duyệt' : 'Phí phát sinh chờ duyệt'}
+        </span>
+        <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+          <input type="number" className="erp-cell num" style={{ width: 110 }} value={draft}
+            onChange={(e) => setPhiDraft((p) => ({ ...p, [o.maDH]: parseFloat(e.target.value) || 0 }))} />
+          <button type="button" className="btn btn-sm btn-primary" onClick={() => savePhiPhatSinh(o.maDH)} title="Lưu phí phát sinh"><FiCheck /></button>
+        </div>
+        <span className="hint" style={{ fontSize: 10 }}>Sửa số tiền xong sẽ quay về trạng thái chờ Kế toán duyệt lại.</span>
+      </div>
+    );
+  }
+
   // ============== RENDER ==============
   const selectedKH = customers.find((c) => c.maKH === maKH);
   const tabCreate = (
@@ -417,6 +477,13 @@ export default function CskhClient({ initial }: Props) {
               <div className="erp-field w-sm">
                 <label>% Cọc</label>
                 <input type="number" min={0} max={100} value={pctCoc} onChange={(e) => setPctCoc(parseFloat(e.target.value) || 0)} />
+              </div>
+              <div className="erp-field w-md">
+                <label>GDV xử lý</label>
+                <select value={gdvId} onChange={(e) => setGdvId(e.target.value)}>
+                  <option value="">— Chưa gán —</option>
+                  {gdvs.map((g) => <option key={g.id} value={g.id}>{g.hoTen}</option>)}
+                </select>
               </div>
             </div>
             <div className="hint" style={{ marginTop: 6 }}>{hintCoc}</div>
@@ -568,7 +635,8 @@ export default function CskhClient({ initial }: Props) {
               <div className="erp-field"><label>Phí phụ thu khác (VNĐ)</label>
                 <input type="number" value={phuThu} onChange={(e) => setPhuThu(parseFloat(e.target.value) || 0)} /></div>
               <div className="erp-field"><label>Phí phát sinh khác (VNĐ)</label>
-                <input type="number" value={phiPhatSinh} onChange={(e) => setPhiPhatSinh(parseFloat(e.target.value) || 0)} /></div>
+                <input type="number" value={phiPhatSinh} onChange={(e) => setPhiPhatSinh(parseFloat(e.target.value) || 0)} />
+                <div className="hint" style={{ marginTop: 4 }}>Kế toán phải duyệt thì phí này mới cộng vào tổng tiền đơn.</div></div>
             </div>
             <div className="erp-fields" style={{ marginTop: 10 }}>
               <div className="erp-field w-md"><label>Ngạch hải quan</label>
@@ -591,7 +659,7 @@ export default function CskhClient({ initial }: Props) {
               <div className="erp-fee-row"><span className="lbl">Phí mua (tạm tính 2%)</span><span className="v">{fmtVND(totals.phiMua)}đ</span></div>
               <div className="erp-fee-row"><span className="lbl">Phí bảo hiểm (1%)</span><span className="v">{fmtVND(totals.phiBH)}đ</span></div>
               <div className="erp-fee-row"><span className="lbl">Phí vận chuyển (Panama)</span><span className="v">{fmtVND(totals.phiVC)}đ</span></div>
-              {totals.phiPS > 0 && <div className="erp-fee-row"><span className="lbl">Phí phát sinh khác</span><span className="v">{fmtVND(totals.phiPS)}đ</span></div>}
+              {totals.phiPS > 0 && <div className="erp-fee-row"><span className="lbl">Phí phát sinh khác <small style={{ color: 'var(--warning-dark, #92400e)', fontWeight: 600 }}>(chờ Kế toán duyệt — chưa cộng vào tổng)</small></span><span className="v">{fmtVND(totals.phiPS)}đ</span></div>}
               {totals.phiThue > 0 && <div className="erp-fee-row"><span className="lbl">Thuế / VAT / kiểm hóa / lưu kho ({ngachHQ})</span><span className="v">{fmtVND(totals.phiThue)}đ</span></div>}
               <div className="erp-fee-row total"><span className="lbl">Tổng tiền</span><span className="v">{fmtVND(totals.tong)}đ</span></div>
               <div className="erp-fee-row coc"><span className="lbl">Cọc ({pctCoc}%)</span><span className="v">{fmtVND(totals.coc)}đ</span></div>
@@ -621,18 +689,18 @@ export default function CskhClient({ initial }: Props) {
 
   const tabOrders = (
     <div className="form-section">
-      <div className="section-title"><FiClipboard /> Đơn hàng tôi đã tạo ({myOrders.length} đơn)</div>
-      {myOrders.length === 0 ? (
+      <div className="section-title"><FiClipboard /> Đơn hàng tôi đã tạo ({orders.length} đơn)</div>
+      {orders.length === 0 ? (
         <div className="empty-state"><FiInbox /><p>Bạn chưa tạo đơn nào.</p></div>
       ) : (
         <table className="data-table">
           <thead><tr>
             <th>Mã đơn</th><th>Ngày</th><th>Khách hàng</th><th>Hàng (đầu tiên)</th>
             <th className="number">Tổng tiền</th><th className="number">Đã trả</th><th className="number">Còn lại</th>
-            <th>Trạng thái</th><th>Thao tác</th>
+            <th>Trạng thái</th><th>GDV xử lý</th><th>Phí phát sinh</th><th>Thao tác</th>
           </tr></thead>
           <tbody>
-            {myOrders.map((o) => (
+            {orders.map((o) => (
               <tr key={o.maDH}>
                 <td className="ma-don" style={{ cursor: 'pointer', textDecoration: 'underline' }}
                     onClick={() => (window as any).openOrderDetail?.(o.maDH)}>{o.maDH}</td>
@@ -645,6 +713,8 @@ export default function CskhClient({ initial }: Props) {
                   {fmtVND(o.conLai)}
                 </td>
                 <td><span className={`status-badge ${statusToClass(o.trangThai)}`}>{statusToLabel(o.trangThai)}</span></td>
+                <td style={{ minWidth: 150 }}>{gdvCell(o)}</td>
+                <td style={{ minWidth: 170 }}>{phiCell(o)}</td>
                 <td>
                   {o.trangThai === 'DonMoiTao' ? (
                     <button className="btn btn-success btn-sm" onClick={() => confirmDepositOrder(o.maDH)}>

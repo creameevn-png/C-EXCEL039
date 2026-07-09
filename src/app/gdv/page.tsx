@@ -6,10 +6,10 @@ export const dynamic = 'force-dynamic';
 
 export default async function GdvPage() {
   const user = await requireRole(['GDV', 'MuaHang']);
-  const [pending, khieuNai] = await Promise.all([
+  const [pending, khieuNai, allRaw] = await Promise.all([
     prisma.donHang.findMany({
       where: { trangThai: { in: ['DatCoc', 'DaMuaHang'] } },
-      include: { khachHang: true, chiTiet: { orderBy: { stt: 'asc' } } },
+      include: { khachHang: true, gdv: true, chiTiet: { orderBy: { stt: 'asc' } } },
       orderBy: { ngayTao: 'desc' }
     }),
     prisma.khieuNai.findMany({
@@ -17,6 +17,15 @@ export default async function GdvPage() {
       include: { khachHang: true },
       orderBy: { ngayTao: 'desc' },
       take: 100
+    }),
+    prisma.donHang.findMany({
+      orderBy: { ngayTao: 'desc' },
+      take: 300,
+      select: {
+        maDH: true, maKH: true, maVD: true, trangThai: true,
+        tongTien: true, ngayTao: true,
+        khachHang: { select: { tenKH: true } }
+      }
     })
   ]);
   return <GdvClient
@@ -28,13 +37,19 @@ export default async function GdvPage() {
       tongTien: o.tongTien, daTra: o.daTra,
       tenHang: o.chiTiet.slice(0, 3).map((c) => `${c.tenSP} (x${c.soLuong})`).join(' · '),
       maGD: o.maGD || '', maVD: o.maVD || '', trangThai: o.trangThai,
+      gdvId: o.gdvId, gdvTen: o.gdv?.hoTen || '',
       vonNDT: o.vonNDT, shipNDTQ: o.shipNDTQ, loiNhuanNDT: o.loiNhuanNDT,
       ghiChuGDV: o.ghiChuGDV || '',
       tongThuNDT: o.chiTiet.reduce((s, c) => s + c.donGiaNDT * c.soLuong, 0),
       chiTiet: o.chiTiet.map((c) => ({
         stt: c.stt, tenSP: c.tenSP, soLuong: c.soLuong,
-        donGiaNDT: c.donGiaNDT, linkTaobao: c.linkTaobao || ''
+        donGiaNDT: c.donGiaNDT, vonNDT: c.vonNDT, linkTaobao: c.linkTaobao || ''
       }))
+    }))}
+    allOrders={allRaw.map((o) => ({
+      maDH: o.maDH, maKH: o.maKH, tenKH: o.khachHang?.tenKH || '',
+      maVD: o.maVD || '', trangThai: o.trangThai,
+      tongTien: o.tongTien, ngayTao: o.ngayTao.toISOString()
     }))}
     khieuNai={khieuNai.map((k) => ({
       maKN: k.maKN, ngayTao: k.ngayTao.toISOString(), maDH: k.maDH || '', maKH: k.maKH || '',

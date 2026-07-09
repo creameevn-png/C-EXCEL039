@@ -1,12 +1,15 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { FiUserCheck, FiUserPlus, FiEdit2, FiX, FiCheck, FiSave, FiSearch, FiInbox } from 'react-icons/fi';
+import { FiUserCheck, FiUserPlus, FiEdit2, FiX, FiCheck, FiSave, FiSearch, FiInbox, FiInfo } from 'react-icons/fi';
 import { callServer, reload } from '@/lib/client';
 import { showToast } from '@/components/Toast';
 import { VAITRO_LABEL } from '@/lib/status';
 
-type U = { id: number; email: string; hoTen: string; vaiTro: string; trangThai: string };
+type U = {
+  id: number; email: string; hoTen: string; vaiTro: string; trangThai: string;
+  pctHoaHong: number; pctThuong: number;
+};
 
 /**
  * 'MuaHang' đã gộp vào 'GDV' (một người làm cả hai) nên KHÔNG còn là lựa chọn khi
@@ -30,6 +33,10 @@ export default function UsersClient({ users }: { users: U[] }) {
   const [q, setQ] = useState('');
   const [roleF, setRoleF] = useState('');
   const [statusF, setStatusF] = useState('');
+  const [pctEdit, setPctEdit] = useState<Record<number, { pctHoaHong: string; pctThuong: string }>>(() =>
+    Object.fromEntries(users.map((u) => [u.id, { pctHoaHong: String(u.pctHoaHong ?? 0), pctThuong: String(u.pctThuong ?? 0) }]))
+  );
+  const [pctBusy, setPctBusy] = useState<Record<number, boolean>>({});
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -68,6 +75,44 @@ export default function UsersClient({ users }: { users: U[] }) {
     else showToast(r?.message || 'Lỗi', 'error');
   }
 
+  // Hoa hồng chỉ áp cho GDV (gồm alias 'MuaHang'); thưởng chỉ áp cho CSKH.
+  const isGDV = (vaiTro: string) => roleMatches(vaiTro, 'GDV');
+  const canPct = (vaiTro: string) => isGDV(vaiTro) || vaiTro === 'CSKH';
+
+  function setPctField(id: number, field: 'pctHoaHong' | 'pctThuong', val: string) {
+    setPctEdit((p) => ({ ...p, [id]: { ...(p[id] ?? { pctHoaHong: '', pctThuong: '' }), [field]: val } }));
+  }
+
+  function pctCell(u: U, field: 'pctHoaHong' | 'pctThuong', applies: boolean) {
+    if (!applies) return <span style={{ color: 'var(--text-faint)' }}>—</span>;
+    const e = pctEdit[u.id] ?? { pctHoaHong: '', pctThuong: '' };
+    return (
+      <input type="number" min={0} max={100} step="0.1" style={{ width: 74, textAlign: 'right' }}
+        value={e[field] ?? ''} disabled={pctBusy[u.id]}
+        onChange={(ev) => setPctField(u.id, field, ev.target.value)} />
+    );
+  }
+
+  async function savePct(u: U) {
+    const e = pctEdit[u.id] ?? { pctHoaHong: '', pctThuong: '' };
+    const patch: { pctHoaHong?: number; pctThuong?: number } = {};
+    if (isGDV(u.vaiTro)) {
+      const v = Number(e.pctHoaHong);
+      if (!Number.isFinite(v) || v < 0 || v > 100) return showToast('% hoa hồng phải từ 0 đến 100', 'error');
+      patch.pctHoaHong = v;
+    }
+    if (u.vaiTro === 'CSKH') {
+      const v = Number(e.pctThuong);
+      if (!Number.isFinite(v) || v < 0 || v > 100) return showToast('% thưởng phải từ 0 đến 100', 'error');
+      patch.pctThuong = v;
+    }
+    setPctBusy((p) => ({ ...p, [u.id]: true }));
+    const r = await callServer('setPctNhanVien', u.id, patch);
+    setPctBusy((p) => ({ ...p, [u.id]: false }));
+    if (r?.success) { showToast('Đã lưu tỉ lệ', 'success'); reload(); }
+    else showToast(r?.message || 'Lỗi', 'error');
+  }
+
   return (
     <>
       <div className="form-section">
@@ -98,10 +143,14 @@ export default function UsersClient({ users }: { users: U[] }) {
           </div>
         </div>
 
+        <p className="hint icon-inline" style={{ marginBottom: 12 }}>
+          <FiInfo /> Hoa hồng GDV tính trên doanh số các đơn được giao phụ trách; thưởng CSKH tính trên tổng phí dịch vụ của đơn do người đó tạo. Xem kết quả ở Báo cáo › Hoa hồng &amp; thưởng.
+        </p>
+
         {filtered.length === 0 ? <div className="empty-state"><FiInbox /><p>Không có nhân viên khớp.</p></div> :
         <table className="data-table">
           <thead><tr>
-            <th>ID</th><th>Email</th><th>Họ tên</th><th>Vai trò</th><th>Trạng thái</th><th>Thao tác</th>
+            <th>ID</th><th>Email</th><th>Họ tên</th><th>Vai trò</th><th>% hoa hồng</th><th>% thưởng</th><th>Trạng thái</th><th>Thao tác</th>
           </tr></thead>
           <tbody>
             {filtered.map((u) => (
@@ -110,13 +159,20 @@ export default function UsersClient({ users }: { users: U[] }) {
                 <td>{u.email}</td>
                 <td>{u.hoTen}</td>
                 <td><span className="role-badge" style={{ background: '#DBEAFE', color: '#1E40AF' }}>{VAITRO_LABEL[u.vaiTro as keyof typeof VAITRO_LABEL]}</span></td>
+                <td>{pctCell(u, 'pctHoaHong', isGDV(u.vaiTro))}</td>
+                <td>{pctCell(u, 'pctThuong', u.vaiTro === 'CSKH')}</td>
                 <td>
                   <span className="status-badge" style={u.trangThai === 'HoatDong' ? { background: '#DCFCE7', color: '#166534' } : { background: '#FEE2E2', color: '#991B1B' }}>
                     {u.trangThai === 'HoatDong' ? 'Hoạt động' : 'Tạm khóa'}
                   </span>
                 </td>
                 <td>
-                  <button className="btn btn-primary btn-sm" onClick={() => openEdit(u)}><FiEdit2 /> Sửa</button>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button className="btn btn-primary btn-sm" onClick={() => openEdit(u)}><FiEdit2 /> Sửa</button>
+                    {canPct(u.vaiTro) && (
+                      <button className="btn btn-secondary btn-sm" onClick={() => savePct(u)} disabled={pctBusy[u.id]}><FiSave /> Lưu %</button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

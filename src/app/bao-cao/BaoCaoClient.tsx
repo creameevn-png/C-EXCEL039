@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   FiCalendar, FiTruck, FiUsers, FiUserCheck, FiTrendingUp, FiTrendingDown, FiInbox,
   FiMapPin, FiDollarSign, FiAlertTriangle, FiDownload, FiPrinter, FiBarChart2,
-  FiPackage, FiRepeat
+  FiPackage, FiRepeat, FiAward, FiBookOpen
 } from 'react-icons/fi';
 import Tabs from '@/components/Tabs';
 import { fmtVND } from '@/lib/format';
@@ -12,13 +12,17 @@ import { LINE_LABEL } from '@/lib/status';
 
 type Row = {
   maDH: string; ngayTao: string; maKH: string; tenKH: string; nv: string;
+  nvId: number | null; gdvId: number | null;
   lineVC: string; tuyen: string; trangThai: string;
   tongKg: number; tongM3: number; tongGiaHang: number;
   phiMua: number; phiBH: number; phiPhatSinh: number; phiVC: number;
   shipND: number; dongGo: number; phuThu: number;
+  phiKhieuNai: number;
   vonNDT: number; shipNDTQ: number; loiNhuanNDT: number;
   tongTien: number; daTra: number; conLai: number;
 };
+type NvRow = { id: number; hoTen: string; vaiTro: string; pctHoaHong: number; pctThuong: number };
+type SoQuyRow = { id: number; ngay: string; quy: string; loai: string; soTien: number; danhMuc: string; noiDung: string; maDH: string; nguoiTao: string };
 type KnRow = {
   maKN: string; ngayTao: string; maKH: string; maDH: string;
   loai: string; trangThai: string; soTienHoan: number; phiDoiTra: number;
@@ -29,6 +33,8 @@ type TonKhoRow = { maDH: string; maKH: string; tenKH: string; trangThai: string;
 const LOAI_KN_LABEL: Record<string, string> = {
   HangLoi: 'Hàng lỗi', ThieuHang: 'Thiếu hàng', GiaoSai: 'Giao sai', KhongNhan: 'Không nhận', Khac: 'Khác'
 };
+const VAITRO_LABEL: Record<string, string> = { GDV: 'GDV', MuaHang: 'Mua hàng', CSKH: 'CSKH' };
+const QUY_LABEL: Record<string, string> = { CongTy: 'Công ty', KhoVN: 'Kho VN', KhoTQ: 'Kho TQ' };
 
 function monthKey(iso: string) {
   const d = new Date(iso);
@@ -137,7 +143,7 @@ function ReportTools({ name, headers, rows }: { name: string; headers: string[];
   );
 }
 
-export default function BaoCaoClient({ rows, knRows, cashRows, tonKhoRows }: { rows: Row[]; knRows: KnRow[]; cashRows: CashRow[]; tonKhoRows: TonKhoRow[] }) {
+export default function BaoCaoClient({ rows, knRows, cashRows, tonKhoRows, nvList, soQuyRows }: { rows: Row[]; knRows: KnRow[]; cashRows: CashRow[]; tonKhoRows: TonKhoRow[]; nvList: NvRow[]; soQuyRows: SoQuyRow[] }) {
   const [month, setMonth] = useState('');
 
   useEffect(() => {
@@ -426,6 +432,9 @@ export default function BaoCaoClient({ rows, knRows, cashRows, tonKhoRows }: { r
   })).sort((a, b) => b.n - a.n);
   const tongHoan = curKN.reduce((s, k) => s + k.soTienHoan, 0);
   const tongPhiDT = curKN.reduce((s, k) => s + k.phiDoiTra, 0);
+  // #47/#49 — phí đổi trả khách phải chịu, đã cộng vào tổng tiền đơn nhưng ghi tách khỏi
+  // chi phí đơn hàng thường (tính trên các đơn của tháng đang xem).
+  const tongPhiKN = cur.reduce((s, r) => s + r.phiKhieuNai, 0);
   const tabKN = (
     <div className="form-section">
       <div className="section-title"><FiAlertTriangle /> Khiếu nại / đổi trả — tháng {ml}</div>
@@ -434,8 +443,10 @@ export default function BaoCaoClient({ rows, knRows, cashRows, tonKhoRows }: { r
       <div className="fee-summary" style={{ marginBottom: 14 }}>
         <div className="fee-row"><span>Tổng số khiếu nại</span><span className="fee-value">{curKN.length}</span></div>
         <div className="fee-row"><span>Tổng tiền hoàn KH</span><span className="fee-value" style={{ color: '#DC2626' }}>{fmtVND(tongHoan)}đ</span></div>
-        <div className="fee-row"><span>Tổng phí đổi/trả</span><span className="fee-value">{fmtVND(tongPhiDT)}đ</span></div>
+        <div className="fee-row"><span>Tổng phí đổi/trả (theo khiếu nại)</span><span className="fee-value">{fmtVND(tongPhiDT)}đ</span></div>
+        <div className="fee-row"><span>Phí khiếu nại tính vào đơn — khách chịu (phiKhieuNai)</span><span className="fee-value">{fmtVND(tongPhiKN)}đ</span></div>
       </div>
+      <div className="alert alert-info" style={{ marginBottom: 12 }}><FiAlertTriangle /><span>Chi phí khiếu nại được ghi <b>tách khỏi chi phí đơn hàng thường</b>: khoản <b>phí khiếu nại (phiKhieuNai) = {fmtVND(tongPhiKN)}đ</b> là phần khách phải chịu, đã cộng vào tổng tiền các đơn phát sinh đổi/trả trong tháng nhưng theo dõi riêng để đối chiếu.</span></div>
       {knByLoai.length === 0 ? <div className="empty-state"><FiInbox /><p>Không có khiếu nại trong tháng.</p></div> : (
         <table className="data-table">
           <thead><tr><th>Loại khiếu nại</th><th className="number">Số vụ</th><th className="number">Tiền hoàn</th><th className="number">Phí đổi/trả</th></tr></thead>
@@ -508,6 +519,16 @@ export default function BaoCaoClient({ rows, knRows, cashRows, tonKhoRows }: { r
   const cashCur = cashRows.filter((c) => monthKey(c.ngay) === month);
   const tongThu = cashCur.filter((c) => c.loai === 'Thu').reduce((s, c) => s + c.soTien, 0);
   const tongChi = cashCur.filter((c) => c.loai === 'Chi').reduce((s, c) => s + c.soTien, 0);
+
+  // #22/#42 — sổ quỹ: bút toán thu-chi KHÔNG gắn đơn hàng, tách theo quỹ (ảnh chụp toàn
+  // bộ bút toán quỹ gần đây, không lọc theo tháng — tồn = tổng thu − tổng chi).
+  const quyData = (['CongTy', 'KhoVN', 'KhoTQ'] as const).map((q) => {
+    const rs = soQuyRows.filter((s) => s.quy === q);
+    const thu = rs.filter((s) => s.loai === 'Thu').reduce((a, s) => a + s.soTien, 0);
+    const chi = rs.filter((s) => s.loai === 'Chi').reduce((a, s) => a + s.soTien, 0);
+    return { q, soBt: rs.length, thu, chi, ton: thu - chi };
+  });
+  const quyTong = quyData.reduce((a, d) => ({ soBt: a.soBt + d.soBt, thu: a.thu + d.thu, chi: a.chi + d.chi, ton: a.ton + d.ton }), { soBt: 0, thu: 0, chi: 0, ton: 0 });
   const tabDongTien = (
     <div className="form-section">
       <div className="section-title"><FiRepeat /> Dòng tiền thu – chi (sổ thu–chi) — tháng {ml}</div>
@@ -535,6 +556,110 @@ export default function BaoCaoClient({ rows, knRows, cashRows, tonKhoRows }: { r
           </tbody>
         </table>
       )}
+
+      <div className="section-title" style={{ marginTop: 22 }}><FiBookOpen /> Thu chi ngoài đơn hàng (sổ quỹ)</div>
+      <div className="alert alert-info" style={{ marginBottom: 12 }}><FiBookOpen /><span>Đây là các <b>bút toán quỹ KHÔNG gắn đơn hàng</b> (thu chi nội bộ công ty, thu hộ / chi ship của kho), <b>tách khỏi dòng tiền của đơn</b> ở trên. Ảnh chụp toàn bộ bút toán quỹ gần đây (tối đa 500), không lọc theo tháng; tồn = tổng thu − tổng chi.</span></div>
+      <ReportTools name="So_quy_theo_quy" headers={['Quỹ', 'Số bút toán', 'Tổng thu', 'Tổng chi', 'Tồn']}
+        rows={quyData.map((d) => [QUY_LABEL[d.q] || d.q, d.soBt, d.thu, d.chi, d.ton])} />
+      {quyTong.soBt === 0 ? <div className="empty-state"><FiInbox /><p>Chưa có bút toán sổ quỹ.</p></div> : (
+        <table className="data-table">
+          <thead><tr><th>Quỹ</th><th className="number">Số bút toán</th><th className="number">Tổng thu</th><th className="number">Tổng chi</th><th className="number">Tồn</th></tr></thead>
+          <tbody>
+            {quyData.map((d) => (
+              <tr key={d.q}>
+                <td><b>{QUY_LABEL[d.q] || d.q}</b></td>
+                <td className="number">{d.soBt}</td>
+                <td className="number" style={{ color: 'var(--success-dark)' }}>{fmtVND(d.thu)}đ</td>
+                <td className="number" style={{ color: '#DC2626' }}>{fmtVND(d.chi)}đ</td>
+                <td className="number" style={{ fontWeight: 700 }}>{fmtVND(d.ton)}đ</td>
+              </tr>
+            ))}
+            <tr style={{ fontWeight: 700, background: 'var(--surface-2)' }}>
+              <td>Σ Tổng 3 quỹ</td><td className="number">{quyTong.soBt}</td>
+              <td className="number">{fmtVND(quyTong.thu)}đ</td><td className="number">{fmtVND(quyTong.chi)}đ</td><td className="number">{fmtVND(quyTong.ton)}đ</td>
+            </tr>
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+
+  // ===== 11. Hoa hồng & thưởng (#52/#53) — theo tháng chọn =====
+  // Hoa hồng GDV = doanh số (Σ tongTien) các đơn được giao phụ trách (gdvId) × pctHoaHong%.
+  // Thưởng CSKH = Σ các loại phí (phiMua+phiVC+phiBH+phiPhatSinh+phuThu+dongGo+shipND) của
+  // các đơn do người đó tạo (nvId) × pctThuong%.
+  const hhData = nvList.filter((n) => n.vaiTro === 'GDV' || n.vaiTro === 'MuaHang').map((n) => {
+    const os = cur.filter((r) => r.gdvId === n.id);
+    const doanhSo = os.reduce((s, r) => s + r.tongTien, 0);
+    const loiNhuan = os.reduce((s, r) => s + r.loiNhuanNDT, 0);
+    return { ...n, soDon: os.length, doanhSo, loiNhuan, hoaHong: doanhSo * n.pctHoaHong / 100 };
+  }).sort((a, b) => b.hoaHong - a.hoaHong);
+  const hhTong = hhData.reduce((s, d) => ({ soDon: s.soDon + d.soDon, doanhSo: s.doanhSo + d.doanhSo, hoaHong: s.hoaHong + d.hoaHong, loiNhuan: s.loiNhuan + d.loiNhuan }), { soDon: 0, doanhSo: 0, hoaHong: 0, loiNhuan: 0 });
+
+  const thData = nvList.filter((n) => n.vaiTro === 'CSKH').map((n) => {
+    const os = cur.filter((r) => r.nvId === n.id);
+    const doanhSo = os.reduce((s, r) => s + r.tongTien, 0);
+    const tongPhi = os.reduce((s, r) => s + r.phiMua + r.phiVC + r.phiBH + r.phiPhatSinh + r.phuThu + r.dongGo + r.shipND, 0);
+    return { ...n, soDon: os.length, doanhSo, tongPhi, thuong: tongPhi * n.pctThuong / 100 };
+  }).sort((a, b) => b.thuong - a.thuong);
+  const thTong = thData.reduce((s, d) => ({ soDon: s.soDon + d.soDon, doanhSo: s.doanhSo + d.doanhSo, tongPhi: s.tongPhi + d.tongPhi, thuong: s.thuong + d.thuong }), { soDon: 0, doanhSo: 0, tongPhi: 0, thuong: 0 });
+
+  const chuaDatTiLe = (
+    <div style={{ fontSize: 10, color: 'var(--text-faint)' }}>chưa đặt tỉ lệ — cấu hình ở Quản trị › Nhân viên</div>
+  );
+  const tabHoaHong = (
+    <div className="form-section">
+      <div className="section-title"><FiAward /> Hoa hồng GDV — tháng {ml}</div>
+      <ReportTools name={`Hoa_hong_GDV_${ml}`} headers={['Nhân viên', 'Vai trò', 'Số đơn phụ trách', 'Doanh số', '% hoa hồng', 'Hoa hồng', 'Lợi nhuận (¥)']}
+        rows={hhData.map((d) => [d.hoTen, VAITRO_LABEL[d.vaiTro] || d.vaiTro, d.soDon, d.doanhSo, d.pctHoaHong + '%', Math.round(d.hoaHong), d.loiNhuan.toFixed(1)])} />
+      {hhData.length === 0 ? <div className="empty-state"><FiInbox /><p>Chưa có nhân viên GDV / Mua hàng.</p></div> : (
+        <table className="data-table">
+          <thead><tr><th>Nhân viên</th><th className="number">Số đơn phụ trách</th><th className="number">Doanh số</th><th className="number">% hoa hồng</th><th className="number">Hoa hồng</th><th className="number">Lợi nhuận (¥)</th></tr></thead>
+          <tbody>
+            {hhData.map((d) => (
+              <tr key={d.id}>
+                <td>{d.hoTen}<br /><span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{VAITRO_LABEL[d.vaiTro] || d.vaiTro}</span></td>
+                <td className="number">{d.soDon}</td>
+                <td className="number">{fmtVND(d.doanhSo)}đ</td>
+                <td className="number">{d.pctHoaHong}%{d.pctHoaHong === 0 && chuaDatTiLe}</td>
+                <td className="number" style={{ fontWeight: 700, color: 'var(--success-dark)' }}>{fmtVND(Math.round(d.hoaHong))}đ</td>
+                <td className="number" style={{ color: d.loiNhuan >= 0 ? 'var(--success-dark)' : 'var(--danger-dark)' }}>{d.loiNhuan.toLocaleString()} ¥</td>
+              </tr>
+            ))}
+            <tr style={{ fontWeight: 700, background: 'var(--surface-2)' }}>
+              <td>Σ Tổng</td><td className="number">{hhTong.soDon}</td><td className="number">{fmtVND(hhTong.doanhSo)}đ</td><td></td>
+              <td className="number">{fmtVND(Math.round(hhTong.hoaHong))}đ</td><td className="number">{hhTong.loiNhuan.toLocaleString()} ¥</td>
+            </tr>
+          </tbody>
+        </table>
+      )}
+
+      <div className="section-title" style={{ marginTop: 22 }}><FiAward /> Thưởng CSKH — tháng {ml}</div>
+      <ReportTools name={`Thuong_CSKH_${ml}`} headers={['Nhân viên', 'Số đơn tạo', 'Doanh số', 'Tổng phí dịch vụ', '% thưởng', 'Thưởng']}
+        rows={thData.map((d) => [d.hoTen, d.soDon, d.doanhSo, d.tongPhi, d.pctThuong + '%', Math.round(d.thuong)])} />
+      {thData.length === 0 ? <div className="empty-state"><FiInbox /><p>Chưa có nhân viên CSKH.</p></div> : (
+        <table className="data-table">
+          <thead><tr><th>Nhân viên</th><th className="number">Số đơn tạo</th><th className="number">Doanh số</th><th className="number">Tổng phí dịch vụ</th><th className="number">% thưởng</th><th className="number">Thưởng</th></tr></thead>
+          <tbody>
+            {thData.map((d) => (
+              <tr key={d.id}>
+                <td>{d.hoTen}</td>
+                <td className="number">{d.soDon}</td>
+                <td className="number">{fmtVND(d.doanhSo)}đ</td>
+                <td className="number">{fmtVND(d.tongPhi)}đ</td>
+                <td className="number">{d.pctThuong}%{d.pctThuong === 0 && chuaDatTiLe}</td>
+                <td className="number" style={{ fontWeight: 700, color: 'var(--success-dark)' }}>{fmtVND(Math.round(d.thuong))}đ</td>
+              </tr>
+            ))}
+            <tr style={{ fontWeight: 700, background: 'var(--surface-2)' }}>
+              <td>Σ Tổng</td><td className="number">{thTong.soDon}</td><td className="number">{fmtVND(thTong.doanhSo)}đ</td>
+              <td className="number">{fmtVND(thTong.tongPhi)}đ</td><td></td><td className="number">{fmtVND(Math.round(thTong.thuong))}đ</td>
+            </tr>
+          </tbody>
+        </table>
+      )}
+
+      <div className="alert alert-info" style={{ marginTop: 12 }}><FiAward /><span><b>Hoa hồng</b> tính trên doanh số (Σ giá trị đơn) các đơn được <b>giao phụ trách</b> (gdvId) × % hoa hồng. <b>Thưởng CSKH</b> tính trên tổng các loại phí (phí mua + vận chuyển + bảo hiểm + phát sinh + phụ thu + đóng gỗ + ship nội địa) của đơn <b>do người đó tạo</b> × % thưởng. Tỉ lệ % đặt ở Quản trị › Nhân viên.</span></div>
     </div>
   );
 
@@ -555,6 +680,7 @@ export default function BaoCaoClient({ rows, knRows, cashRows, tonKhoRows }: { r
         { id: 'loinhuan', label: <><FiBarChart2 /> Lợi nhuận</>, content: tabLoiNhuan },
         { id: 'tonkho', label: <><FiPackage /> Tồn kho</>, content: tabTonKho },
         { id: 'dongtien', label: <><FiRepeat /> Dòng tiền</>, content: tabDongTien },
+        { id: 'hoahong', label: <><FiAward /> Hoa hồng &amp; thưởng</>, content: tabHoaHong },
         { id: 'kn', label: <><FiAlertTriangle /> Khiếu nại</>, content: tabKN }
       ]} />
     </>

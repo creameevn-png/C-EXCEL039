@@ -11,7 +11,8 @@ export default async function AdminUsersPage() {
   return (
     <AppShell user={user} subtitle={`${users.length} nhân viên`}>
       <UsersClient users={users.map((u) => ({
-        id: u.id, email: u.email, hoTen: u.hoTen, vaiTro: u.vaiTro, trangThai: u.trangThai
+        id: u.id, email: u.email, hoTen: u.hoTen, vaiTro: u.vaiTro, trangThai: u.trangThai,
+        pctHoaHong: u.pctHoaHong, pctThuong: u.pctThuong
       }))} />
     </AppShell>
   );

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import {
   FiInfo, FiTruck, FiPackage, FiCheckCircle, FiDownload, FiClock, FiCheck, FiAlertCircle, FiTarget,
-  FiEdit2, FiX, FiBox, FiMapPin, FiSave
+  FiEdit2, FiX, FiBox, FiMapPin, FiSave, FiLayers, FiRotateCcw, FiDollarSign, FiPlus
 } from 'react-icons/fi';
 import type { SessionUser } from '@/lib/auth';
 import AppShell from '@/components/AppShell';
@@ -12,7 +12,7 @@ import OrderDetailModalHost from '@/components/OrderDetailModal';
 import ImageUploadModalHost from '@/components/ImageUploadModal';
 import { showToast } from '@/components/Toast';
 import { callServer, reload } from '@/lib/client';
-import { fmtVND } from '@/lib/format';
+import { fmtVND, formatDate } from '@/lib/format';
 
 type WeighLine = { stt: number; tenSP: string; soLuong: number; kg: string; m3: string };
 
@@ -25,7 +25,19 @@ type Bao = {
   maBao: string; line: string; trangThai: string;
   tongKg: number; tongM3: number; soKien: number; daNhan: number; tong: number;
 };
+type Kien = { maVD: string; maDH: string; maBao: string; trangThai: string; ngayVeVN: string; ngayGiao: string };
+type KnRow = {
+  maKN: string; maDH: string; maKH: string; tenKH: string; maVDTraHang: string;
+  daNhanHangKN: boolean; phiDoiTra: number; ghiChuXuLy: string; ngayNhanKN: string; chuyenKhoVNAt: string;
+};
+type Quy = { id: number; ngay: string; loai: string; soTien: number; danhMuc: string; noiDung: string; maDH: string; nguoiTao: string };
+type BaoOpen = { maBao: string; line: string; soKien: number; daVe: number; kien: { maVD: string; maDH: string; trangThai: string }[] };
+
 const LINE_LABEL: Record<string, string> = { LineNhanh: 'Nhanh', LineThuong: 'Thường', LineRe: 'Tiết kiệm' };
+const KIEN_LABEL: Record<string, string> = { ChuaVe: 'Chưa về', DaVeVN: 'Đã về VN', DaGiao: 'Đã giao' };
+const KIEN_CLASS: Record<string, string> = { ChuaVe: 's-waiting', DaVeVN: 's-shipping', DaGiao: 's-done' };
+// Danh mục quỹ kho VN gợi ý (góp ý NV #43): kho thu hộ khách, chi ship nội địa, bốc xếp…
+const DANH_MUC_QUY = ['Thu hộ khách', 'Chi ship nội địa VN', 'Chi bốc xếp', 'Chi khác'];
 // Góp ý NV #41: line vận chuyển nội địa VN do kho VN chọn khi giao hàng.
 const LINE_NOI_DIA = ['Viettel Post', 'GHTK', 'J&T Express', 'Xe khách', 'Xe tải nhà', 'Khách tự lấy'];
 
@@ -38,8 +50,11 @@ function filterByScan(rows: Row[], q: string) {
     o.maBao.toLowerCase().includes(k) || o.tenKH.toLowerCase().includes(k));
 }
 
-export default function KhoVnClient({ user, incomingShipments, atWarehouse, readyToDeliver, baos }:
-  { user: SessionUser; incomingShipments: Row[]; atWarehouse: Row[]; readyToDeliver: Row[]; baos: Bao[] }) {
+export default function KhoVnClient({ user, incomingShipments, atWarehouse, readyToDeliver, baos, kienList, knList, quyList }:
+  {
+    user: SessionUser; incomingShipments: Row[]; atWarehouse: Row[]; readyToDeliver: Row[]; baos: Bao[];
+    kienList: Kien[]; knList: KnRow[]; quyList: Quy[];
+  }) {
 
   const [weighMaDH, setWeighMaDH] = useState<string | null>(null);
   const [weighLines, setWeighLines] = useState<WeighLine[]>([]);
@@ -105,6 +120,103 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
     const r = await callServer('updateShipVN', maDH, v, lineInputs[maDH] ?? '');
     if (r?.success) { showToast('Đã cập nhật ship nội địa VN', 'success'); reload(); }
     else showToast(r?.message || 'Lỗi', 'error');
+  }
+
+  // ===== Tab Kiện hàng (#28/#37/#38): nhận & giao theo từng mã vận đơn =====
+  const [baoScan, setBaoScan] = useState('');
+  const [baoOpen, setBaoOpen] = useState<BaoOpen | null>(null);
+  const [baoConThieu, setBaoConThieu] = useState(0);
+  const [nhanKienScan, setNhanKienScan] = useState('');
+  const [giaoKienScan, setGiaoKienScan] = useState('');
+
+  async function openBaoKien() {
+    const ma = baoScan.trim();
+    if (!ma) return showToast('Quét / nhập mã bao', 'error');
+    const r = await callServer('openBaoAtVN', ma);
+    if (r?.success) {
+      setBaoOpen({ maBao: r.maBao, line: r.line, soKien: r.soKien, daVe: r.daVe, kien: r.kien });
+      setBaoConThieu(r.soKien - r.daVe);
+    } else showToast(r?.message || 'Lỗi', 'error');
+  }
+
+  async function nhanKien() {
+    const maVD = nhanKienScan.trim();
+    if (!maVD) return showToast('Bắn / nhập mã vận đơn', 'error');
+    const r = await callServer('receiveKienVN', maVD);
+    if (!r?.success) return showToast(r?.message || 'Lỗi', 'error');
+    setNhanKienScan('');
+    // Cập nhật checklist tại chỗ — không reload toàn trang (#28).
+    setBaoOpen((prev) => {
+      if (!prev) return prev;
+      const kien = prev.kien.map((k) => (k.maVD === r.maVD ? { ...k, trangThai: 'DaVeVN' } : k));
+      return { ...prev, kien, daVe: kien.filter((k) => k.trangThai !== 'ChuaVe').length };
+    });
+    if (baoOpen && r.maBao === baoOpen.maBao) setBaoConThieu(r.baoConThieu || 0);
+    showToast(`Đã nhận kiện ${r.maVD} — đơn ${r.maDH}: ${r.daVe}/${r.tongKien} kiện`, 'success');
+  }
+
+  async function giaoKien() {
+    const maVD = giaoKienScan.trim();
+    if (!maVD) return showToast('Bắn / nhập mã vận đơn', 'error');
+    const r = await callServer('giaoKienVN', maVD);
+    if (!r?.success) return showToast(r?.message || 'Lỗi', 'error');
+    setGiaoKienScan('');
+    if (r.conLaiKien === 0) showToast(`Đơn ${r.maDH} đã giao đủ ${r.tongKien} kiện — hoàn thành`, 'success');
+    else showToast(`Đã giao kiện ${r.maVD} — đơn ${r.maDH} còn ${r.conLaiKien} kiện`, 'success');
+    reload();
+  }
+
+  // ===== Tab Hàng khiếu nại (#44/#46) =====
+  const [knVDScan, setKnVDScan] = useState('');
+  const [knPhi, setKnPhi] = useState('');
+  const [knGhiChu, setKnGhiChu] = useState('');
+  const [knEditPhi, setKnEditPhi] = useState<Record<string, string>>({});
+  const [knEditNote, setKnEditNote] = useState<Record<string, string>>({});
+
+  async function nhanHangKN() {
+    const maVD = knVDScan.trim();
+    if (!maVD) return showToast('Bắn / nhập mã VĐ hàng khiếu nại', 'error');
+    const r = await callServer('khoVnNhanHangKN', maVD, { phiDoiTra: parseFloat(knPhi) || 0, ghiChu: knGhiChu.trim() });
+    if (r?.success) { showToast(`Đã nhận hàng khiếu nại ${r.maKN}${r.maDH ? ' — đơn ' + r.maDH : ''}`, 'success'); reload(); }
+    else showToast(r?.message || 'Lỗi', 'error');
+  }
+
+  async function saveKnPhi(k: KnRow) {
+    const phiRaw = knEditPhi[k.maKN];
+    const patch: { phiDoiTra: number; ghiChuXuLy?: string } = {
+      phiDoiTra: phiRaw !== undefined ? (parseFloat(phiRaw) || 0) : k.phiDoiTra
+    };
+    // Kho VN chỉ được gửi 2 trường; không đụng note nếu chưa sửa (tránh xoá ghi chú cũ).
+    if (knEditNote[k.maKN] !== undefined) patch.ghiChuXuLy = knEditNote[k.maKN];
+    const r = await callServer('updateKhieuNai', k.maKN, patch);
+    if (r?.success) { showToast('Đã cập nhật phí đổi trả', 'success'); reload(); }
+    else showToast(r?.message || 'Lỗi', 'error');
+  }
+
+  // ===== Tab Quỹ kho VN (#43) =====
+  const [quyLoai, setQuyLoai] = useState<'Thu' | 'Chi'>('Thu');
+  const [quySoTien, setQuySoTien] = useState('');
+  const [quyNoiDung, setQuyNoiDung] = useState('');
+  const [quyDanhMuc, setQuyDanhMuc] = useState('');
+  const [quyMaDH, setQuyMaDH] = useState('');
+
+  const tongThuQuy = quyList.filter((q) => q.loai === 'Thu').reduce((s, q) => s + q.soTien, 0);
+  const tongChiQuy = quyList.filter((q) => q.loai === 'Chi').reduce((s, q) => s + q.soTien, 0);
+  const tonQuy = tongThuQuy - tongChiQuy;
+
+  async function addQuy() {
+    const soTien = parseFloat(quySoTien) || 0;
+    if (soTien <= 0) return showToast('Số tiền phải lớn hơn 0', 'error');
+    if (!quyNoiDung.trim()) return showToast('Nhập nội dung thu / chi', 'error');
+    const r = await callServer('addSoQuy', {
+      quy: 'KhoVN', loai: quyLoai, soTien, noiDung: quyNoiDung.trim(),
+      danhMuc: quyDanhMuc || undefined, maDH: quyMaDH.trim() || undefined
+    });
+    if (r?.success) {
+      showToast('Đã ghi bút toán quỹ kho VN', 'success');
+      setQuySoTien(''); setQuyNoiDung(''); setQuyDanhMuc(''); setQuyMaDH('');
+      reload();
+    } else showToast(r?.message || 'Lỗi', 'error');
   }
 
   function shipVN(o: Row) {
@@ -282,6 +394,241 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
     </div>
   );
 
+  function knCard(k: KnRow) {
+    return (
+      <div key={k.maKN} className="action-card">
+        <div className="ac-header">
+          <div className="ac-title"><FiRotateCcw /> {k.maKN}</div>
+          <span className={`status-badge ${k.daNhanHangKN ? 's-done' : 's-deposit'}`}>
+            {k.daNhanHangKN ? 'Đã nhận hàng trả' : 'Chờ nhận hàng trả'}
+          </span>
+        </div>
+        <div className="ac-meta">
+          {k.maDH && <>Đơn: <b style={{ cursor: 'pointer', textDecoration: 'underline', color: '#1E3A8A' }}
+            onClick={() => (window as any).openOrderDetail?.(k.maDH)}>{k.maDH}</b> · </>}
+          KH: <b>{k.tenKH || k.maKH || '—'}</b> · Mã VĐ trả: <b>{k.maVDTraHang || '(chưa có)'}</b>
+        </div>
+        {k.daNhanHangKN && k.ngayNhanKN && (
+          <div className="ac-meta" style={{ fontSize: 12 }}>
+            Đã nhận: {formatDate(k.ngayNhanKN)} · Phí đổi trả hiện tại: <b>{fmtVND(k.phiDoiTra)}đ</b>
+          </div>
+        )}
+        {k.daNhanHangKN ? (
+          <div className="form-grid" style={{ marginTop: 8 }}>
+            <div className="form-field">
+              <label>Sửa phí đổi trả (VNĐ)</label>
+              <input type="number" defaultValue={k.phiDoiTra || ''} placeholder="0"
+                onChange={(e) => setKnEditPhi((p) => ({ ...p, [k.maKN]: e.target.value }))} />
+            </div>
+            <div className="form-field">
+              <label>Ghi chú xử lý</label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input defaultValue={k.ghiChuXuLy} placeholder="ghi chú kho VN"
+                  onChange={(e) => setKnEditNote((p) => ({ ...p, [k.maKN]: e.target.value }))} />
+                <button className="btn btn-secondary btn-sm" onClick={() => saveKnPhi(k)}><FiSave /></button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="icon-inline" style={{ background: '#FEF3C7', padding: 8, borderRadius: 6, marginTop: 8, fontSize: 12, color: '#92400E' }}>
+            <FiAlertCircle /> Bắn mã VĐ <b>{k.maVDTraHang || '—'}</b> ở ô trên để xác nhận đã nhận hàng khách gửi trả.
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const tabKien = (
+    <div className="form-section">
+      <div className="section-title"><FiLayers /> Kiện hàng — nhận & giao theo từng mã vận đơn</div>
+
+      <div className="action-card">
+        <div className="ac-title"><FiDownload /> Nhận hàng theo bao</div>
+        <div className="form-grid" style={{ marginTop: 8 }}>
+          <div className="form-field"><label>Quét / nhập mã bao</label>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input value={baoScan} onChange={(e) => setBaoScan(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') openBaoKien(); }} placeholder="BAO0001" />
+              <button className="btn btn-primary" onClick={openBaoKien}><FiBox /> Mở bao</button>
+            </div>
+          </div>
+        </div>
+
+        {baoOpen && (
+          <>
+            <div className="ac-meta" style={{ marginTop: 10 }}>
+              Bao <b>{baoOpen.maBao}</b> · Line {LINE_LABEL[baoOpen.line] || baoOpen.line} · Đã về: <b>{baoOpen.daVe}/{baoOpen.soKien}</b> kiện
+            </div>
+            <div className="form-field" style={{ marginTop: 8 }}>
+              <label>Bắn mã vận đơn (nhận từng kiện)</label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input value={nhanKienScan} onChange={(e) => setNhanKienScan(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') nhanKien(); }} placeholder="Quét mã VĐ trên kiện…" />
+                <button className="btn btn-success" onClick={nhanKien}><FiCheck /> Nhận kiện</button>
+              </div>
+            </div>
+            {baoConThieu > 0 && (
+              <div className="icon-inline" style={{ background: '#FEF3C7', padding: 8, borderRadius: 6, marginTop: 8, fontSize: 12, color: '#92400E' }}>
+                <FiAlertCircle /> Bao còn <b>{baoConThieu}</b> kiện chưa nhận.
+              </div>
+            )}
+            <table className="data-table" style={{ marginTop: 10 }}>
+              <thead><tr><th>Mã VĐ</th><th>Mã đơn</th><th>Trạng thái</th></tr></thead>
+              <tbody>
+                {baoOpen.kien.map((k) => (
+                  <tr key={k.maVD}>
+                    <td><b>{k.maVD}</b></td>
+                    <td>{k.maDH}</td>
+                    <td><span className={`status-badge ${KIEN_CLASS[k.trangThai] || 's-waiting'}`}>{KIEN_LABEL[k.trangThai] || k.trangThai}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+        <div className="hint">Mở bao rồi bắn từng mã VĐ. Đơn chỉ về kho khi mọi kiện của nó đã nhận.</div>
+      </div>
+
+      <div className="action-card">
+        <div className="ac-title"><FiTruck /> Giao khách theo kiện</div>
+        <div className="form-field" style={{ marginTop: 8 }}>
+          <label>Bắn mã vận đơn (giao từng kiện)</label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input value={giaoKienScan} onChange={(e) => setGiaoKienScan(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') giaoKien(); }} placeholder="Quét mã VĐ kiện giao khách…" />
+            <button className="btn btn-success" onClick={giaoKien}><FiTarget /> Giao kiện</button>
+          </div>
+        </div>
+        <div className="hint">Đơn về một phần vẫn giao được kiện đã về. Đơn còn nợ tiền sẽ không giao được.</div>
+      </div>
+
+      <div className="section-title" style={{ marginTop: 16 }}><FiLayers /> Kiện của các đơn đang xử lý ({kienList.length})</div>
+      {kienList.length === 0 ? (
+        <div className="empty-state"><FiLayers /><p>Chưa có kiện nào.</p></div>
+      ) : (
+        <table className="data-table">
+          <thead><tr><th>Mã VĐ</th><th>Mã đơn</th><th>Mã bao</th><th>Trạng thái</th><th>Ngày về</th><th>Ngày giao</th></tr></thead>
+          <tbody>
+            {kienList.map((k) => (
+              <tr key={`${k.maDH}-${k.maVD}`}>
+                <td><b>{k.maVD}</b></td>
+                <td style={{ cursor: 'pointer', textDecoration: 'underline', color: '#1E3A8A' }}
+                  onClick={() => (window as any).openOrderDetail?.(k.maDH)}>{k.maDH}</td>
+                <td>{k.maBao || '—'}</td>
+                <td><span className={`status-badge ${KIEN_CLASS[k.trangThai] || 's-waiting'}`}>{KIEN_LABEL[k.trangThai] || k.trangThai}</span></td>
+                <td>{k.ngayVeVN ? formatDate(k.ngayVeVN) : '—'}</td>
+                <td>{k.ngayGiao ? formatDate(k.ngayGiao) : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+
+  const tabKN = (
+    <div className="form-section">
+      <div className="section-title"><FiRotateCcw /> Hàng khiếu nại khách gửi trả</div>
+
+      <div className="action-card">
+        <div className="ac-title"><FiCheck /> Nhận hàng khiếu nại</div>
+        <div className="form-grid" style={{ marginTop: 8 }}>
+          <div className="form-field"><label>Bắn mã VĐ hàng khiếu nại</label>
+            <input value={knVDScan} onChange={(e) => setKnVDScan(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') nhanHangKN(); }} placeholder="Quét mã VĐ khách gửi trả…" />
+          </div>
+          <div className="form-field"><label>Phí đổi trả (VNĐ)</label>
+            <input type="number" value={knPhi} onChange={(e) => setKnPhi(e.target.value)} placeholder="0" />
+          </div>
+        </div>
+        <div className="form-field" style={{ marginTop: 8 }}><label>Ghi chú</label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input value={knGhiChu} onChange={(e) => setKnGhiChu(e.target.value)} placeholder="tình trạng hàng nhận về…" />
+            <button className="btn btn-success" onClick={nhanHangKN}><FiCheck /> Xác nhận nhận</button>
+          </div>
+        </div>
+        <div className="hint">Bắn mã VĐ khách gửi trả để tích đã nhận và ghi phí đổi trả. Kế toán / CSKH sẽ nhận thông báo.</div>
+      </div>
+
+      {knList.length === 0 ? (
+        <div className="empty-state"><FiRotateCcw /><p>Không có hàng khiếu nại nào chuyển về kho.</p></div>
+      ) : knList.map((k) => knCard(k))}
+    </div>
+  );
+
+  const tabQuy = (
+    <div className="form-section">
+      <div className="section-title"><FiDollarSign /> Quỹ kho VN — thu hộ / chi ship nội địa</div>
+
+      <div className="kpi-row">
+        <div className="kpi" style={{ ['--primary' as any]: '#16a34a' }}>
+          <div className="kpi-label"><FiDownload /> Tổng thu</div>
+          <div className="kpi-value">{fmtVND(tongThuQuy)}đ</div>
+        </div>
+        <div className="kpi" style={{ ['--primary' as any]: '#dc2626' }}>
+          <div className="kpi-label"><FiTruck /> Tổng chi</div>
+          <div className="kpi-value">{fmtVND(tongChiQuy)}đ</div>
+        </div>
+        <div className="kpi" style={{ ['--primary' as any]: '#2563eb' }}>
+          <div className="kpi-label"><FiDollarSign /> Tồn quỹ</div>
+          <div className="kpi-value">{fmtVND(tonQuy)}đ</div>
+        </div>
+      </div>
+
+      <div className="action-card">
+        <div className="ac-title"><FiPlus /> Thêm bút toán</div>
+        <div className="form-grid" style={{ marginTop: 8 }}>
+          <div className="form-field"><label>Loại</label>
+            <select value={quyLoai} onChange={(e) => setQuyLoai(e.target.value as 'Thu' | 'Chi')}>
+              <option value="Thu">Thu</option>
+              <option value="Chi">Chi</option>
+            </select>
+          </div>
+          <div className="form-field"><label>Số tiền (VNĐ)</label>
+            <input type="number" value={quySoTien} onChange={(e) => setQuySoTien(e.target.value)} placeholder="0" />
+          </div>
+          <div className="form-field"><label>Danh mục</label>
+            <select value={quyDanhMuc} onChange={(e) => setQuyDanhMuc(e.target.value)}>
+              <option value="">-- Chọn danh mục --</option>
+              {DANH_MUC_QUY.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+          <div className="form-field"><label>Mã đơn (nếu có)</label>
+            <input value={quyMaDH} onChange={(e) => setQuyMaDH(e.target.value)} placeholder="DH..." />
+          </div>
+        </div>
+        <div className="form-field" style={{ marginTop: 8 }}><label>Nội dung</label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input value={quyNoiDung} onChange={(e) => setQuyNoiDung(e.target.value)} placeholder="diễn giải thu / chi" />
+            <button className="btn btn-primary" onClick={addQuy}><FiSave /> Ghi sổ</button>
+          </div>
+        </div>
+      </div>
+
+      {quyList.length === 0 ? (
+        <div className="empty-state"><FiDollarSign /><p>Chưa có bút toán quỹ kho VN.</p></div>
+      ) : (
+        <table className="data-table">
+          <thead><tr><th>Ngày</th><th>Loại</th><th>Danh mục</th><th>Nội dung</th><th>Mã đơn</th><th className="number">Số tiền</th></tr></thead>
+          <tbody>
+            {quyList.map((q) => (
+              <tr key={q.id}>
+                <td>{formatDate(q.ngay)}</td>
+                <td><span className={`status-badge ${q.loai === 'Thu' ? 's-done' : 's-cancel'}`}>{q.loai === 'Thu' ? 'Thu' : 'Chi'}</span></td>
+                <td>{q.danhMuc || '—'}</td>
+                <td>{q.noiDung}</td>
+                <td>{q.maDH || '—'}</td>
+                <td className="number" style={{ color: q.loai === 'Thu' ? '#166534' : '#991B1B', fontWeight: 700 }}>
+                  {q.loai === 'Thu' ? '+' : '−'}{fmtVND(q.soTien)}đ
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+
   return (
     <AppShell user={user}>
       <div className="alert alert-info">
@@ -311,7 +658,10 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
         { id: 'tab-bao', label: <><FiBox /> Nhận bao ({baos.length})</>, content: tabBao },
         { id: 'tab-incoming', label: <><FiDownload /> Đang về VN ({incomingShipments.length})</>, content: tabIncoming },
         { id: 'tab-at-vn', label: <><FiPackage /> Tại VN - chờ TT ({atWarehouse.length})</>, content: tabAtVN },
-        { id: 'tab-ready', label: <><FiTruck /> Sẵn sàng giao ({readyToDeliver.length})</>, content: tabReady }
+        { id: 'tab-ready', label: <><FiTruck /> Sẵn sàng giao ({readyToDeliver.length})</>, content: tabReady },
+        { id: 'tab-kien', label: <><FiLayers /> Kiện hàng ({kienList.length})</>, content: tabKien },
+        { id: 'tab-kn', label: <><FiRotateCcw /> Hàng khiếu nại ({knList.length})</>, content: tabKN },
+        { id: 'tab-quy', label: <><FiDollarSign /> Quỹ kho VN ({quyList.length})</>, content: tabQuy }
       ]} />
 
       {/* Modal sửa cân nặng (có lưu lịch sử) */}

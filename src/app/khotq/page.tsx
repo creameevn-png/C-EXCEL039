@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export default async function KhoTqPage() {
   const user = await requireRole(['KhoTQ']);
 
-  const [pending, atW, voChu, baos] = await Promise.all([
+  const [pending, atW, voChu, baos, nhanViens, soQuy] = await Promise.all([
     prisma.donHang.findMany({
       where: { trangThai: 'NccGiaoHang' },
       include: { chiTiet: { orderBy: { stt: 'asc' } } },
@@ -27,6 +27,17 @@ export default async function KhoTqPage() {
       where: { trangThai: { in: ['DangDong', 'DaXuat'] } },
       orderBy: { createdAt: 'desc' },
       take: 100,
+    }),
+    // Góp ý NV #32: kho TQ có người trực tiếp làm và người phụ trách — chọn theo danh sách nhân viên kho.
+    prisma.nhanVien.findMany({
+      where: { vaiTro: 'KhoTQ', trangThai: 'HoatDong' },
+      select: { id: true, hoTen: true }
+    }),
+    // Góp ý NV #43: kho TQ xem & ghi quỹ kho của chính mình.
+    prisma.soQuy.findMany({
+      where: { quy: 'KhoTQ' },
+      orderBy: { ngay: 'desc' },
+      take: 200,
     })
   ]);
 
@@ -41,6 +52,7 @@ export default async function KhoTqPage() {
     web: o.chiTiet[0]?.webNguon || '',
     tuyen: o.tuyen,
     kiemDem: o.kiemDem, dongGo: o.dongGo > 0,
+    nguoiLamTQ: o.nguoiLamTQ || '',
     nguoiPhuTrachTQ: o.nguoiPhuTrachTQ || '',
     maBao: o.maBao || '',
     lines: o.chiTiet.map((c: any) => ({
@@ -61,6 +73,11 @@ export default async function KhoTqPage() {
       maBao: b.maBao, line: b.line, trangThai: b.trangThai,
       tongKg: b.tongKg, tongM3: b.tongM3, soKien: b.soKien,
       orders: ordersByBao[b.maBao] || []
+    }))}
+    nhanViens={nhanViens}
+    soQuy={soQuy.map((q) => ({
+      id: q.id, ngay: q.ngay.toISOString(), loai: q.loai, soTien: q.soTien,
+      danhMuc: q.danhMuc || '', noiDung: q.noiDung, maDH: q.maDH || '', nguoiTao: q.nguoiTao || ''
     }))}
   />;
 }

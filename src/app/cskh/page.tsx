@@ -12,21 +12,22 @@ export default async function CskhPage() {
 
   const normWeb = (s: string) => String(s || '').toLowerCase().replace(/\s+/g, '').replace(/\.com.*$/, '');
 
-  const [customers, products, myOrders, kpiMyToday, kpiCompleted, kpiInProgress, kpiCustomers, tyGia, bangGiaWebs] = await Promise.all([
+  const [customers, products, myOrders, kpiMyToday, kpiCompleted, kpiInProgress, kpiCustomers, tyGia, bangGiaWebs, gdvs] = await Promise.all([
     prisma.khachHang.findMany({ orderBy: { maKH: 'asc' } }),
     prisma.sanPham.findMany({ orderBy: { maSP: 'asc' } }),
     prisma.donHang.findMany({
       where: { nvId: user.id },
       orderBy: { ngayTao: 'desc' },
       take: 200,
-      include: { khachHang: true, chiTiet: { take: 1, orderBy: { stt: 'asc' } } }
+      include: { khachHang: true, chiTiet: { take: 1, orderBy: { stt: 'asc' } }, gdv: { select: { hoTen: true } } }
     }),
     prisma.donHang.count({ where: { nvId: user.id, ngayTao: { gte: todayStart } } }),
     prisma.donHang.count({ where: { nvId: user.id, trangThai: 'HoanThanh' } }),
     prisma.donHang.count({ where: { nvId: user.id, trangThai: { notIn: ['HoanThanh', 'Huy'] } } }),
     prisma.khachHang.count(),
     getNumber('ty_gia_ndt_vnd', 3650),
-    prisma.bangGiaWeb.findMany({ where: { hoatDong: true } })
+    prisma.bangGiaWeb.findMany({ where: { hoatDong: true } }),
+    prisma.nhanVien.findMany({ where: { vaiTro: { in: ['GDV', 'MuaHang'] }, trangThai: 'HoatDong' }, select: { id: true, hoTen: true } })
   ]);
 
   // Tỷ giá riêng theo từng sàn (PL02 #10): CSKH chọn "Nguồn" nào thì dòng đó tự lấy
@@ -48,12 +49,17 @@ export default async function CskhPage() {
       kgGoiY: p.kgGoiY, m3GoiY: p.m3GoiY,
       giaThamKhao: p.giaThamKhao, webNguon: p.webNguon || ''
     })),
+    gdvs: gdvs.map((g) => ({ id: g.id, hoTen: g.hoTen })),
     myOrders: myOrders.map((o) => ({
       maDH: o.maDH, ngayTao: o.ngayTao.toISOString(),
       tenKH: o.khachHang?.tenKH || '',
       tenHang: o.chiTiet[0]?.tenSP || '',
       tongTien: o.tongTien, daTra: o.daTra, conLai: o.conLai,
-      trangThai: o.trangThai
+      trangThai: o.trangThai,
+      gdvId: o.gdvId,
+      gdvTen: o.gdv?.hoTen || '',
+      phiPhatSinh: o.phiPhatSinh,
+      phiPhatSinhDuyet: o.phiPhatSinhDuyet
     })),
     kpi: {
       myOrdersToday: kpiMyToday,

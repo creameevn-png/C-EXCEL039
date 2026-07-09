@@ -103,7 +103,14 @@ model NhanVien {
   trangThai    TrangThaiUser @default(HoatDong) @map("trang_thai")
   createdAt    DateTime      @default(now()) @map("created_at")
 
+  // Góp ý NV #52, #53 — tỉ lệ tính thù lao cuối tháng, admin đặt cho từng người:
+  // GDV: hoa hồng = doanh số đơn mình phụ trách × pctHoaHong%.
+  // CSKH: thưởng  = tổng các loại phí trên đơn mình tạo × pctThuong%.
+  pctHoaHong   Float         @default(0) @map("pct_hoa_hong")
+  pctThuong    Float         @default(0) @map("pct_thuong")
+
   ordersCreated DonHang[]    @relation("DonHang_NV")
+  ordersGDV     DonHang[]    @relation("DonHang_GDV")
   walletTxns    GiaoDichVi[]
   payments      ThanhToan[]
   gioMuaHo      GioMuaHo[]
@@ -172,6 +179,8 @@ model DonHang {
   maKH        String       @map("ma_kh")
   nvTao       String?      @map("nv_tao")
   nvId        Int?         @map("nv_id")
+  // Góp ý NV #12 — GDV được CSKH giao phụ trách đơn này (nền tảng tính hoa hồng #52).
+  gdvId       Int?         @map("gdv_id")
   tuyen       Tuyen        @default(HaNoi)
 
   maGD        String?      @map("ma_gd") @db.Text
@@ -188,6 +197,13 @@ model DonHang {
   phiMua      Float        @default(0) @map("phi_mua")
   phiBH       Float        @default(0) @map("phi_bh")
   phiPhatSinh Float        @default(0) @map("phi_phat_sinh")
+  // Góp ý NV #9 — CSKH nhập phí phát sinh, chỉ khi Kế toán duyệt mới cộng vào tổng tiền.
+  phiPhatSinhDuyet   Boolean   @default(false) @map("phi_phat_sinh_duyet")
+  phiPhatSinhDuyetBy String?   @map("phi_phat_sinh_duyet_by")
+  phiPhatSinhDuyetAt DateTime? @map("phi_phat_sinh_duyet_at")
+  // Góp ý NV #47 — phí đổi trả khách phải chịu, ghi cột riêng để tách sổ chi phí
+  // khiếu nại (#49) nhưng vẫn cộng vào khoản Kế toán cần thu.
+  phiKhieuNai Float        @default(0) @map("phi_khieu_nai")
   phiVC       Float        @default(0) @map("phi_vc")
   shipND      Float        @default(0) @map("ship_nd")
   dongGo      Float        @default(0) @map("dong_go")
@@ -205,7 +221,9 @@ model DonHang {
   diaChiNhan  String?      @map("dia_chi_nhan") @db.Text
 
   // Đợt 4 — kho TQ: người phụ trách nhận (2 NV kho)
+  // Góp ý NV #32 — tách "người trực tiếp làm" và "người phụ trách" (kho TQ có 2 nhân viên).
   nguoiPhuTrachTQ String?  @map("nguoi_phu_trach_tq")
+  nguoiLamTQ      String?  @map("nguoi_lam_tq")
 
   // Đợt 5 — đơn thuộc bao tổng nào (gộp nhiều đơn → 1 bao chuyển về VN)
   maBao       String?      @map("ma_bao")
@@ -238,11 +256,14 @@ model DonHang {
 
   khachHang KhachHang   @relation(fields: [maKH], references: [maKH])
   nv        NhanVien?   @relation("DonHang_NV", fields: [nvId], references: [id])
+  gdv       NhanVien?   @relation("DonHang_GDV", fields: [gdvId], references: [id])
   chiTiet   ChiTietDon[]
+  kienHang  KienHang[]
   payments  ThanhToan[]
   khieuNai  KhieuNai[]
   chungTu   ChungTu[]
 
+  @@index([gdvId])
   @@index([maKH, ngayTao(sort: Desc)])
   @@index([trangThai, ngayTao(sort: Desc)])
   @@index([ngayTao(sort: Desc)])
@@ -259,8 +280,15 @@ model ChiTietDon {
   tyGia      Float    @default(3650) @map("ty_gia")
   donGiaVND  Float    @default(0) @map("don_gia_vnd")
   thanhTien  Float    @default(0) @map("thanh_tien")
+  // Góp ý NV #13 — tiền tệ (¥) GDV mua thực tế của TỪNG sản phẩm.
+  // Giá vốn đơn = Σ vonNDT các dòng (nếu GDV nhập theo dòng).
+  vonNDT     Float    @default(0) @map("von_ndt")
   kg         Float    @default(0)
   m3         Float    @default(0)
+  // Góp ý NV #33 — kích thước thực đo; m³ suy ra = dài×rộng×cao / hệ số (cài đặt "m3_chia").
+  dai        Float    @default(0)
+  rong       Float    @default(0)
+  cao        Float    @default(0)
   webNguon   String?  @map("web_nguon")
   linkTaobao String?  @map("link_taobao") @db.Text
   ghiChu     String?  @map("ghi_chu") @db.Text
@@ -273,6 +301,56 @@ model ChiTietDon {
 
   @@index([maDH, stt])
   @@map("chi_tiet_don")
+}
+
+/// Góp ý NV #28, #37, #38 — mỗi mã vận đơn của một đơn hàng là một KIỆN riêng.
+/// Kho VN quét mã bao → quét từng mã VĐ để xác nhận nhận (#28); bắn mã từng kiện
+/// khi giao khách (#37); đơn về một phần thì giao trước các kiện đã về (#38).
+/// Kiện được sinh tự động từ ô "mã vận đơn" của GDV (nhiều mã, cách nhau dấu phẩy).
+model KienHang {
+  id        Int       @id @default(autoincrement())
+  maDH      String    @map("ma_dh")
+  maVD      String    @map("ma_vd")
+  kg        Float     @default(0)
+  m3        Float     @default(0)
+  maBao     String?   @map("ma_bao")
+  /// ChuaVe | DaVeVN | DaGiao
+  trangThai String    @default("ChuaVe") @map("trang_thai")
+  ngayVeVN  DateTime? @map("ngay_ve_vn")
+  ngayGiao  DateTime? @map("ngay_giao")
+  nguoiNhan String?   @map("nguoi_nhan")
+  nguoiGiao String?   @map("nguoi_giao")
+  ghiChu    String?   @map("ghi_chu") @db.Text
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  donHang DonHang @relation(fields: [maDH], references: [maDH], onDelete: Cascade)
+
+  @@unique([maDH, maVD], name: "uq_kien_don_vd")
+  @@index([maVD])
+  @@index([trangThai])
+  @@map("kien_hang")
+}
+
+/// Góp ý NV #22, #42, #43 — sổ quỹ thu-chi.
+///   quy = "CongTy" → định khoản thu chi nội bộ công ty (Kế toán ghi, #22).
+///   quy = "KhoVN" | "KhoTQ" → quỹ của kho: kho thu hộ khách, chi tiền ship (#42);
+///   chính tài khoản kho xem được sổ quỹ của mình (#43), Kế toán xem tất cả.
+model SoQuy {
+  id        Int        @id @default(autoincrement())
+  ngay      DateTime   @default(now())
+  quy       String     @default("CongTy")
+  loai      LoaiThuChi @default(Thu)
+  soTien    Float      @default(0) @map("so_tien")
+  danhMuc   String?    @map("danh_muc")
+  noiDung   String     @map("noi_dung") @db.Text
+  maDH      String?    @map("ma_dh")
+  maKH      String?    @map("ma_kh")
+  nguoiTao  String?    @map("nguoi_tao")
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  @@index([quy, ngay(sort: Desc)])
+  @@index([ngay(sort: Desc)])
+  @@map("so_quy")
 }
 
 /// Đợt 6 — phiếu giao gộp nhiều đơn của 1 khách; công nợ tính theo phiếu.
@@ -412,6 +490,16 @@ model KhieuNai {
   // Khi quỹ chịu = NCC: tên NCC/shop gánh chi phí + cờ đã cấn trừ vào sổ công nợ NCC.
   doiTacNCC     String?      @map("doi_tac_ncc")
   daTruNCC      Boolean      @default(false) @map("da_tru_ncc")
+  // Góp ý NV #45 — CSKH tiếp nhận kiện khiếu nại rồi chuyển về kho VN (kèm mã VĐ khách gửi lại).
+  maVDTraHang   String?      @map("ma_vd_tra_hang")
+  chuyenKhoVN   Boolean      @default(false) @map("chuyen_kho_vn")
+  chuyenKhoVNAt DateTime?    @map("chuyen_kho_vn_at")
+  // Góp ý NV #44 — kho VN bắn mã VĐ trả hàng và tích đã nhận hàng khiếu nại.
+  daNhanHangKN  Boolean      @default(false) @map("da_nhan_hang_kn")
+  ngayNhanKN    DateTime?    @map("ngay_nhan_kn")
+  nguoiNhanKN   String?      @map("nguoi_nhan_kn")
+  // Góp ý NV #47 — cờ chống cộng trùng phí đổi trả vào khoản phải thu của khách.
+  daTinhPhiKH   Boolean      @default(false) @map("da_tinh_phi_kh")
   ghiChuXuLy    String?      @map("ghi_chu_xu_ly") @db.Text
   duyetCap1By   String?      @map("duyet_cap1_by")
   duyetCap1At   DateTime?    @map("duyet_cap1_at")

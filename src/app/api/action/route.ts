@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getSession } from '@/lib/auth';
-import { computeOrderTotals, calcPhiMua } from '@/lib/shipping-fee';
+import { computeOrderTotals, calcPhiMua, calcM3 } from '@/lib/shipping-fee';
 import { nextMaDH, nextMaKH, nextMaSP, nextMaKN, nextMaYC, nextMaNCC } from '@/lib/codes';
 import { logActivity } from '@/lib/audit';
 import { pushNotify } from '@/lib/notify';
@@ -27,6 +27,16 @@ function normTuyen(v: any): Tuyen {
 const LINE_VC: LineVC[] = ['LineNhanh', 'LineThuong', 'LineRe'];
 // Các gói đóng gỗ/bọt khí khách được chọn — khớp select trên form CSKH và form khách.
 const DONG_GO_GOI = [0, 5000, 10000];
+
+// Sổ quỹ (góp ý NV #22, #42, #43): mỗi vai trò chỉ ghi được sổ quỹ của mình.
+const QUY_HOP_LE = ['CongTy', 'KhoVN', 'KhoTQ'];
+function quyChoPhep(role: VaiTro): string[] {
+  if (role === 'Admin') return QUY_HOP_LE;
+  if (role === 'KeToan') return ['CongTy'];
+  if (role === 'KhoVN') return ['KhoVN'];
+  if (role === 'KhoTQ') return ['KhoTQ'];
+  return [];
+}
 
 type ChiTietInput = {
   tenSP: string;
@@ -56,7 +66,9 @@ async function recomputeDonHang(maDH: string) {
     kg: tongKg, m3: tongM3,
     tuyen: o.tuyen,
     phiShipND: o.shipND, phiDongGoi: o.dongGo, phiPhuThu: o.phuThu,
-    phiPhatSinh: o.phiPhatSinh,
+    // Góp ý NV #9: phí phát sinh chỉ vào tổng tiền sau khi Kế toán duyệt.
+    phiPhatSinh: o.phiPhatSinhDuyet ? o.phiPhatSinh : 0,
+    phiKhieuNai: o.phiKhieuNai,
     phiMuaOverride: phiMuaPerWeb,
     thueNK: o.thueNK, vat: o.vat, phiKiemHoa: o.phiKiemHoa, phiLuuKho: o.phiLuuKho,
     pctCoc: o.pctCoc,
@@ -67,12 +79,80 @@ async function recomputeDonHang(maDH: string) {
     where: { maDH },
     data: {
       tongGiaHang, tongKg, tongM3,
-      phiMua: totals.phiMua, phiBH: totals.phiBH, phiPhatSinh: totals.phiPhatSinh, phiVC: totals.phiVC,
+      // KHÔNG ghi đè phiPhatSinh: đó là số CSKH nhập, đang chờ duyệt hay đã duyệt
+      // đều phải giữ nguyên để Kế toán còn thấy mà xét.
+      phiMua: totals.phiMua, phiBH: totals.phiBH, phiVC: totals.phiVC,
       tongTien: totals.tongTien,
       tienCoc: totals.coc,
       conLai: totals.tongTien - o.daTra
     }
   });
+}
+
+/** Góp ý NV #13 — giá vốn đơn = Σ tiền tệ mua thực tế của từng dòng hàng (nếu GDV đã nhập theo dòng). */
+async function recomputeVonGDV(maDH: string) {
+  const o = await prisma.donHang.findUnique({ where: { maDH }, include: { chiTiet: true } });
+  if (!o) return;
+  const vonTheoDong = o.chiTiet.reduce((s, c) => s + (c.vonNDT || 0), 0);
+  if (vonTheoDong <= 0) return; // GDV chưa nhập theo dòng → giữ số tổng nhập tay.
+  const tongThuNDT = o.chiTiet.reduce((s, c) => s + c.donGiaNDT * c.soLuong, 0);
+  await prisma.donHang.update({
+    where: { maDH },
+    data: { vonNDT: vonTheoDong, loiNhuanNDT: tongThuNDT - (vonTheoDong + o.shipNDTQ) }
+  });
+}
+
+/** Tách ô "mã vận đơn" (nhiều mã, cách nhau dấu phẩy) thành danh sách mã sạch. */
+function tachMaVD(raw: string | null | undefined): string[] {
+  return String(raw || '')
+    .split(/[,;\n]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Góp ý NV #28, #37, #38 — đồng bộ danh sách KIỆN của đơn theo ô mã vận đơn.
+ * Thêm kiện mới, xoá kiện có mã không còn trong ô — nhưng KHÔNG xoá kiện đã về
+ * hoặc đã giao (tránh mất dấu hàng thật khi GDV sửa lại ô mã).
+ */
+async function syncKienTheoMaVD(maDH: string, maVDRaw: string | null | undefined) {
+  const codes = tachMaVD(maVDRaw);
+  const daCo = await prisma.kienHang.findMany({ where: { maDH } });
+  const o = await prisma.donHang.findUnique({ where: { maDH } });
+
+  for (const maVD of codes) {
+    if (daCo.some((k) => k.maVD === maVD)) continue;
+    await prisma.kienHang.create({ data: { maDH, maVD, maBao: o?.maBao || null } });
+  }
+  const thua = daCo.filter((k) => !codes.includes(k.maVD) && k.trangThai === 'ChuaVe');
+  if (thua.length > 0) {
+    await prisma.kienHang.deleteMany({ where: { id: { in: thua.map((k) => k.id) } } });
+  }
+}
+
+/**
+ * Tìm kiện theo mã vận đơn. Đơn tạo trước khi có bảng kiện chưa được tách kiện,
+ * nên nếu chưa thấy thì dò trong ô mã VĐ của đơn rồi sinh bù — kho không phải chờ
+ * chạy script mới bắn được mã.
+ */
+/** 'TRUNG' = mã vận đơn đang gắn với nhiều đơn, không đoán được kiện nào. */
+async function timHoacSinhKien(maVD: string) {
+  // Cùng một mã vận đơn không được gắn với hai đơn — nếu có, bắt người dùng kiểm tra
+  // lại thay vì đoán đơn nào, kẻo đánh dấu nhầm hàng của khách khác.
+  const trung = await prisma.kienHang.findMany({ where: { maVD }, take: 2 });
+  if (trung.length > 1) return 'TRUNG' as const;
+  const kien = trung[0];
+  if (kien) return kien;
+
+  const ungVien = await prisma.donHang.findMany({
+    where: { maVD: { contains: maVD } },
+    select: { maDH: true, maVD: true }
+  });
+  const don = ungVien.find((o) => tachMaVD(o.maVD).includes(maVD));
+  if (!don) return null;
+
+  await syncKienTheoMaVD(don.maDH, don.maVD);
+  return prisma.kienHang.findFirst({ where: { maDH: don.maDH, maVD } });
 }
 
 // Công nợ phiếu giao tính lại từ các đơn thành viên (tránh stale sau khi KH trả thêm).
@@ -139,6 +219,8 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         maKH: kh.maKH,
         nvTao: user.email,
         nvId: user.id,
+        // Góp ý NV #12: CSKH chọn GDV phụ trách ngay khi lên đơn (khách tự đặt thì để trống).
+        gdvId: isCustomer ? null : (Number(d.gdvId) || null),
         tuyen,
         lineVC,
         loaiHang: d.loaiHang || 'Thường',
@@ -146,7 +228,9 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         shipND: isCustomer ? 0 : Number(d.phiShipND) || 0,
         dongGo,
         phuThu: isCustomer ? 0 : Number(d.phiPhuThu) || 0,
+        // Góp ý NV #9: phí phát sinh vào đơn ở trạng thái CHỜ Kế toán duyệt.
         phiPhatSinh: isCustomer ? 0 : Number(d.phiPhatSinh) || 0,
+        phiPhatSinhDuyet: false,
         ngachHQ: isCustomer ? 'Tiểu ngạch' : (d.ngachHQ || 'Tiểu ngạch'),
         thueNK: isCustomer ? 0 : Number(d.thueNK) || 0,
         vat: isCustomer ? 0 : Number(d.vat) || 0,
@@ -338,6 +422,8 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (!o) return err('Đơn không tồn tại');
     if (o.trangThai !== 'DaMuaHang') return err('Đơn không ở trạng thái Đã mua');
     await prisma.donHang.update({ where: { maDH }, data: { maVD, trangThai: 'NccGiaoHang' } });
+    // Mỗi mã vận đơn là một kiện — kho VN sẽ bắn từng mã để nhận và giao (#28, #37, #38).
+    await syncKienTheoMaVD(maDH, maVD);
     await logActivity(user.email, 'UPDATE_MA_VD', maDH, { maVD });
     await pushNotify({
       vaiTro: 'KhoTQ', loai: 'info', maDH,
@@ -364,6 +450,74 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     await prisma.donHang.update({ where: { maDH }, data: { vonNDT, shipNDTQ, loiNhuanNDT, ...(ghiChuGDV !== undefined && { ghiChuGDV }) } });
     await logActivity(user.email, 'UPDATE_VON_GDV', maDH, { vonNDT, shipNDTQ, loiNhuanNDT });
     return ok({ vonNDT, shipNDTQ, tongThuNDT, loiNhuanNDT });
+  },
+
+  // Góp ý NV #13: GDV nhập tiền tệ (¥) mua thực tế của TỪNG sản phẩm.
+  // Nhập theo dòng thì giá vốn đơn = tổng các dòng (ô tổng chuyển sang chỉ đọc).
+  async updateChiTietVon(args, user) {
+    if (!allow(user.vaiTro, ['GDV', 'MuaHang'])) return err('Không có quyền');
+    const [maDH, stt, vonNDT] = args;
+    if (!maDH || !stt) return err('Thiếu thông tin dòng hàng');
+    const von = Math.max(0, Number(vonNDT) || 0);
+    const line = await prisma.chiTietDon.findFirst({ where: { maDH, stt: Number(stt) } });
+    if (!line) return err('Không tìm thấy dòng hàng');
+    await prisma.chiTietDon.update({ where: { id: line.id }, data: { vonNDT: von } });
+    await recomputeVonGDV(maDH);
+    await logActivity(user.email, 'SUA_VON_DONG', maDH, { stt, vonNDT: `${line.vonNDT}→${von}` });
+    const o = await prisma.donHang.findUnique({ where: { maDH } });
+    return ok({ vonNDT: o?.vonNDT || 0, loiNhuanNDT: o?.loiNhuanNDT || 0 });
+  },
+
+  // Góp ý NV #12: CSKH giao đơn cho một GDV cụ thể xử lý.
+  async assignGDV(args, user) {
+    if (!allow(user.vaiTro, ['CSKH'])) return err('Không có quyền');
+    const [maDH, gdvId] = args;
+    const o = await prisma.donHang.findUnique({ where: { maDH } });
+    if (!o) return err('Đơn không tồn tại');
+    if (!gdvId) {
+      await prisma.donHang.update({ where: { maDH }, data: { gdvId: null } });
+      await logActivity(user.email, 'BO_GAN_GDV', maDH);
+      return ok({ gdvId: null });
+    }
+    const gdv = await prisma.nhanVien.findUnique({ where: { id: Number(gdvId) } });
+    if (!gdv || !['GDV', 'MuaHang'].includes(gdv.vaiTro)) return err('Nhân viên không phải GDV / Mua hàng');
+    if (gdv.trangThai !== 'HoatDong') return err('Tài khoản GDV đang bị khoá');
+    await prisma.donHang.update({ where: { maDH }, data: { gdvId: gdv.id } });
+    await logActivity(user.email, 'GAN_GDV', maDH, { gdv: gdv.email });
+    await pushNotify({
+      vaiTro: ['GDV', 'MuaHang'], loai: 'info', maDH,
+      tieuDe: `Đơn ${maDH} giao cho ${gdv.hoTen}`,
+      noiDung: `${user.email} giao đơn này cho ${gdv.hoTen} xử lý.`,
+      link: '/gdv', nguoiTao: user.email
+    });
+    return ok({ gdvId: gdv.id, hoTen: gdv.hoTen });
+  },
+
+  // Góp ý NV #9: Kế toán duyệt (hoặc từ chối) phí phát sinh khác do CSKH nhập.
+  // Chỉ khi duyệt, phí mới được cộng vào tổng tiền của đơn.
+  async duyetPhiPhatSinh(args, user) {
+    if (!allow(user.vaiTro, ['KeToan'])) return err('Chỉ Kế toán duyệt phí phát sinh');
+    const [maDH, accepted, note] = args;
+    const o = await prisma.donHang.findUnique({ where: { maDH } });
+    if (!o) return err('Đơn không tồn tại');
+    if (o.phiPhatSinh <= 0) return err('Đơn không có phí phát sinh cần duyệt');
+    await prisma.donHang.update({
+      where: { maDH },
+      data: accepted
+        ? { phiPhatSinhDuyet: true, phiPhatSinhDuyetBy: user.email, phiPhatSinhDuyetAt: new Date() }
+        // Từ chối → xoá phí khỏi đơn, ghi lại ai từ chối.
+        : { phiPhatSinh: 0, phiPhatSinhDuyet: false, phiPhatSinhDuyetBy: user.email, phiPhatSinhDuyetAt: new Date() }
+    });
+    await recomputeDonHang(maDH);
+    await recomputePhieuGiao(o.maPhieuGiao);
+    await logActivity(user.email, accepted ? 'DUYET_PHI_PHAT_SINH' : 'TU_CHOI_PHI_PHAT_SINH', maDH, { soTien: o.phiPhatSinh, note });
+    await pushNotify({
+      vaiTro: ['CSKH'], loai: accepted ? 'success' : 'warning', maDH,
+      tieuDe: `Phí phát sinh đơn ${maDH} ${accepted ? 'đã được duyệt' : 'bị từ chối'}`,
+      noiDung: `${Math.round(o.phiPhatSinh).toLocaleString('vi-VN')}đ${note ? ' — ' + note : ''}`,
+      link: '/cskh', nguoiTao: user.email
+    });
+    return ok();
   },
 
   // Góp ý NV #17: GDV sửa số lượng còn của shop trong chi tiết đơn (shop hết hàng → giảm SL).
@@ -595,6 +749,8 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (!o) return err('Đơn không tồn tại: ' + maDH);
     if (o.trangThai !== 'KhoTqNhan') return err('Chỉ gán được đơn đang ở "Kho TQ nhận"');
     await prisma.donHang.update({ where: { maDH: o.maDH }, data: { maBao } });
+    // Các kiện của đơn đi cùng bao — kho VN quét bao rồi bắn từng mã kiện (#28).
+    await prisma.kienHang.updateMany({ where: { maDH: o.maDH }, data: { maBao } });
     await recomputeBao(maBao);
     await logActivity(user.email, 'ADD_TO_BAO', maBao, { maDH: o.maDH });
     return ok();
@@ -645,6 +801,11 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (!bao) return err('Bao không tồn tại: ' + maBao);
     if (!['DaXuat', 'DaVeVN'].includes(bao.trangThai)) return err('Bao chưa xuất từ TQ');
     const orders = await prisma.donHang.findMany({ where: { maBao } });
+    // Đơn cũ chưa tách kiện → sinh bù để tab Kiện hàng phản ánh đúng thực tế.
+    for (const o of orders) {
+      const dem = await prisma.kienHang.count({ where: { maDH: o.maDH } });
+      if (dem === 0 && o.maVD) await syncKienTheoMaVD(o.maDH, o.maVD);
+    }
     let received = 0;
     for (const o of orders) {
       if (o.trangThai === 'DangVanChuyen') {
@@ -655,6 +816,11 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     }
     const conChua = orders.filter((o) => o.trangThai === 'DangVanChuyen').length - received;
     const allIn = orders.every((o) => o.trangThai !== 'DangVanChuyen') ;
+    // Nhận nhanh cả bao → mọi kiện trong bao coi như đã về (kho vẫn có thể bắn từng mã ở tab Kiện hàng).
+    await prisma.kienHang.updateMany({
+      where: { maBao, trangThai: 'ChuaVe' },
+      data: { trangThai: 'DaVeVN', ngayVeVN: new Date(), nguoiNhan: user.hoTen || user.email }
+    });
     await prisma.baoTong.update({
       where: { maBao },
       data: { trangThai: allIn ? 'HoanThanh' : 'DaVeVN', veVNAt: new Date(), nguoiNhanVN: user.hoTen || user.email }
@@ -663,6 +829,78 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     await recomputeBao(maBao);
     await logActivity(user.email, 'NHAN_BAO_VN', maBao, { received });
     return ok({ received, total: orders.length, conChua: Math.max(0, conChua) });
+  },
+
+  // ============== SO QUY (góp ý NV #22, #42, #43) ==============
+  // quy = CongTy → bút toán thu-chi nội bộ (Kế toán).
+  // quy = KhoVN / KhoTQ → quỹ của kho: thu hộ khách, chi tiền ship; kho tự xem sổ của mình.
+  async addSoQuy(args, user) {
+    const d = args[0] || {};
+    const quy = String(d.quy || 'CongTy');
+    if (!QUY_HOP_LE.includes(quy)) return err('Quỹ không hợp lệ');
+    if (!quyChoPhep(user.vaiTro).includes(quy)) return err(`Bạn không được ghi sổ quỹ ${quy}`);
+    const soTien = Math.round(Number(d.soTien) || 0);
+    if (soTien <= 0) return err('Số tiền phải lớn hơn 0');
+    const noiDung = String(d.noiDung || '').trim();
+    if (!noiDung) return err('Nhập nội dung thu / chi');
+    const loai = d.loai === 'Chi' ? 'Chi' : 'Thu';
+
+    const row = await prisma.soQuy.create({
+      data: {
+        quy, loai, soTien, noiDung,
+        danhMuc: d.danhMuc ? String(d.danhMuc) : null,
+        maDH: d.maDH ? String(d.maDH) : null,
+        maKH: d.maKH ? String(d.maKH) : null,
+        nguoiTao: user.email
+      }
+    });
+    await logActivity(user.email, 'GHI_SO_QUY', quy, { loai, soTien, noiDung });
+    return ok({ id: row.id });
+  },
+
+  async deleteSoQuy(args, user) {
+    if (!allow(user.vaiTro, ['KeToan'])) return err('Chỉ Kế toán được xoá bút toán');
+    const [id] = args;
+    const row = await prisma.soQuy.findUnique({ where: { id: Number(id) } });
+    if (!row) return err('Bút toán không tồn tại');
+    await prisma.soQuy.delete({ where: { id: row.id } });
+    await logActivity(user.email, 'XOA_SO_QUY', String(row.id), { quy: row.quy, soTien: row.soTien });
+    return ok();
+  },
+
+  // Góp ý NV #32: kho TQ có 2 nhân viên → ghi rõ ai trực tiếp làm, ai phụ trách.
+  async setNguoiKhoTQ(args, user) {
+    if (!allow(user.vaiTro, ['KhoTQ'])) return err('Không có quyền');
+    const [maDH, patch] = args;
+    const o = await prisma.donHang.findUnique({ where: { maDH } });
+    if (!o) return err('Đơn không tồn tại');
+    await prisma.donHang.update({
+      where: { maDH },
+      data: {
+        nguoiLamTQ: patch?.nguoiLam !== undefined ? (String(patch.nguoiLam).trim() || null) : undefined,
+        nguoiPhuTrachTQ: patch?.nguoiPhuTrach !== undefined ? (String(patch.nguoiPhuTrach).trim() || null) : undefined
+      }
+    });
+    await logActivity(user.email, 'SET_NGUOI_KHO_TQ', maDH, patch);
+    return ok();
+  },
+
+  // Góp ý NV #52, #53: admin đặt % hoa hồng (GDV) và % thưởng (CSKH) cho từng nhân viên.
+  async setPctNhanVien(args, user) {
+    if (user.vaiTro !== 'Admin') return err('Chỉ Admin đặt tỉ lệ hoa hồng / thưởng');
+    const [id, patch] = args;
+    const nv = await prisma.nhanVien.findUnique({ where: { id: Number(id) } });
+    if (!nv) return err('Nhân viên không tồn tại');
+    const clamp = (v: any) => Math.min(100, Math.max(0, Number(v) || 0));
+    await prisma.nhanVien.update({
+      where: { id: nv.id },
+      data: {
+        pctHoaHong: patch?.pctHoaHong !== undefined ? clamp(patch.pctHoaHong) : undefined,
+        pctThuong: patch?.pctThuong !== undefined ? clamp(patch.pctThuong) : undefined
+      }
+    });
+    await logActivity(user.email, 'SET_PCT_NV', nv.email, patch);
+    return ok();
   },
 
   async updateShipVN(args, user) {
@@ -679,6 +917,142 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     await recomputeDonHang(maDH);
     await logActivity(user.email, 'UPDATE_SHIP_VN', maDH, { shipVN, lineNoiDia: line });
     return ok();
+  },
+
+  // ============== KIEN HANG (góp ý NV #28, #37, #38) ==============
+
+  // #28 bước 1: quét mã bao → mở bao và trả về danh sách kiện cần bắn từng mã.
+  async openBaoAtVN(args, user) {
+    if (!allow(user.vaiTro, ['KhoVN'])) return err('Không có quyền');
+    const [maBaoRaw] = args;
+    const maBao = String(maBaoRaw || '').trim();
+    if (!maBao) return err('Quét / nhập mã bao');
+    const bao = await prisma.baoTong.findUnique({ where: { maBao } });
+    if (!bao) return err('Bao không tồn tại: ' + maBao);
+    if (!['DaXuat', 'DaVeVN', 'HoanThanh'].includes(bao.trangThai)) return err('Bao chưa xuất từ TQ');
+
+    if (bao.trangThai === 'DaXuat') {
+      await prisma.baoTong.update({
+        where: { maBao },
+        data: { trangThai: 'DaVeVN', veVNAt: new Date(), nguoiNhanVN: user.hoTen || user.email }
+      });
+    }
+
+    // Đơn tạo trước khi có bảng kiện thì chưa được tách kiện — sinh bù ngay tại đây
+    // để kho vẫn bắn được từng mã, không phải chạy script riêng.
+    const orders = await prisma.donHang.findMany({ where: { maBao } });
+    for (const o of orders) {
+      const dem = await prisma.kienHang.count({ where: { maDH: o.maDH } });
+      if (dem === 0 && o.maVD) await syncKienTheoMaVD(o.maDH, o.maVD);
+    }
+
+    const kien = await prisma.kienHang.findMany({ where: { maBao }, orderBy: [{ maDH: 'asc' }, { maVD: 'asc' }] });
+    await logActivity(user.email, 'MO_BAO_VN', maBao, { soKien: kien.length });
+    return ok({
+      maBao, line: bao.line, soKien: kien.length,
+      daVe: kien.filter((k) => k.trangThai !== 'ChuaVe').length,
+      kien: kien.map((k) => ({ maVD: k.maVD, maDH: k.maDH, trangThai: k.trangThai }))
+    });
+  },
+
+  // #28 bước 2: sau khi quét mã bao, kho VN bắn từng mã vận đơn để xác nhận nhận đúng kiện đó.
+  // Đơn chỉ chuyển trạng thái khi TẤT CẢ kiện của nó đã về (#38: về một phần thì đơn vẫn đang vận chuyển).
+  async receiveKienVN(args, user) {
+    if (!allow(user.vaiTro, ['KhoVN'])) return err('Không có quyền');
+    const [maVDRaw] = args;
+    const maVD = String(maVDRaw || '').trim();
+    if (!maVD) return err('Bắn / nhập mã vận đơn');
+    const kien = await timHoacSinhKien(maVD);
+    if (kien === 'TRUNG') return err(`Mã VĐ "${maVD}" đang gắn với nhiều đơn — kiểm tra lại`);
+    if (!kien) return err(`Không tìm thấy kiện có mã VĐ "${maVD}"`);
+    if (kien.trangThai === 'DaGiao') return err(`Kiện ${maVD} đã giao khách rồi`);
+    if (kien.trangThai === 'DaVeVN') return err(`Kiện ${maVD} đã nhận trước đó`);
+
+    await prisma.kienHang.update({
+      where: { id: kien.id },
+      data: { trangThai: 'DaVeVN', ngayVeVN: new Date(), nguoiNhan: user.hoTen || user.email }
+    });
+
+    const cacKien = await prisma.kienHang.findMany({ where: { maDH: kien.maDH } });
+    const conThieu = cacKien.filter((k) => k.trangThai === 'ChuaVe').length;
+    const o = await prisma.donHang.findUnique({ where: { maDH: kien.maDH } });
+    let trangThaiDon = o?.trangThai;
+
+    // Đủ kiện → đơn về kho VN (trả đủ thì sẵn sàng giao, còn nợ thì chờ thanh toán).
+    if (conThieu === 0 && o && o.trangThai === 'DangVanChuyen') {
+      trangThaiDon = o.conLai <= 0.5 ? 'KhoVnNhan' : 'ChoThanhToan';
+      await prisma.donHang.update({ where: { maDH: o.maDH }, data: { trangThai: trangThaiDon } });
+    }
+
+    // #29: bao chỉ hoàn thành khi mọi kiện trong bao đã được nhận.
+    let baoConThieu = 0;
+    if (kien.maBao) {
+      const kienBao = await prisma.kienHang.findMany({ where: { maBao: kien.maBao } });
+      baoConThieu = kienBao.filter((k) => k.trangThai === 'ChuaVe').length;
+      if (baoConThieu === 0) {
+        await prisma.baoTong.update({ where: { maBao: kien.maBao }, data: { trangThai: 'HoanThanh' } }).catch(() => {});
+      }
+    }
+
+    await logActivity(user.email, 'NHAN_KIEN_VN', kien.maDH, { maVD, conThieu });
+    return ok({
+      maDH: kien.maDH, maVD, conThieu, tongKien: cacKien.length,
+      daVe: cacKien.length - conThieu, trangThaiDon,
+      maBao: kien.maBao, baoConThieu
+    });
+  },
+
+  // #37 + #38: bắn mã từng kiện đã về để giao cho khách. Đơn về một phần vẫn giao được
+  // các kiện đã về; đơn chỉ hoàn thành khi mọi kiện đều đã giao.
+  async giaoKienVN(args, user) {
+    if (!allow(user.vaiTro, ['KhoVN'])) return err('Không có quyền');
+    const [maVDRaw, imageBase64] = args;
+    const maVD = String(maVDRaw || '').trim();
+    if (!maVD) return err('Bắn / nhập mã vận đơn');
+    const kien = await timHoacSinhKien(maVD);
+    if (kien === 'TRUNG') return err(`Mã VĐ "${maVD}" đang gắn với nhiều đơn — kiểm tra lại`);
+    if (!kien) return err(`Không tìm thấy kiện có mã VĐ "${maVD}"`);
+    if (kien.trangThai === 'ChuaVe') return err(`Kiện ${maVD} chưa về kho VN`);
+    if (kien.trangThai === 'DaGiao') return err(`Kiện ${maVD} đã giao rồi`);
+
+    const o = await prisma.donHang.findUnique({ where: { maDH: kien.maDH } });
+    if (!o) return err('Đơn không tồn tại');
+    // #39: thu đủ tiền trước khi giao hàng.
+    if (o.conLai > 0.5) return err(`Đơn ${o.maDH} còn nợ ${Math.round(o.conLai).toLocaleString('vi-VN')}đ — chưa giao được`);
+
+    await prisma.kienHang.update({
+      where: { id: kien.id },
+      data: { trangThai: 'DaGiao', ngayGiao: new Date(), nguoiGiao: user.hoTen || user.email }
+    });
+
+    const cacKien = await prisma.kienHang.findMany({ where: { maDH: kien.maDH } });
+    const conLaiKien = cacKien.filter((k) => k.trangThai !== 'DaGiao').length;
+
+    if (conLaiKien === 0) {
+      // Giao hết kiện → đơn hoàn thành (cùng hiệu lực với nút "Đã giao tới KH").
+      if (o.trangThai !== 'HoanThanh') {
+        await prisma.donHang.update({
+          where: { maDH: o.maDH },
+          data: { trangThai: 'HoanThanh', anhGiaoKH: imageBase64 || o.anhGiaoKH || null }
+        });
+        await prisma.khachHang.update({
+          where: { maKH: o.maKH },
+          data: { tongDon: { increment: 1 }, doanhThu: { increment: o.tongTien } }
+        });
+        await recomputePhieuGiao(o.maPhieuGiao);
+        await pushNotify({
+          vaiTro: ['CSKH', 'KeToan'], loai: 'success', maDH: o.maDH,
+          tieuDe: `Đơn ${o.maDH} đã hoàn thành`,
+          noiDung: `Đã giao đủ ${cacKien.length} kiện cho khách.`, link: '/admin/don-hang', nguoiTao: user.email
+        });
+      }
+    } else if (o.trangThai === 'KhoVnNhan') {
+      // Mới giao một phần → đánh dấu đơn đang giao hàng.
+      await prisma.donHang.update({ where: { maDH: o.maDH }, data: { trangThai: 'GiaoHang' } });
+    }
+
+    await logActivity(user.email, 'GIAO_KIEN', kien.maDH, { maVD, conLaiKien });
+    return ok({ maDH: kien.maDH, maVD, conLaiKien, tongKien: cacKien.length });
   },
 
   // ============== PHIEU GIAO (Đợt 6) ==============
@@ -791,21 +1165,105 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
   },
 
   async updateKhieuNai(args, user) {
-    if (!allow(user.vaiTro, ['CSKH', 'KeToan', 'GDV', 'MuaHang'])) return err('Không có quyền');
+    // Góp ý NV #46: kho VN cũng cập nhật được phí đổi trả / phí xử lý — nhưng CHỈ hai
+    // trường đó, không được đụng phương án, tiền hoàn hay trạng thái duyệt.
+    if (!allow(user.vaiTro, ['CSKH', 'KeToan', 'GDV', 'MuaHang', 'KhoVN'])) return err('Không có quyền');
+    const chiPhiVaGhiChu = user.vaiTro === 'KhoVN';
     const [maKN, patch] = args;
     if (!maKN) return err('Thiếu mã KN');
     const data: any = {};
-    if (patch?.trangThai) data.trangThai = patch.trangThai as TrangThaiKN;
-    if (patch?.phuongAn !== undefined) data.phuongAn = patch.phuongAn;
-    if (patch?.soTienHoan !== undefined) data.soTienHoan = Number(patch.soTienHoan) || 0;
-    if (patch?.phiDoiTra !== undefined) data.phiDoiTra = Number(patch.phiDoiTra) || 0;
-    if (patch?.hoanVi !== undefined) data.hoanVi = !!patch.hoanVi;
-    if (patch?.quyChiuPhi !== undefined) data.quyChiuPhi = patch.quyChiuPhi || null;
-    if (patch?.doiTacNCC !== undefined) data.doiTacNCC = patch.doiTacNCC || null;
+    if (patch?.phiDoiTra !== undefined) data.phiDoiTra = Math.max(0, Number(patch.phiDoiTra) || 0);
     if (patch?.ghiChuXuLy !== undefined) data.ghiChuXuLy = patch.ghiChuXuLy;
+    if (!chiPhiVaGhiChu) {
+      if (patch?.trangThai) data.trangThai = patch.trangThai as TrangThaiKN;
+      if (patch?.phuongAn !== undefined) data.phuongAn = patch.phuongAn;
+      if (patch?.soTienHoan !== undefined) data.soTienHoan = Number(patch.soTienHoan) || 0;
+      if (patch?.hoanVi !== undefined) data.hoanVi = !!patch.hoanVi;
+      if (patch?.quyChiuPhi !== undefined) data.quyChiuPhi = patch.quyChiuPhi || null;
+      if (patch?.doiTacNCC !== undefined) data.doiTacNCC = patch.doiTacNCC || null;
+    }
+    if (Object.keys(data).length === 0) return ok();
     await prisma.khieuNai.update({ where: { maKN }, data });
-    await logActivity(user.email, 'UPDATE_KHIEU_NAI', maKN, patch);
+    await logActivity(user.email, 'UPDATE_KHIEU_NAI', maKN, data);
     return ok();
+  },
+
+  // Góp ý NV #9: CSKH sửa phí phát sinh sau khi đơn đã tạo → gửi lại Kế toán duyệt.
+  async updatePhiPhatSinh(args, user) {
+    if (!allow(user.vaiTro, ['CSKH'])) return err('Không có quyền');
+    const [maDH, soTien] = args;
+    const o = await prisma.donHang.findUnique({ where: { maDH } });
+    if (!o) return err('Đơn không tồn tại');
+    const v = Math.max(0, Math.round(Number(soTien) || 0));
+    await prisma.donHang.update({
+      where: { maDH },
+      data: { phiPhatSinh: v, phiPhatSinhDuyet: false, phiPhatSinhDuyetBy: null, phiPhatSinhDuyetAt: null }
+    });
+    await recomputeDonHang(maDH);
+    await recomputePhieuGiao(o.maPhieuGiao);
+    await logActivity(user.email, 'SUA_PHI_PHAT_SINH', maDH, { cu: o.phiPhatSinh, moi: v });
+    if (v > 0) {
+      await pushNotify({
+        vaiTro: ['KeToan'], loai: 'warning', maDH,
+        tieuDe: `Phí phát sinh đơn ${maDH} chờ duyệt`,
+        noiDung: `${user.email} nhập ${v.toLocaleString('vi-VN')}đ — cần Kế toán duyệt mới cộng vào đơn.`,
+        link: '/ketoan', nguoiTao: user.email
+      });
+    }
+    return ok();
+  },
+
+  // Góp ý NV #45: CSKH tiếp nhận kiện khiếu nại của khách rồi chuyển về kho VN,
+  // kèm mã vận đơn khách gửi trả để kho còn đối chiếu khi hàng tới.
+  async chuyenKNVeKhoVN(args, user) {
+    if (!allow(user.vaiTro, ['CSKH'])) return err('Không có quyền');
+    const [maKN, maVDTraHang] = args;
+    const kn = await prisma.khieuNai.findUnique({ where: { maKN } });
+    if (!kn) return err('Khiếu nại không tồn tại');
+    const maVD = String(maVDTraHang || '').trim();
+    if (!maVD) return err('Nhập mã vận đơn khách gửi trả');
+    await prisma.khieuNai.update({
+      where: { maKN },
+      data: { maVDTraHang: maVD, chuyenKhoVN: true, chuyenKhoVNAt: new Date() }
+    });
+    await logActivity(user.email, 'CHUYEN_KN_KHO_VN', maKN, { maVDTraHang: maVD });
+    await pushNotify({
+      vaiTro: ['KhoVN'], loai: 'warning', maDH: kn.maDH || undefined,
+      tieuDe: `Hàng khiếu nại ${maKN} sẽ về kho`,
+      noiDung: `Khách gửi trả theo mã VĐ ${maVD}${kn.maDH ? ' (đơn ' + kn.maDH + ')' : ''}. Nhận hàng thì tích xác nhận.`,
+      link: '/khovn', nguoiTao: user.email
+    });
+    return ok();
+  },
+
+  // Góp ý NV #44 + #46: kho VN bắn mã VĐ khách gửi trả, tích đã nhận hàng khiếu nại
+  // và cập nhật phí đổi trả / phí xử lý.
+  async khoVnNhanHangKN(args, user) {
+    if (!allow(user.vaiTro, ['KhoVN'])) return err('Không có quyền');
+    const [maVDRaw, patch] = args;
+    const maVD = String(maVDRaw || '').trim();
+    if (!maVD) return err('Bắn / nhập mã vận đơn hàng khiếu nại');
+    const kn = await prisma.khieuNai.findFirst({ where: { maVDTraHang: maVD } });
+    if (!kn) return err(`Không có khiếu nại nào gắn mã VĐ "${maVD}"`);
+    if (kn.daNhanHangKN) return err(`Hàng khiếu nại ${kn.maKN} đã nhận trước đó`);
+
+    const phiDoiTra = patch?.phiDoiTra !== undefined ? Math.max(0, Number(patch.phiDoiTra) || 0) : undefined;
+    await prisma.khieuNai.update({
+      where: { maKN: kn.maKN },
+      data: {
+        daNhanHangKN: true, ngayNhanKN: new Date(), nguoiNhanKN: user.hoTen || user.email,
+        ...(phiDoiTra !== undefined && { phiDoiTra }),
+        ...(patch?.ghiChu && { ghiChuXuLy: String(patch.ghiChu) })
+      }
+    });
+    await logActivity(user.email, 'KHO_VN_NHAN_HANG_KN', kn.maKN, { maVD, phiDoiTra });
+    await pushNotify({
+      vaiTro: ['CSKH', 'KeToan'], loai: 'info', maDH: kn.maDH || undefined,
+      tieuDe: `Kho VN đã nhận hàng khiếu nại ${kn.maKN}`,
+      noiDung: `Mã VĐ ${maVD}${phiDoiTra ? ` · phí đổi trả ${Math.round(phiDoiTra).toLocaleString('vi-VN')}đ` : ''}`,
+      link: '/admin/khieu-nai', nguoiTao: user.email
+    });
+    return ok({ maKN: kn.maKN, maDH: kn.maDH });
   },
 
   async duyetKhieuNaiCap1(args, user) {
@@ -846,6 +1304,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     // không bao giờ lệch nửa chừng. Idempotent qua daHoanVi/daTruNCC.
     let hoanVi = 0;
     let truNCC = 0;
+    let phiVeKhach = 0;
     await prisma.$transaction(async (tx) => {
       await tx.khieuNai.update({
         where: { maKN },
@@ -893,10 +1352,37 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
           truNCC = boiThuong;
         }
       }
+
+      // Góp ý NV #47: quỹ chịu = Khách hàng → phí đổi trả cộng vào khoản phải thu của
+      // đơn (cột riêng phi_khieu_nai để báo cáo vẫn tách được chi phí khiếu nại — #49).
+      if (accepted && kn.quyChiuPhi === 'KhachHang' && kn.phiDoiTra > 0 && !kn.daTinhPhiKH && kn.maDH) {
+        const don = await tx.donHang.findUnique({ where: { maDH: kn.maDH } });
+        if (don) {
+          await tx.donHang.update({
+            where: { maDH: kn.maDH },
+            data: { phiKhieuNai: don.phiKhieuNai + kn.phiDoiTra }
+          });
+          await tx.khieuNai.update({ where: { maKN }, data: { daTinhPhiKH: true } });
+          phiVeKhach = kn.phiDoiTra;
+        }
+      }
     });
 
-    await logActivity(user.email, 'DUYET_KN_CAP2', maKN, { accepted, hoanVi, quy: kn.quyChiuPhi, truNCC });
-    return ok({ hoanVi, truNCC });
+    // recompute nằm ngoài transaction vì đọc lại đơn + bảng giá; idempotent.
+    if (phiVeKhach > 0 && kn.maDH) {
+      await recomputeDonHang(kn.maDH);
+      const don = await prisma.donHang.findUnique({ where: { maDH: kn.maDH } });
+      await recomputePhieuGiao(don?.maPhieuGiao);
+      await pushNotify({
+        vaiTro: ['KeToan', 'CSKH'], loai: 'warning', maDH: kn.maDH,
+        tieuDe: `Phí đổi trả ${Math.round(phiVeKhach).toLocaleString('vi-VN')}đ cần thu của khách`,
+        noiDung: `Khiếu nại ${maKN} — khách chịu phí, đã cộng vào khoản phải thu của đơn ${kn.maDH}.`,
+        link: '/ketoan', nguoiTao: user.email
+      });
+    }
+
+    await logActivity(user.email, 'DUYET_KN_CAP2', maKN, { accepted, hoanVi, quy: kn.quyChiuPhi, truNCC, phiVeKhach });
+    return ok({ hoanVi, truNCC, phiVeKhach });
   },
 
   // ============== YEU CAU MUA (public) ==============
@@ -1074,6 +1560,8 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       if (!own || own.maKH !== o.maKH) return err('Không có quyền xem đơn này');
     }
     const canSeeMoney = ['Admin', 'CSKH', 'KeToan', 'Customer'].includes(user?.vaiTro || 'Customer');
+    // Góp ý NV #21: Kế toán làm việc trên số tiền, không cần thông tin liên lạc của khách.
+    const canSeeLienHe = user?.vaiTro !== 'KeToan';
     // Giá vốn & lợi nhuận: CHỈ Admin / Kế toán / GDV được xem (CSKH không thấy).
     const canSeeProfit = ['Admin', 'KeToan', 'GDV', 'MuaHang'].includes(user?.vaiTro || '');
     const tongThuNDT = o.chiTiet.reduce((s, c) => s + c.donGiaNDT * c.soLuong, 0);
@@ -1083,7 +1571,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         ngayTao: o.ngayTao.toISOString(),
         maKH: o.maKH,
         tenKH: o.khachHang?.tenKH || '',
-        sdt: o.khachHang?.sdt || '',
+        sdt: canSeeLienHe ? (o.khachHang?.sdt || '') : '',
         tuyen: o.tuyen,
         lineVC: o.lineVC,
         loaiHang: o.loaiHang,
@@ -1098,13 +1586,16 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
           tyGia: c.tyGia,
           donGiaVND: canSeeMoney ? c.donGiaVND : 0,
           thanhTien: canSeeMoney ? c.thanhTien : 0,
-          kg: c.kg, m3: c.m3,
+          kg: c.kg, m3: c.m3, dai: c.dai, rong: c.rong, cao: c.cao,
+          vonNDT: canSeeProfit ? c.vonNDT : 0,
           webNguon: c.webNguon, linkTaobao: c.linkTaobao, ghiChu: c.ghiChu
         })),
         tongGiaHang: canSeeMoney ? o.tongGiaHang : 0,
         phiMua: canSeeMoney ? o.phiMua : 0,
         phiBH: canSeeMoney ? o.phiBH : 0,
         phiPhatSinh: canSeeMoney ? o.phiPhatSinh : 0,
+        phiPhatSinhDuyet: o.phiPhatSinhDuyet,
+        phiKhieuNai: canSeeMoney ? o.phiKhieuNai : 0,
         phiVC: canSeeMoney ? o.phiVC : 0,
         shipND: canSeeMoney ? o.shipND : 0,
         dongGo: canSeeMoney ? o.dongGo : 0,
@@ -1116,13 +1607,15 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         ngachHQ: o.ngachHQ,
         kiemDem: o.kiemDem,
         nguoiNhan: o.nguoiNhan || '',
-        sdtNhan: o.sdtNhan || '',
+        sdtNhan: canSeeLienHe ? (o.sdtNhan || '') : '',
         diaChiNhan: o.diaChiNhan || '',
         tongTien: canSeeMoney ? o.tongTien : 0,
         tienCoc: canSeeMoney ? o.tienCoc : 0,
         daTra: canSeeMoney ? o.daTra : 0,
         conLai: canSeeMoney ? o.conLai : 0,
         ghiChu: o.ghiChu || '',
+        ghiChuGDV: o.ghiChuGDV || '',
+        lineNoiDia: o.lineNoiDia || '',
         canSeeProfit,
         vonNDT: canSeeProfit ? o.vonNDT : 0,
         shipNDTQ: canSeeProfit ? o.shipNDTQ : 0,
@@ -1337,6 +1830,8 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
   },
 
   // ============== KHO: SUA KG/M3 CO LICH SU ==============
+  // Góp ý NV #25 (kho tự điền cân), #33 (kích thước → m³ theo công thức admin),
+  // #34 (lưu lịch sử thay đổi + tự tính lại phí vận chuyển).
   async updateChiTietKg(args, user) {
     if (!allow(user.vaiTro, ['KhoVN', 'KhoTQ'])) return err('Không có quyền');
     const [maDH, stt, patch] = args;
@@ -1345,13 +1840,29 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (!line) return err('Không tìm thấy dòng hàng');
     const data: any = {};
     const changes: any = {};
-    if (patch?.kg !== undefined) { const v = Number(patch.kg) || 0; if (v !== line.kg) { changes.kg = `${line.kg}→${v}`; data.kg = v; } }
-    if (patch?.m3 !== undefined) { const v = Number(patch.m3) || 0; if (v !== line.m3) { changes.m3 = `${line.m3}→${v}`; data.m3 = v; } }
+    const num = (v: any) => Number(v) || 0;
+
+    if (patch?.kg !== undefined) { const v = num(patch.kg); if (v !== line.kg) { changes.kg = `${line.kg}→${v}`; data.kg = v; } }
+    for (const k of ['dai', 'rong', 'cao'] as const) {
+      if (patch?.[k] !== undefined) { const v = num(patch[k]); if (v !== line[k]) { changes[k] = `${line[k]}→${v}`; data[k] = v; } }
+    }
+
+    // Có đủ 3 chiều → m³ suy ra từ kích thước; không thì lấy m³ nhập tay.
+    const dai = data.dai ?? line.dai, rong = data.rong ?? line.rong, cao = data.cao ?? line.cao;
+    const m3TuKichThuoc = await calcM3(dai, rong, cao);
+    if (m3TuKichThuoc > 0) {
+      if (m3TuKichThuoc !== line.m3) { changes.m3 = `${line.m3}→${m3TuKichThuoc} (từ ${dai}×${rong}×${cao})`; data.m3 = m3TuKichThuoc; }
+    } else if (patch?.m3 !== undefined) {
+      const v = num(patch.m3); if (v !== line.m3) { changes.m3 = `${line.m3}→${v}`; data.m3 = v; }
+    }
+
     if (Object.keys(data).length === 0) return ok();
     await prisma.chiTietDon.update({ where: { id: line.id }, data });
     await recomputeDonHang(maDH);
+    const o = await prisma.donHang.findUnique({ where: { maDH } });
+    await recomputePhieuGiao(o?.maPhieuGiao);
     await logActivity(user.email, 'SUA_KG', maDH, { stt, ...changes });
-    return ok();
+    return ok({ m3: data.m3 ?? line.m3 });
   },
 
   // ============== ADMIN: SUA DON (kể cả khi đã hoàn thành/nhập kho) ==============
@@ -1370,7 +1881,16 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (patch?.shipND !== undefined) { data.shipND = Number(patch.shipND) || 0; changes.shipND = data.shipND; }
     if (patch?.dongGo !== undefined) { data.dongGo = Number(patch.dongGo) || 0; changes.dongGo = data.dongGo; }
     if (patch?.phuThu !== undefined) { data.phuThu = Number(patch.phuThu) || 0; changes.phuThu = data.phuThu; }
-    if (patch?.phiPhatSinh !== undefined) { data.phiPhatSinh = Number(patch.phiPhatSinh) || 0; changes.phiPhatSinh = data.phiPhatSinh; }
+    // Sửa lại phí phát sinh → quay về trạng thái chờ Kế toán duyệt (góp ý NV #9).
+    if (patch?.phiPhatSinh !== undefined) {
+      data.phiPhatSinh = Number(patch.phiPhatSinh) || 0;
+      changes.phiPhatSinh = data.phiPhatSinh;
+      if (data.phiPhatSinh !== o.phiPhatSinh) {
+        data.phiPhatSinhDuyet = false;
+        data.phiPhatSinhDuyetBy = null;
+        data.phiPhatSinhDuyetAt = null;
+      }
+    }
     if (patch?.ngachHQ !== undefined) { data.ngachHQ = patch.ngachHQ || 'Tiểu ngạch'; changes.ngachHQ = data.ngachHQ; }
     if (patch?.thueNK !== undefined) { data.thueNK = Number(patch.thueNK) || 0; changes.thueNK = data.thueNK; }
     if (patch?.vat !== undefined) { data.vat = Number(patch.vat) || 0; changes.vat = data.vat; }

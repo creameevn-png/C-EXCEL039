@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import {
   FiInfo, FiClock, FiPackage, FiTruck, FiCheckCircle, FiDownload, FiCheck, FiLock,
-  FiAlertTriangle, FiPlus, FiLink, FiTrash2, FiHelpCircle, FiBox, FiSend, FiTarget
+  FiAlertTriangle, FiPlus, FiLink, FiTrash2, FiHelpCircle, FiBox, FiSend, FiTarget,
+  FiEdit2, FiX, FiSave, FiUser, FiUsers, FiDollarSign
 } from 'react-icons/fi';
 import type { SessionUser } from '@/lib/auth';
 import AppShell from '@/components/AppShell';
@@ -12,12 +13,14 @@ import OrderDetailModalHost from '@/components/OrderDetailModal';
 import ImageUploadModalHost from '@/components/ImageUploadModal';
 import { showToast } from '@/components/Toast';
 import { callServer, reload } from '@/lib/client';
+import { fmtVND } from '@/lib/format';
 
 type Line = { stt: number; tenSP: string; soLuong: number; kiemKe: string; kiemKeNote: string };
 type Row = {
   maDH: string; maVD: string; tenHang: string;
   kg: number; m3: number; web: string; tuyen: string;
-  kiemDem: boolean; dongGo: boolean; nguoiPhuTrachTQ: string; maBao: string; lines: Line[];
+  kiemDem: boolean; dongGo: boolean;
+  nguoiLamTQ: string; nguoiPhuTrachTQ: string; maBao: string; lines: Line[];
 };
 type VoChu = {
   id: number; maVD: string; kg: number; dai: number; rong: number; cao: number; m3: number;
@@ -27,6 +30,14 @@ type Bao = {
   maBao: string; line: string; trangThai: string;
   tongKg: number; tongM3: number; soKien: number; orders: string[];
 };
+type NhanVien = { id: number; hoTen: string };
+type Quy = {
+  id: number; ngay: string; loai: string; soTien: number;
+  danhMuc: string; noiDung: string; maDH: string; nguoiTao: string;
+};
+// Góp ý NV #25/#33: kho TQ tự nhập cân & kích thước từng dòng hàng.
+type WeighLine = { stt: number; tenSP: string; soLuong: number; kg: string; dai: string; rong: string; cao: string; m3: string };
+const QUY_DANH_MUC = ['Thu hộ khách', 'Chi ship nội địa TQ', 'Chi đóng gói', 'Chi khác'];
 const LINE_LABEL: Record<string, string> = { LineNhanh: 'Nhanh', LineThuong: 'Thường', LineRe: 'Tiết kiệm' };
 
 // Góp ý NV #35: bắn (quét) mã vận đơn để tìm nhanh đơn trong danh sách kho.
@@ -38,8 +49,9 @@ function filterByScan(rows: Row[], q: string) {
     o.maBao.toLowerCase().includes(k) || o.tenHang.toLowerCase().includes(k));
 }
 
-export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu, baos }:
-  { user: SessionUser; pendingArrivals: Row[]; atWarehouse: Row[]; voChu: VoChu[]; baos: Bao[] }) {
+export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu, baos, nhanViens, soQuy }:
+  { user: SessionUser; pendingArrivals: Row[]; atWarehouse: Row[]; voChu: VoChu[]; baos: Bao[];
+    nhanViens: NhanVien[]; soQuy: Quy[] }) {
 
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [keNote, setKeNote] = useState<Record<string, string>>({});
@@ -69,6 +81,87 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
     const r = await callServer('markKiemKe', maDH, stt, { trangThai, note });
     setBusy((p) => ({ ...p, [key]: false }));
     if (r?.success) { showToast(`Đã đánh dấu link ${stt}: ${trangThai}`, 'success'); reload(); }
+    else showToast(r?.message || 'Lỗi', 'error');
+  }
+
+  // ===== Nhập cân & kích thước (góp ý #25/#33) =====
+  const [weighMaDH, setWeighMaDH] = useState<string | null>(null);
+  const [weighLines, setWeighLines] = useState<WeighLine[]>([]);
+  const [weighBusy, setWeighBusy] = useState<Record<number, boolean>>({});
+
+  async function openWeigh(maDH: string) {
+    setWeighMaDH(maDH); setWeighLines([]); setWeighBusy({});
+    const r = await callServer('getOrderDetail', maDH);
+    if (r?.success) {
+      // Server chưa trả dài/rộng/cao → để trống cho kho TQ nhập mới.
+      setWeighLines(r.data.chiTiet.map((c: any) => ({
+        stt: c.stt, tenSP: c.tenSP, soLuong: c.soLuong,
+        kg: String(c.kg ?? ''), dai: '', rong: '', cao: '', m3: String(c.m3 ?? '')
+      })));
+    } else { showToast(r?.message || 'Lỗi tải đơn', 'error'); setWeighMaDH(null); }
+  }
+  function patchWeigh(stt: number, p: Partial<WeighLine>) {
+    setWeighLines((ls) => ls.map((l) => (l.stt === stt ? { ...l, ...p } : l)));
+  }
+  async function saveWeighLine(l: WeighLine) {
+    if (!weighMaDH) return;
+    const kg = parseFloat(l.kg) || 0;
+    const dai = parseFloat(l.dai) || 0, rong = parseFloat(l.rong) || 0, cao = parseFloat(l.cao) || 0;
+    const hasKT = dai > 0 && rong > 0 && cao > 0;
+    const payload = hasKT ? { kg, dai, rong, cao } : { kg, m3: parseFloat(l.m3) || 0 };
+    setWeighBusy((p) => ({ ...p, [l.stt]: true }));
+    const r = await callServer('updateChiTietKg', weighMaDH, l.stt, payload);
+    setWeighBusy((p) => ({ ...p, [l.stt]: false }));
+    if (r?.success) {
+      // m³ do server tính lại (từ kích thước nếu có) — cập nhật ngược lên ô m³.
+      if (r.m3 !== undefined) patchWeigh(l.stt, { m3: String(r.m3) });
+      showToast(`Đã lưu dòng ${l.stt} (kg / m³)`, 'success');
+    } else showToast(r?.message || 'Lỗi', 'error');
+  }
+
+  // ===== Người làm / phụ trách kho TQ (góp ý #32) =====
+  async function saveNguoiTQ(maDH: string, patch: { nguoiLam?: string; nguoiPhuTrach?: string }) {
+    const r = await callServer('setNguoiKhoTQ', maDH, patch);
+    if (r?.success) { showToast('Đã lưu người phụ trách kho TQ', 'success'); reload(); }
+    else showToast(r?.message || 'Lỗi', 'error');
+  }
+  function nguoiSelect(maDH: string, current: string, field: 'nguoiLam' | 'nguoiPhuTrach') {
+    const names = nhanViens.map((nv) => nv.hoTen);
+    const opts = current && !names.includes(current) ? [current, ...names] : names;
+    return (
+      <select value={current} onChange={(e) => saveNguoiTQ(maDH,
+        field === 'nguoiLam' ? { nguoiLam: e.target.value } : { nguoiPhuTrach: e.target.value })}>
+        <option value="">-- Chưa chọn --</option>
+        {opts.map((n) => <option key={n} value={n}>{n}</option>)}
+      </select>
+    );
+  }
+  function nguoiTQ(o: Row) {
+    return (
+      <div className="form-grid" style={{ marginTop: 8 }}>
+        <div className="form-field"><label><FiUser /> Người làm</label>{nguoiSelect(o.maDH, o.nguoiLamTQ, 'nguoiLam')}</div>
+        <div className="form-field"><label><FiUsers /> Người phụ trách</label>{nguoiSelect(o.maDH, o.nguoiPhuTrachTQ, 'nguoiPhuTrach')}</div>
+      </div>
+    );
+  }
+
+  // ===== Quỹ kho TQ (góp ý #43) =====
+  const [quyForm, setQuyForm] = useState({ loai: 'Thu', soTien: '', danhMuc: '', noiDung: '', maDH: '' });
+  const tongThu = soQuy.filter((q) => q.loai === 'Thu').reduce((s, q) => s + q.soTien, 0);
+  const tongChi = soQuy.filter((q) => q.loai === 'Chi').reduce((s, q) => s + q.soTien, 0);
+  const tonQuy = tongThu - tongChi;
+
+  async function addQuy() {
+    const soTien = parseFloat(quyForm.soTien) || 0;
+    if (soTien <= 0) return showToast('Số tiền phải lớn hơn 0', 'error');
+    if (!quyForm.noiDung.trim()) return showToast('Nhập nội dung thu / chi', 'error');
+    setBusy((p) => ({ ...p, quy: true }));
+    const r = await callServer('addSoQuy', {
+      quy: 'KhoTQ', loai: quyForm.loai, soTien, noiDung: quyForm.noiDung,
+      danhMuc: quyForm.danhMuc || undefined, maDH: quyForm.maDH.trim() || undefined
+    });
+    setBusy((p) => ({ ...p, quy: false }));
+    if (r?.success) { showToast('Đã ghi bút toán quỹ kho TQ', 'success'); reload(); }
     else showToast(r?.message || 'Lỗi', 'error');
   }
 
@@ -208,9 +301,13 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
             Hàng: {o.tenHang} · {o.kg}kg · {o.m3}m³ · {o.web}
           </div>
           {kiemKe(o)}
+          {nguoiTQ(o)}
           <div className="ac-actions">
             <button className="btn btn-success" onClick={() => confirmKhoTQ(o.maDH)}>
               <FiCheck /> Xác nhận đã nhận tại kho TQ
+            </button>
+            <button className="btn btn-secondary" onClick={() => openWeigh(o.maDH)}>
+              <FiEdit2 /> Nhập cân (KG / kích thước)
             </button>
           </div>
         </div>
@@ -227,7 +324,7 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
       ) : (
         <table className="data-table">
           <thead><tr>
-            <th>Mã VĐ</th><th>Mã đơn</th><th>Hàng</th><th>Kg/M³</th><th>Người nhận TQ</th><th>DV</th><th>Thao tác</th>
+            <th>Mã VĐ</th><th>Mã đơn</th><th>Hàng</th><th>Kg/M³</th><th>Người làm / phụ trách</th><th>DV</th><th>Thao tác</th>
           </tr></thead>
           <tbody>
             {atWarehouseFiltered.map((o) => (
@@ -236,11 +333,19 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
                 <td><span className="ma-don" style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => (window as any).openOrderDetail?.(o.maDH)}>{o.maDH}</span></td>
                 <td>{o.tenHang}</td>
                 <td>{o.kg} / {o.m3}</td>
-                <td>{o.nguoiPhuTrachTQ || '-'}</td>
+                <td style={{ minWidth: 180 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div className="icon-inline" style={{ fontSize: 12 }}><FiUser /> {nguoiSelect(o.maDH, o.nguoiLamTQ, 'nguoiLam')}</div>
+                    <div className="icon-inline" style={{ fontSize: 12 }}><FiUsers /> {nguoiSelect(o.maDH, o.nguoiPhuTrachTQ, 'nguoiPhuTrach')}</div>
+                  </div>
+                </td>
                 <td>{o.kiemDem && '✔KĐ'}{o.kiemDem && o.dongGo && ' '}{o.dongGo && '📦'}</td>
-                <td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <button className="btn btn-secondary btn-sm" onClick={() => openWeigh(o.maDH)}>
+                    <FiEdit2 /> Nhập cân
+                  </button>{' '}
                   <button className="btn btn-primary btn-sm" onClick={() => markLeftTQ(o.maDH)}>
-                    <FiTruck /> Đánh dấu rời TQ
+                    <FiTruck /> Rời TQ
                   </button>
                 </td>
               </tr>
@@ -357,6 +462,77 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
     </div>
   );
 
+  const tabQuy = (
+    <div className="form-section">
+      <div className="section-title"><FiDollarSign /> Quỹ kho TQ — thu hộ khách, chi phí nội địa TQ</div>
+
+      <div className="kpi-row">
+        <div className="kpi" style={{ ['--primary' as any]: '#16a34a' }}>
+          <div className="kpi-label"><FiPlus /> Tổng thu</div>
+          <div className="kpi-value">{fmtVND(tongThu)}</div>
+        </div>
+        <div className="kpi" style={{ ['--primary' as any]: '#ef4444' }}>
+          <div className="kpi-label"><FiSend /> Tổng chi</div>
+          <div className="kpi-value">{fmtVND(tongChi)}</div>
+        </div>
+        <div className="kpi" style={{ ['--primary' as any]: '#0f766e' }}>
+          <div className="kpi-label"><FiDollarSign /> Tồn quỹ</div>
+          <div className="kpi-value">{fmtVND(tonQuy)}</div>
+          <div className="kpi-sub">thu − chi</div>
+        </div>
+      </div>
+
+      <div className="action-card">
+        <div className="ac-header"><div className="ac-title"><FiPlus /> Thêm bút toán quỹ</div></div>
+        <div className="form-grid-3" style={{ marginTop: 8 }}>
+          <div className="form-field"><label>Loại</label>
+            <select value={quyForm.loai} onChange={(e) => setQuyForm({ ...quyForm, loai: e.target.value })}>
+              <option value="Thu">Thu</option><option value="Chi">Chi</option>
+            </select></div>
+          <div className="form-field"><label className="required">Số tiền (VNĐ)</label>
+            <input type="number" value={quyForm.soTien} onChange={(e) => setQuyForm({ ...quyForm, soTien: e.target.value })} placeholder="0" /></div>
+          <div className="form-field"><label>Danh mục</label>
+            <input list="quy-danh-muc" value={quyForm.danhMuc} onChange={(e) => setQuyForm({ ...quyForm, danhMuc: e.target.value })} placeholder="Thu hộ khách..." />
+            <datalist id="quy-danh-muc">{QUY_DANH_MUC.map((d) => <option key={d} value={d} />)}</datalist></div>
+        </div>
+        <div className="form-grid" style={{ marginTop: 10 }}>
+          <div className="form-field"><label className="required">Nội dung</label>
+            <input value={quyForm.noiDung} onChange={(e) => setQuyForm({ ...quyForm, noiDung: e.target.value })} placeholder="mô tả thu / chi" /></div>
+          <div className="form-field"><label>Mã đơn (tuỳ chọn)</label>
+            <input value={quyForm.maDH} onChange={(e) => setQuyForm({ ...quyForm, maDH: e.target.value })} placeholder="DH-..." /></div>
+        </div>
+        <div className="ac-actions">
+          <button className="btn btn-success" onClick={addQuy} disabled={busy.quy}><FiPlus /> Ghi bút toán</button>
+        </div>
+      </div>
+
+      {soQuy.length === 0 ? (
+        <div className="empty-state"><FiDollarSign /><p>Chưa có bút toán quỹ nào.</p></div>
+      ) : (
+        <table className="data-table" style={{ marginTop: 12 }}>
+          <thead><tr>
+            <th>Ngày</th><th>Loại</th><th className="number">Số tiền</th><th>Danh mục</th><th>Nội dung</th><th>Mã đơn</th><th>Người tạo</th>
+          </tr></thead>
+          <tbody>
+            {soQuy.map((q) => (
+              <tr key={q.id}>
+                <td>{new Date(q.ngay).toLocaleDateString('vi-VN')}</td>
+                <td><span className={`status-badge ${q.loai === 'Thu' ? 's-vn' : 's-waiting'}`}>{q.loai}</span></td>
+                <td className="number" style={{ color: q.loai === 'Thu' ? '#059669' : '#DC2626', fontWeight: 700 }}>
+                  {q.loai === 'Thu' ? '+' : '−'}{fmtVND(q.soTien)}
+                </td>
+                <td>{q.danhMuc || '-'}</td>
+                <td>{q.noiDung}</td>
+                <td className="ma-don">{q.maDH || '-'}</td>
+                <td>{q.nguoiTao}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+
   return (
     <AppShell user={user}>
       <div className="alert alert-info">
@@ -388,11 +564,66 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
         { id: 'tab-receive', label: <><FiDownload /> Chờ nhận từ NCC ({pendingArrivals.length})</>, content: tabReceive },
         { id: 'tab-ship', label: <><FiTruck /> Chuyển về VN ({atWarehouse.length})</>, content: tabShip },
         { id: 'tab-bao', label: <><FiBox /> Bao tổng ({openBaos.length})</>, content: tabBao },
-        { id: 'tab-vochu', label: <><FiHelpCircle /> Hàng vô chủ ({voChu.length})</>, content: tabVoChu }
+        { id: 'tab-vochu', label: <><FiHelpCircle /> Hàng vô chủ ({voChu.length})</>, content: tabVoChu },
+        { id: 'tab-quy', label: <><FiDollarSign /> Quỹ kho TQ</>, content: tabQuy }
       ]} />
 
       <div className="alert alert-lock">
         <FiLock /><span><b>Bạn KHÔNG thấy:</b> Giá tiền · Tên KH · Phí · Thông tin tài chính</span>
+      </div>
+
+      {/* Modal nhập cân & kích thước từng dòng (góp ý #25/#33) */}
+      <div className={`modal-overlay ${weighMaDH ? 'show' : ''}`} onClick={(e) => { if (e.target === e.currentTarget) setWeighMaDH(null); }}>
+        <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 760 }}>
+          <div className="modal-header">
+            <h2><FiEdit2 /> Nhập cân & kích thước — {weighMaDH}</h2>
+            <button className="modal-close" onClick={() => setWeighMaDH(null)}><FiX /></button>
+          </div>
+          <div className="modal-body">
+            <div className="alert alert-info" style={{ marginBottom: 12 }}>
+              <FiInfo /><span>Nhập đủ <b>Dài × Rộng × Cao (cm)</b> thì ô <b>M³</b> tự tính theo công thức trong Cài đặt và bị khoá. Bỏ trống kích thước thì gõ M³ tay. Bấm <FiSave /> để lưu từng dòng.</span>
+            </div>
+            {weighLines.length === 0 ? (
+              <div className="empty-state"><FiClock /><p>Đang tải dòng hàng…</p></div>
+            ) : (
+              <table className="data-table" style={{ fontSize: 13 }}>
+                <thead><tr>
+                  <th>Sản phẩm</th><th className="number">SL</th><th className="number">Kg</th>
+                  <th className="number">Dài</th><th className="number">Rộng</th><th className="number">Cao (cm)</th>
+                  <th className="number">M³</th><th></th>
+                </tr></thead>
+                <tbody>
+                  {weighLines.map((l) => {
+                    const dai = parseFloat(l.dai) || 0, rong = parseFloat(l.rong) || 0, cao = parseFloat(l.cao) || 0;
+                    const hasKT = dai > 0 && rong > 0 && cao > 0;
+                    return (
+                      <tr key={l.stt}>
+                        <td>{l.tenSP}</td>
+                        <td className="number">{l.soLuong}</td>
+                        <td className="number"><input type="number" step="0.01" value={l.kg} style={{ width: 72, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { kg: e.target.value })} /></td>
+                        <td className="number"><input type="number" value={l.dai} style={{ width: 60, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { dai: e.target.value })} /></td>
+                        <td className="number"><input type="number" value={l.rong} style={{ width: 60, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { rong: e.target.value })} /></td>
+                        <td className="number"><input type="number" value={l.cao} style={{ width: 60, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { cao: e.target.value })} /></td>
+                        <td className="number">
+                          <input type="number" step="0.0001" value={l.m3} readOnly={hasKT}
+                            title={hasKT ? 'm³ tự tính từ kích thước theo công thức trong Cài đặt' : undefined}
+                            style={{ width: 84, textAlign: 'right', background: hasKT ? '#F3F4F6' : undefined, cursor: hasKT ? 'not-allowed' : 'text' }}
+                            onChange={(e) => patchWeigh(l.stt, { m3: e.target.value })} />
+                          {hasKT && <div className="hint" style={{ fontSize: 10 }}>tự tính từ KT</div>}
+                        </td>
+                        <td><button className="btn btn-success btn-sm" disabled={weighBusy[l.stt]} onClick={() => saveWeighLine(l)}><FiSave /></button></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+            <div className="hint" style={{ marginTop: 8 }}>m³ tự tính từ kích thước theo công thức trong Cài đặt.</div>
+          </div>
+          <div className="btn-row">
+            <button className="btn btn-secondary" onClick={() => setWeighMaDH(null)}>Đóng</button>
+          </div>
+        </div>
       </div>
 
       <OrderDetailModalHost canSeeMoney={false} />

@@ -21,7 +21,11 @@ export default async function AdminKhieuNaiPage() {
         phiDoiTra: k.phiDoiTra, hoanVi: k.hoanVi, daHoanVi: k.daHoanVi,
         quyChiuPhi: k.quyChiuPhi || '',
         doiTacNCC: k.doiTacNCC || '', daTruNCC: k.daTruNCC,
-        ghiChuXuLy: k.ghiChuXuLy || ''
+        ghiChuXuLy: k.ghiChuXuLy || '',
+        maVDTraHang: k.maVDTraHang || '', chuyenKhoVN: k.chuyenKhoVN,
+        daNhanHangKN: k.daNhanHangKN,
+        ngayNhanKN: k.ngayNhanKN ? k.ngayNhanKN.toISOString() : '',
+        nguoiNhanKN: k.nguoiNhanKN || ''
       }))} />
       <OrderDetailModalHost canSeeMoney={['Admin', 'CSKH', 'KeToan'].includes(user.vaiTro)} canSeeProfit={['Admin', 'KeToan', 'GDV', 'MuaHang'].includes(user.vaiTro)} />
     </AppShell>

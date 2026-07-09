@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import {
-  FiAlertTriangle, FiFileText, FiUser, FiX, FiSave, FiSend, FiCheckCircle, FiXCircle, FiSearch
+  FiAlertTriangle, FiFileText, FiUser, FiX, FiSave, FiSend, FiCheckCircle, FiXCircle, FiSearch, FiRotateCcw
 } from 'react-icons/fi';
 import { callServer, reload } from '@/lib/client';
 import { showToast } from '@/components/Toast';
@@ -19,6 +19,9 @@ type KN = {
   phiDoiTra: number; hoanVi: boolean; daHoanVi: boolean; quyChiuPhi: string;
   doiTacNCC: string; daTruNCC: boolean;
   ghiChuXuLy: string;
+  // Luồng khách gửi trả hàng về kho VN.
+  maVDTraHang: string; chuyenKhoVN: boolean;
+  daNhanHangKN: boolean; ngayNhanKN: string; nguoiNhanKN: string;
 };
 
 const LOAI_LABEL: Record<string, string> = {
@@ -35,6 +38,7 @@ export default function KnClient({ userVaiTro, list }: { userVaiTro: string; lis
   const [busy, setBusy] = useState(false);
   const [q, setQ] = useState('');
   const [statusF, setStatusF] = useState('');
+  const [maVDTra, setMaVDTra] = useState('');
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -47,6 +51,7 @@ export default function KnClient({ userVaiTro, list }: { userVaiTro: string; lis
 
   function open(k: KN) {
     setEditing(k);
+    setMaVDTra(k.maVDTraHang || '');
     setPatch({
       trangThai: k.trangThai, phuongAn: k.phuongAn || 'HoanTien',
       soTienHoan: k.soTienHoan || 0, phiDoiTra: k.phiDoiTra || 0,
@@ -62,6 +67,17 @@ export default function KnClient({ userVaiTro, list }: { userVaiTro: string; lis
     const r = await callServer('updateKhieuNai', editing.maKN, patch);
     setBusy(false);
     if (r?.success) { showToast('Đã cập nhật', 'success'); setEditing(null); reload(); }
+    else showToast(r?.message || 'Lỗi', 'error');
+  }
+
+  async function chuyenVeKhoVN() {
+    if (!editing) return;
+    const maVD = maVDTra.trim();
+    if (!maVD) return showToast('Nhập mã vận đơn khách gửi trả', 'error');
+    setBusy(true);
+    const r = await callServer('chuyenKNVeKhoVN', editing.maKN, maVD);
+    setBusy(false);
+    if (r?.success) { showToast(`Đã báo kho VN nhận hàng theo mã ${maVD}`, 'success'); setEditing(null); reload(); }
     else showToast(r?.message || 'Lỗi', 'error');
   }
 
@@ -208,6 +224,34 @@ export default function KnClient({ userVaiTro, list }: { userVaiTro: string; lis
                     {editing.daHoanVi && <div style={{ fontSize: 11, marginTop: 4, color: 'var(--success-dark)' }}>✓ Đã hoàn vào ví.</div>}
                   </div>
                 </div>
+                {/* Khách gửi trả hàng về kho VN: CSKH ghi mã vận đơn rồi báo kho nhận. */}
+                <div style={{ marginTop: 12, padding: 10, background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>
+                    <FiRotateCcw /> Hàng khách gửi trả về kho VN
+                  </div>
+                  {editing.daNhanHangKN ? (
+                    <div style={{ fontSize: 12, color: 'var(--success-dark)' }}>
+                      ✓ Kho VN đã nhận hàng (mã VĐ <b>{editing.maVDTraHang}</b>
+                      {editing.nguoiNhanKN ? ` · ${editing.nguoiNhanKN}` : ''}
+                      {editing.ngayNhanKN ? ` · ${formatDateTime(editing.ngayNhanKN)}` : ''})
+                    </div>
+                  ) : editing.chuyenKhoVN ? (
+                    <div style={{ fontSize: 12, color: '#92400E' }}>
+                      Đã báo kho VN — chờ nhận hàng theo mã VĐ <b>{editing.maVDTraHang}</b>.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                      <div className="form-field" style={{ flex: 1, margin: 0 }}>
+                        <label>Mã vận đơn khách gửi trả</label>
+                        <input value={maVDTra} onChange={(e) => setMaVDTra(e.target.value)} placeholder="VD: VD26071234" />
+                      </div>
+                      <button className="btn btn-warning" disabled={busy} onClick={chuyenVeKhoVN}>
+                        <FiRotateCcw /> Chuyển về kho VN
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 <div className="form-field" style={{ marginTop: 10 }}>
                   <label>Ghi chú xử lý / duyệt</label>
                   <textarea rows={3} value={patch.ghiChuXuLy} onChange={(e) => setPatch({ ...patch, ghiChuXuLy: e.target.value })} />

@@ -13,7 +13,7 @@ export default async function BaoCaoPage() {
   const since = new Date();
   since.setMonth(since.getMonth() - 18);
 
-  const [orders, khieuNai, thanhToan, tonKhoOrders] = await Promise.all([
+  const [orders, khieuNai, thanhToan, tonKhoOrders, nhanViens, soQuy] = await Promise.all([
     prisma.donHang.findMany({
       where: { ngayTao: { gte: since }, trangThai: { not: 'Huy' } },
       include: { khachHang: true, nv: true },
@@ -33,7 +33,14 @@ export default async function BaoCaoPage() {
       where: { trangThai: { in: ['KhoTqNhan', 'DangVanChuyen', 'KhoVnNhan', 'ChoThanhToan', 'GiaoHang'] } },
       include: { khachHang: true },
       orderBy: { ngayTao: 'asc' }
-    })
+    }),
+    // Hoa hồng & thưởng (#52/#53): danh sách nhân viên đang hoạt động để đối chiếu tỉ lệ.
+    prisma.nhanVien.findMany({
+      where: { trangThai: 'HoatDong' },
+      orderBy: { hoTen: 'asc' }
+    }),
+    // Sổ quỹ (#22/#42): bút toán thu-chi không gắn đơn hàng, tách theo quỹ.
+    prisma.soQuy.findMany({ take: 500, orderBy: { ngay: 'desc' } })
   ]);
 
   const rows = orders.map((o) => ({
@@ -42,6 +49,7 @@ export default async function BaoCaoPage() {
     maKH: o.maKH,
     tenKH: o.khachHang?.tenKH || o.maKH,
     nv: o.nv?.hoTen || o.nvTao || '(không rõ)',
+    nvId: o.nvId, gdvId: o.gdvId,
     lineVC: o.lineVC as string,
     tuyen: o.tuyen as string,
     trangThai: o.trangThai as string,
@@ -49,8 +57,20 @@ export default async function BaoCaoPage() {
     tongGiaHang: o.tongGiaHang,
     phiMua: o.phiMua, phiBH: o.phiBH, phiPhatSinh: o.phiPhatSinh, phiVC: o.phiVC,
     shipND: o.shipND, dongGo: o.dongGo, phuThu: o.phuThu,
+    phiKhieuNai: o.phiKhieuNai,
     vonNDT: o.vonNDT, shipNDTQ: o.shipNDTQ, loiNhuanNDT: o.loiNhuanNDT,
     tongTien: o.tongTien, daTra: o.daTra, conLai: o.conLai
+  }));
+
+  const nvList = nhanViens.map((n) => ({
+    id: n.id, hoTen: n.hoTen, vaiTro: n.vaiTro as string,
+    pctHoaHong: n.pctHoaHong, pctThuong: n.pctThuong
+  }));
+
+  const soQuyRows = soQuy.map((s) => ({
+    id: s.id, ngay: s.ngay.toISOString(),
+    quy: s.quy, loai: s.loai as string, soTien: s.soTien,
+    danhMuc: s.danhMuc || '', noiDung: s.noiDung, maDH: s.maDH || '', nguoiTao: s.nguoiTao || ''
   }));
 
   const knRows = khieuNai.map((k) => ({
@@ -72,7 +92,7 @@ export default async function BaoCaoPage() {
 
   return (
     <AppShell user={user}>
-      <BaoCaoClient rows={rows} knRows={knRows} cashRows={cashRows} tonKhoRows={tonKhoRows} />
+      <BaoCaoClient rows={rows} knRows={knRows} cashRows={cashRows} tonKhoRows={tonKhoRows} nvList={nvList} soQuyRows={soQuyRows} />
       <OrderDetailModalHost canSeeMoney={['Admin', 'CSKH', 'KeToan'].includes(user.vaiTro)} canSeeProfit={['Admin', 'KeToan', 'GDV', 'MuaHang'].includes(user.vaiTro)} />
     </AppShell>
   );

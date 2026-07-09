@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import {
   FiInfo, FiEdit3, FiClock, FiTruck, FiPackage, FiSave, FiLock, FiFileText,
-  FiAlertTriangle, FiMessageSquare, FiExternalLink, FiInbox
+  FiAlertTriangle, FiMessageSquare, FiExternalLink, FiInbox, FiUser, FiList
 } from 'react-icons/fi';
 import type { SessionUser } from '@/lib/auth';
 import AppShell from '@/components/AppShell';
@@ -12,15 +12,20 @@ import OrderDetailModalHost from '@/components/OrderDetailModal';
 import { showToast } from '@/components/Toast';
 import { callServer, reload } from '@/lib/client';
 import { fmtVND, fmtDateDDMM } from '@/lib/format';
-import { KN_LABEL } from '@/lib/status';
+import { KN_LABEL, TRANG_THAI_LABEL, statusToLabel, statusToClass } from '@/lib/status';
 
-type ChiTiet = { stt: number; tenSP: string; soLuong: number; donGiaNDT: number; linkTaobao: string };
+type ChiTiet = { stt: number; tenSP: string; soLuong: number; donGiaNDT: number; vonNDT: number; linkTaobao: string };
 type Pending = {
   maDH: string; tenKH: string; web: string; tongKg: number; tuyen: string;
   tongTien: number; daTra: number; tenHang: string;
   maGD: string; maVD: string; trangThai: string;
+  gdvId: number | null; gdvTen: string;
   vonNDT: number; shipNDTQ: number; loiNhuanNDT: number; tongThuNDT: number;
   ghiChuGDV: string; chiTiet: ChiTiet[];
+};
+type AllOrder = {
+  maDH: string; maKH: string; tenKH: string; maVD: string;
+  trangThai: string; tongTien: number; ngayTao: string;
 };
 type KhieuNai = {
   maKN: string; ngayTao: string; maDH: string; maKH: string; tenKH: string;
@@ -33,9 +38,10 @@ const KN_LOAI: Record<string, string> = {
 const PHUONG_AN = ['Hoàn tiền', 'Đổi/trả hàng', 'Bồi thường', 'Giảm giá đơn sau', 'Hỗ trợ trao đổi NCC', 'Từ chối'];
 const KN_STATUS = ['ChoXuLy', 'DangXuLy', 'DaXuLy', 'TuChoi'];
 
-export default function GdvClient({ user, pendingOrders, khieuNai }: { user: SessionUser; pendingOrders: Pending[]; khieuNai: KhieuNai[] }) {
+export default function GdvClient({ user, pendingOrders, allOrders, khieuNai }: { user: SessionUser; pendingOrders: Pending[]; allOrders: AllOrder[]; khieuNai: KhieuNai[] }) {
   const ordersDeposit = pendingOrders.filter((o) => o.trangThai === 'DatCoc');
   const ordersBought = pendingOrders.filter((o) => o.trangThai === 'DaMuaHang');
+  const myOrders = pendingOrders.filter((o) => o.gdvId === user.id);
 
   const [gdInputs, setGdInputs] = useState<Record<string, string>>(() =>
     Object.fromEntries(pendingOrders.map((o) => [o.maDH, o.maGD || ''])));
@@ -51,18 +57,38 @@ export default function GdvClient({ user, pendingOrders, khieuNai }: { user: Ses
   // Góp ý NV #17: số lượng còn của shop theo từng dòng hàng — khoá "maDH:stt".
   const [slInputs, setSlInputs] = useState<Record<string, string>>(() =>
     Object.fromEntries(pendingOrders.flatMap((o) => o.chiTiet.map((c) => [`${o.maDH}:${c.stt}`, String(c.soLuong)]))));
+  // Góp ý NV #13: tệ mua thực tế theo từng dòng hàng — khoá "maDH:stt".
+  const [vonLineInputs, setVonLineInputs] = useState<Record<string, string>>(() =>
+    Object.fromEntries(pendingOrders.flatMap((o) => o.chiTiet.map((c) => [`${o.maDH}:${c.stt}`, c.vonNDT ? String(c.vonNDT) : '']))));
+  // Góp ý NV #20: tìm & lọc trạng thái ở tab "Tất cả đơn".
+  const [allSearch, setAllSearch] = useState('');
+  const [allStatus, setAllStatus] = useState('');
   const [busy, setBusy] = useState<Record<string, boolean>>({});
 
   function fmtNDT(n: number) { return Number(n || 0).toLocaleString('zh-CN') + '¥'; }
 
   async function submitVonGDV(maDH: string) {
-    const vonNDT = parseFloat(vonInputs[maDH] || '0') || 0;
+    // Nếu GDV đã nhập giá vốn theo từng dòng (#13) thì giữ tổng đó, không để ô tổng ghi đè.
+    const o = pendingOrders.find((x) => x.maDH === maDH);
+    const tongVonDong = o ? o.chiTiet.reduce((s, c) => s + (c.vonNDT || 0), 0) : 0;
+    const vonNDT = tongVonDong > 0 ? tongVonDong : (parseFloat(vonInputs[maDH] || '0') || 0);
     const shipNDTQ = parseFloat(shipTqInputs[maDH] || '0') || 0;
     if (vonNDT <= 0) return showToast('Nhập tổng tệ mua thực tế (¥)', 'error');
     setBusy((p) => ({ ...p, [maDH]: true }));
     const r = await callServer('updateVonGDV', maDH, { vonNDT, shipNDTQ, ghiChuGDV: noteInputs[maDH] ?? '' });
     setBusy((p) => ({ ...p, [maDH]: false }));
     if (r?.success) { showToast(`Đã lưu giá vốn ${maDH} · LN ${fmtNDT(r.loiNhuanNDT)}`, 'success'); reload(); }
+    else showToast(r?.message || 'Lỗi', 'error');
+  }
+
+  // Góp ý NV #13: lưu tệ mua thực tế của một dòng hàng; server tự tính lại giá vốn + lợi nhuận đơn.
+  async function submitVonLine(maDH: string, stt: number) {
+    const von = parseFloat(vonLineInputs[`${maDH}:${stt}`] || '0') || 0;
+    if (von < 0) return showToast('Giá vốn không hợp lệ', 'error');
+    setBusy((p) => ({ ...p, [maDH]: true }));
+    const r = await callServer('updateChiTietVon', maDH, stt, von);
+    setBusy((p) => ({ ...p, [maDH]: false }));
+    if (r?.success) { showToast(`Đã lưu tệ mua dòng ${stt} · giá vốn đơn ${fmtNDT(r.vonNDT)} · LN ${fmtNDT(r.loiNhuanNDT)}`, 'success'); reload(); }
     else showToast(r?.message || 'Lỗi', 'error');
   }
 
@@ -82,10 +108,14 @@ export default function GdvClient({ user, pendingOrders, khieuNai }: { user: Ses
     return (
       <div style={{ marginTop: 10 }}>
         <div className="ac-meta" style={{ marginBottom: 6 }}>
-          <b>Số lượng còn của shop</b> — sửa nếu shop hết hàng; tổng tiền đơn tự tính lại.
+          <b>Số lượng còn & tệ mua thực tế từng sản phẩm</b> — sửa SL nếu shop hết hàng (tổng tiền tự tính lại); nhập tệ mua thực tế (¥) để tính giá vốn theo dòng.
         </div>
         <table className="data-table">
-          <thead><tr><th>#</th><th>Sản phẩm</th><th className="number">Giá tệ</th><th style={{ width: 150 }}>SL còn</th><th style={{ width: 60 }}></th></tr></thead>
+          <thead><tr>
+            <th>#</th><th>Sản phẩm</th><th className="number">Giá tệ</th>
+            <th style={{ width: 170 }}>SL còn</th>
+            <th style={{ width: 190 }}>Tệ mua thực tế (¥)</th>
+          </tr></thead>
           <tbody>
             {o.chiTiet.map((c) => (
               <tr key={c.stt}>
@@ -96,14 +126,24 @@ export default function GdvClient({ user, pendingOrders, khieuNai }: { user: Ses
                 </td>
                 <td className="number">{fmtNDT(c.donGiaNDT)}</td>
                 <td>
-                  <input type="number" min={0} value={slInputs[`${o.maDH}:${c.stt}`] ?? ''}
-                    onChange={(e) => setSlInputs((p) => ({ ...p, [`${o.maDH}:${c.stt}`]: e.target.value }))}
-                    disabled={busy[o.maDH]} />
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <input type="number" min={0} value={slInputs[`${o.maDH}:${c.stt}`] ?? ''}
+                      onChange={(e) => setSlInputs((p) => ({ ...p, [`${o.maDH}:${c.stt}`]: e.target.value }))}
+                      disabled={busy[o.maDH]} />
+                    <button className="btn btn-secondary btn-sm" onClick={() => submitSoLuong(o.maDH, c.stt)} disabled={busy[o.maDH]}>
+                      <FiSave />
+                    </button>
+                  </div>
                 </td>
                 <td>
-                  <button className="btn btn-secondary btn-sm" onClick={() => submitSoLuong(o.maDH, c.stt)} disabled={busy[o.maDH]}>
-                    <FiSave />
-                  </button>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <input type="number" min={0} step="0.01" value={vonLineInputs[`${o.maDH}:${c.stt}`] ?? ''}
+                      onChange={(e) => setVonLineInputs((p) => ({ ...p, [`${o.maDH}:${c.stt}`]: e.target.value }))}
+                      placeholder="¥ / dòng" disabled={busy[o.maDH]} />
+                    <button className="btn btn-secondary btn-sm" onClick={() => submitVonLine(o.maDH, c.stt)} disabled={busy[o.maDH]}>
+                      <FiSave />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -113,8 +153,21 @@ export default function GdvClient({ user, pendingOrders, khieuNai }: { user: Ses
     );
   }
 
+  // Góp ý NV #12: nhãn GDV phụ trách đơn (hiện ở các tab khác khi không phải đơn của mình).
+  function gdvPhuTrach(o: Pending) {
+    if (o.gdvId == null || o.gdvId === user.id) return null;
+    return (
+      <div className="ac-meta" style={{ marginTop: 4, fontSize: 12, color: 'var(--text-muted)' }}>
+        <FiUser /> GDV phụ trách: <b>{o.gdvTen || `#${o.gdvId}`}</b>
+      </div>
+    );
+  }
+
   function vonGDV(o: Pending) {
-    const von = parseFloat(vonInputs[o.maDH] || '0') || 0;
+    // Góp ý NV #13: nếu đã nhập tệ mua theo từng dòng thì tổng giá vốn = Σ các dòng, ô tổng chỉ đọc.
+    const tongVonDong = o.chiTiet.reduce((s, c) => s + (c.vonNDT || 0), 0);
+    const theoDong = tongVonDong > 0;
+    const von = theoDong ? tongVonDong : (parseFloat(vonInputs[o.maDH] || '0') || 0);
     const shipTq = parseFloat(shipTqInputs[o.maDH] || '0') || 0;
     const ln = o.tongThuNDT - (von + shipTq);
     return (
@@ -125,9 +178,11 @@ export default function GdvClient({ user, pendingOrders, khieuNai }: { user: Ses
         <div className="form-grid">
           <div className="form-field">
             <label>Tổng tệ MUA thực tế (¥)</label>
-            <input type="number" step="0.01" value={vonInputs[o.maDH] ?? ''}
+            <input type="number" step="0.01"
+              value={theoDong ? String(tongVonDong) : (vonInputs[o.maDH] ?? '')}
               onChange={(e) => setVonInputs((p) => ({ ...p, [o.maDH]: e.target.value }))}
-              placeholder="VD: 1250" disabled={busy[o.maDH]} />
+              placeholder="VD: 1250" readOnly={theoDong} disabled={busy[o.maDH]} />
+            {theoDong && <div className="hint">Đang tính theo giá vốn từng sản phẩm</div>}
           </div>
           <div className="form-field">
             <label>Ship nội địa TQ (¥)</label>
@@ -192,24 +247,30 @@ export default function GdvClient({ user, pendingOrders, khieuNai }: { user: Ses
     else showToast(r?.message || 'Lỗi', 'error');
   }
 
-  const tabDeposit = (
-    <div className="form-section">
-      <div className="section-title"><FiEdit3 /> Đơn đặt cọc — cần mua hàng từ NCC</div>
-      {ordersDeposit.length === 0 ? (
-        <div className="empty-state"><FiPackage /><p>Không có đơn nào chờ mua.</p></div>
-      ) : ordersDeposit.map((o) => (
-        <div key={o.maDH} className="action-card" style={{ opacity: busy[o.maDH] ? 0.5 : 1 }}>
-          <div className="ac-header">
-            <div className="ac-title" style={{ cursor: 'pointer', textDecoration: 'underline' }}
-                 onClick={() => (window as any).openOrderDetail?.(o.maDH)}>{o.maDH}</div>
-            <span className="status-badge s-deposit">Đặt cọc</span>
-          </div>
-          <div className="ac-meta">KH: <b>{o.tenKH}</b> · Web: <b>{o.web}</b> · {o.tongKg}kg · {o.tuyen === 'HCM' ? 'HCM' : 'Hà Nội'}</div>
-          <div className="ac-amount">
-            <div>Tổng tiền: <b>{fmtVND(o.tongTien)}đ</b></div>
-            <div>Đã cọc: <b style={{ color: '#059669' }}>{fmtVND(o.daTra)}đ</b></div>
-          </div>
-          <div className="ac-meta icon-inline" style={{ marginTop: 8 }}><FiFileText /><b>Hàng:</b> {o.tenHang}</div>
+  // Thẻ đơn dùng chung cho các tab "Đơn cần mua", "Chờ mã VĐ" và "Đơn của tôi".
+  function orderCard(o: Pending) {
+    const isDeposit = o.trangThai === 'DatCoc';
+    return (
+      <div key={o.maDH} className="action-card" style={{ opacity: busy[o.maDH] ? 0.5 : 1 }}>
+        <div className="ac-header">
+          <div className="ac-title" style={{ cursor: 'pointer', textDecoration: 'underline' }}
+               onClick={() => (window as any).openOrderDetail?.(o.maDH)}>{o.maDH}</div>
+          <span className={`status-badge ${isDeposit ? 's-deposit' : 's-bought'}`}>{isDeposit ? 'Đặt cọc' : 'Đã mua hàng'}</span>
+        </div>
+        {isDeposit ? (
+          <>
+            <div className="ac-meta">KH: <b>{o.tenKH}</b> · Web: <b>{o.web}</b> · {o.tongKg}kg · {o.tuyen === 'HCM' ? 'HCM' : 'Hà Nội'}</div>
+            <div className="ac-amount">
+              <div>Tổng tiền: <b>{fmtVND(o.tongTien)}đ</b></div>
+              <div>Đã cọc: <b style={{ color: '#059669' }}>{fmtVND(o.daTra)}đ</b></div>
+            </div>
+            <div className="ac-meta icon-inline" style={{ marginTop: 8 }}><FiFileText /><b>Hàng:</b> {o.tenHang}</div>
+          </>
+        ) : (
+          <div className="ac-meta">KH: <b>{o.tenKH}</b> · Web: <b>{o.web}</b> · Mã GD: <b>{o.maGD || '(chưa có)'}</b></div>
+        )}
+        {gdvPhuTrach(o)}
+        {isDeposit ? (
           <div className="form-grid" style={{ margin: '12px 0' }}>
             <div className="form-field">
               <label className="required">Mã giao dịch (NCC)</label>
@@ -219,31 +280,7 @@ export default function GdvClient({ user, pendingOrders, khieuNai }: { user: Ses
               <div className="hint">Mã đơn hàng bên NCC — có thể nhập nhiều mã, cách nhau dấu phẩy</div>
             </div>
           </div>
-          {chiTietSL(o)}
-          {vonGDV(o)}
-          <div className="ac-actions">
-            <button className="btn btn-primary" onClick={() => submitMaGD(o.maDH)} disabled={busy[o.maDH]}>
-              <FiSave /> Lưu mã GD + chuyển sang "Đã mua"
-            </button>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-
-  const tabBought = (
-    <div className="form-section">
-      <div className="section-title"><FiClock /> Đã mua — chờ NCC phát hàng và nhập mã VĐ</div>
-      {ordersBought.length === 0 ? (
-        <div className="empty-state"><FiPackage /><p>Không có đơn nào chờ mã VĐ.</p></div>
-      ) : ordersBought.map((o) => (
-        <div key={o.maDH} className="action-card" style={{ opacity: busy[o.maDH] ? 0.5 : 1 }}>
-          <div className="ac-header">
-            <div className="ac-title" style={{ cursor: 'pointer', textDecoration: 'underline' }}
-                 onClick={() => (window as any).openOrderDetail?.(o.maDH)}>{o.maDH}</div>
-            <span className="status-badge s-bought">Đã mua hàng</span>
-          </div>
-          <div className="ac-meta">KH: <b>{o.tenKH}</b> · Web: <b>{o.web}</b> · Mã GD: <b>{o.maGD || '(chưa có)'}</b></div>
+        ) : (
           <div className="form-grid" style={{ margin: '12px 0' }}>
             <div className="form-field">
               <label className="required">Mã vận đơn (từ NCC)</label>
@@ -254,15 +291,104 @@ export default function GdvClient({ user, pendingOrders, khieuNai }: { user: Ses
               <div className="hint" style={{ color: '#92400E' }}>NCC gửi mã này khi phát hàng — có thể nhập nhiều mã VĐ, cách nhau dấu phẩy</div>
             </div>
           </div>
-          {chiTietSL(o)}
-          {vonGDV(o)}
-          <div className="ac-actions">
+        )}
+        {chiTietSL(o)}
+        {vonGDV(o)}
+        <div className="ac-actions">
+          {isDeposit ? (
+            <button className="btn btn-primary" onClick={() => submitMaGD(o.maDH)} disabled={busy[o.maDH]}>
+              <FiSave /> Lưu mã GD + chuyển sang "Đã mua"
+            </button>
+          ) : (
             <button className="btn btn-warning" onClick={() => submitMaVD(o.maDH)} disabled={busy[o.maDH]}>
               <FiSave /> Lưu mã VĐ + chuyển sang "NCC giao hàng"
             </button>
-          </div>
+          )}
         </div>
-      ))}
+      </div>
+    );
+  }
+
+  const tabDeposit = (
+    <div className="form-section">
+      <div className="section-title"><FiEdit3 /> Đơn đặt cọc — cần mua hàng từ NCC</div>
+      {ordersDeposit.length === 0 ? (
+        <div className="empty-state"><FiPackage /><p>Không có đơn nào chờ mua.</p></div>
+      ) : ordersDeposit.map((o) => orderCard(o))}
+    </div>
+  );
+
+  const tabBought = (
+    <div className="form-section">
+      <div className="section-title"><FiClock /> Đã mua — chờ NCC phát hàng và nhập mã VĐ</div>
+      {ordersBought.length === 0 ? (
+        <div className="empty-state"><FiPackage /><p>Không có đơn nào chờ mã VĐ.</p></div>
+      ) : ordersBought.map((o) => orderCard(o))}
+    </div>
+  );
+
+  const tabMine = (
+    <div className="form-section">
+      <div className="section-title"><FiUser /> Đơn của tôi — bạn được giao phụ trách</div>
+      {myOrders.length === 0 ? (
+        <div className="empty-state"><FiInbox /><p>Chưa có đơn nào được giao cho bạn.</p></div>
+      ) : myOrders.map((o) => orderCard(o))}
+    </div>
+  );
+
+  const allFiltered = allOrders.filter((o) => {
+    if (allStatus && o.trangThai !== allStatus) return false;
+    const q = allSearch.trim().toLowerCase();
+    if (!q) return true;
+    return o.maDH.toLowerCase().includes(q)
+      || o.maKH.toLowerCase().includes(q)
+      || o.tenKH.toLowerCase().includes(q)
+      || o.maVD.toLowerCase().includes(q);
+  });
+
+  const tabAll = (
+    <div className="form-section">
+      <div className="section-title"><FiList /> Tất cả đơn — chỉ để xem ({allOrders.length})</div>
+      <div className="form-grid" style={{ marginBottom: 12 }}>
+        <div className="form-field">
+          <label>Tìm đơn</label>
+          <input type="text" value={allSearch} onChange={(e) => setAllSearch(e.target.value)}
+            placeholder="Mã đơn / mã KH / tên KH / mã VĐ" />
+        </div>
+        <div className="form-field">
+          <label>Lọc theo trạng thái</label>
+          <select value={allStatus} onChange={(e) => setAllStatus(e.target.value)}>
+            <option value="">Tất cả trạng thái</option>
+            {Object.entries(TRANG_THAI_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+        </div>
+      </div>
+      {allFiltered.length === 0 ? (
+        <div className="empty-state"><FiInbox /><p>Không có đơn khớp bộ lọc.</p></div>
+      ) : (
+        <table className="data-table">
+          <thead><tr>
+            <th>Mã đơn</th><th>Mã KH</th><th>Khách hàng</th><th>Mã VĐ</th>
+            <th>Trạng thái</th><th className="number">Tổng tiền</th><th>Ngày tạo</th>
+          </tr></thead>
+          <tbody>
+            {allFiltered.map((o) => (
+              <tr key={o.maDH}>
+                <td>
+                  <span style={{ cursor: 'pointer', color: 'var(--primary)', textDecoration: 'underline' }}
+                    onClick={() => (window as any).openOrderDetail?.(o.maDH)}>{o.maDH}</span>
+                </td>
+                <td>{o.maKH}</td>
+                <td>{o.tenKH}</td>
+                <td>{o.maVD || '-'}</td>
+                <td><span className={`status-badge ${statusToClass(o.trangThai)}`}>{statusToLabel(o.trangThai)}</span></td>
+                <td className="number">{fmtVND(o.tongTien)}đ</td>
+                <td>{fmtDateDDMM(o.ngayTao)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 
@@ -349,6 +475,8 @@ export default function GdvClient({ user, pendingOrders, khieuNai }: { user: Ses
       <Tabs tabs={[
         { id: 'tab-deposit', label: <><FiEdit3 /> Đơn cần mua ({ordersDeposit.length})</>, content: tabDeposit },
         { id: 'tab-bought', label: <><FiClock /> Chờ mã VĐ ({ordersBought.length})</>, content: tabBought },
+        { id: 'tab-mine', label: <><FiUser /> Đơn của tôi ({myOrders.length})</>, content: tabMine },
+        { id: 'tab-all', label: <><FiList /> Tất cả đơn ({allOrders.length})</>, content: tabAll },
         { id: 'tab-kn', label: <><FiAlertTriangle /> Khiếu nại ({khieuNai.length})</>, content: tabKhieuNai }
       ]} />
 

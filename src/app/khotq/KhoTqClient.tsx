@@ -132,7 +132,7 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
     else showToast(r?.message || 'Lỗi', 'error');
   }
 
-  function ServiceBadges({ o }: { o: Row }) {
+  function serviceBadges(o: Row) {
     if (!o.kiemDem && !o.dongGo) return null;
     return (
       <div style={{ display: 'flex', gap: 6, margin: '6px 0' }}>
@@ -142,7 +142,7 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
     );
   }
 
-  function KiemKe({ o }: { o: Row }) {
+  function kiemKe(o: Row) {
     if (!o.kiemDem) return null;
     return (
       <div style={{ marginTop: 8, padding: 10, background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8 }}>
@@ -201,13 +201,13 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
             <div className="ac-title">Mã VĐ: {o.maVD || '(chưa có)'}</div>
             <span className="status-badge s-tq">NCC đã giao</span>
           </div>
-          <ServiceBadges o={o} />
+          {serviceBadges(o)}
           <div className="ac-meta">
             Đơn: <b style={{ cursor: 'pointer', textDecoration: 'underline', color: '#1E3A8A' }}
                     onClick={() => (window as any).openOrderDetail?.(o.maDH)}>{o.maDH}</b> ·
             Hàng: {o.tenHang} · {o.kg}kg · {o.m3}m³ · {o.web}
           </div>
-          <KiemKe o={o} />
+          {kiemKe(o)}
           <div className="ac-actions">
             <button className="btn btn-success" onClick={() => confirmKhoTQ(o.maDH)}>
               <FiCheck /> Xác nhận đã nhận tại kho TQ

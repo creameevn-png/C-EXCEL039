@@ -107,7 +107,7 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
     else showToast(r?.message || 'Lỗi', 'error');
   }
 
-  function ShipVN({ o }: { o: Row }) {
+  function shipVN(o: Row) {
     return (
       <div className="form-grid" style={{ marginTop: 8 }}>
         <div className="form-field">
@@ -140,7 +140,7 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
     </div>
   );
 
-  function DiaChi({ o }: { o: Row }) {
+  function diaChi(o: Row) {
     if (!o.diaChiNhan && !o.nguoiNhan) return null;
     return (
       <div className="icon-inline" style={{ background: '#ECFDF5', padding: 8, borderRadius: 6, marginTop: 8, fontSize: 12, color: '#065F46' }}>
@@ -171,8 +171,8 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
             KH: {o.tenKH} · {o.tenHang} · Tuyến: <b>{o.tuyen === 'HCM' ? 'HCM' : 'Hà Nội'}</b>
             {o.maBao && <> · Bao: <b>{o.maBao}</b></>}
           </div>
-          <DiaChi o={o} />
-          <ShipVN o={o} />
+          {diaChi(o)}
+          {shipVN(o)}
           <div className="ac-actions">
             <button className="btn btn-success" onClick={() => confirmKhoVN(o.maDH)}>
               <FiCheck /> Xác nhận đã nhận tại VN
@@ -227,7 +227,7 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
             <span className="status-badge s-vn">Sẵn sàng giao</span>
           </div>
           <div className="ac-meta">KH: <b>{o.tenKH}</b> · {o.tenHang} · Tuyến: <b>{o.tuyen === 'HCM' ? 'HCM' : 'Hà Nội'}</b></div>
-          <DiaChi o={o} />
+          {diaChi(o)}
           {o.conLai > 0.5 && (
             <div className="icon-inline" style={{ background: '#FEE2E2', padding: 8, borderRadius: 6, marginTop: 8, fontSize: 12, color: '#991B1B' }}>
               <FiAlertCircle /> Còn nợ {fmtVND(o.conLai)}đ — không thể giao đến khi thanh toán đủ

@@ -77,7 +77,7 @@ export default function GdvClient({ user, pendingOrders, khieuNai }: { user: Ses
     else showToast(r?.message || 'Lỗi', 'error');
   }
 
-  function ChiTietSL({ o }: { o: Pending }) {
+  function chiTietSL(o: Pending) {
     if (o.chiTiet.length === 0) return null;
     return (
       <div style={{ marginTop: 10 }}>
@@ -113,7 +113,7 @@ export default function GdvClient({ user, pendingOrders, khieuNai }: { user: Ses
     );
   }
 
-  function VonGDV({ o }: { o: Pending }) {
+  function vonGDV(o: Pending) {
     const von = parseFloat(vonInputs[o.maDH] || '0') || 0;
     const shipTq = parseFloat(shipTqInputs[o.maDH] || '0') || 0;
     const ln = o.tongThuNDT - (von + shipTq);
@@ -219,8 +219,8 @@ export default function GdvClient({ user, pendingOrders, khieuNai }: { user: Ses
               <div className="hint">Mã đơn hàng bên NCC — có thể nhập nhiều mã, cách nhau dấu phẩy</div>
             </div>
           </div>
-          <ChiTietSL o={o} />
-          <VonGDV o={o} />
+          {chiTietSL(o)}
+          {vonGDV(o)}
           <div className="ac-actions">
             <button className="btn btn-primary" onClick={() => submitMaGD(o.maDH)} disabled={busy[o.maDH]}>
               <FiSave /> Lưu mã GD + chuyển sang "Đã mua"
@@ -254,8 +254,8 @@ export default function GdvClient({ user, pendingOrders, khieuNai }: { user: Ses
               <div className="hint" style={{ color: '#92400E' }}>NCC gửi mã này khi phát hàng — có thể nhập nhiều mã VĐ, cách nhau dấu phẩy</div>
             </div>
           </div>
-          <ChiTietSL o={o} />
-          <VonGDV o={o} />
+          {chiTietSL(o)}
+          {vonGDV(o)}
           <div className="ac-actions">
             <button className="btn btn-warning" onClick={() => submitMaVD(o.maDH)} disabled={busy[o.maDH]}>
               <FiSave /> Lưu mã VĐ + chuyển sang "NCC giao hàng"

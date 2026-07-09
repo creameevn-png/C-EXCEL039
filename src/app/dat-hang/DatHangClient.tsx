@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import {
   FiCheckCircle, FiArrowLeft, FiSend, FiClock, FiPlus, FiX,
-  FiFileText, FiUser, FiShoppingCart, FiDollarSign, FiEdit3, FiBox, FiRefreshCw
+  FiFileText, FiUser, FiShoppingCart, FiDollarSign, FiEdit3, FiBox, FiRefreshCw, FiPackage
 } from 'react-icons/fi';
 import { callServer } from '@/lib/client';
 import { showToast } from '@/components/Toast';
@@ -20,11 +20,20 @@ type Item = {
 let SEQ = 1;
 const mk = (): Item => ({ tempId: SEQ++, tenSP: '', soLuong: 1, donGiaNDT: 0, tyGia: 3650, kg: 0, m3: 0, webNguon: '', linkTaobao: '' });
 
-export default function DatHangClient({ kh }: { kh: { maKH: string; tenKH: string; pctCoc: number; tuyen: string } | null }) {
+type KH = { maKH: string; tenKH: string; pctCoc: number; tuyen: string; sdt: string; diaChi: string };
+
+export default function DatHangClient({ kh, isCustomer }: { kh: KH | null; isCustomer: boolean }) {
   const [items, setItems] = useState<Item[]>([mk()]);
   const [tuyen, setTuyen] = useState<'HaNoi' | 'HCM'>((kh?.tuyen as any) || 'HaNoi');
+  const [lineVC, setLineVC] = useState<'LineNhanh' | 'LineThuong' | 'LineRe'>('LineThuong');
   const [pctCoc, setPctCoc] = useState(kh?.pctCoc || 70);
   const [ghiChu, setGhiChu] = useState('');
+  // Mặc định theo khách đã chọn, khách sửa được nếu muốn giao địa chỉ khác.
+  const [nguoiNhan, setNguoiNhan] = useState(kh?.tenKH || '');
+  const [sdtNhan, setSdtNhan] = useState(kh?.sdt || '');
+  const [diaChiNhan, setDiaChiNhan] = useState(kh?.diaChi || '');
+  const [kiemDem, setKiemDem] = useState(false);
+  const [dongGoi, setDongGoi] = useState(0);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [today, setToday] = useState('');
@@ -43,10 +52,10 @@ export default function DatHangClient({ kh }: { kh: { maKH: string; tenKH: strin
     const m3 = items.reduce((s, it) => s + it.m3 * it.soLuong, 0);
     const phiMua = Math.round(giaHang * 0.02 / 1000) * 1000;
     const phiVC = calcPhiVCPanama(kg, m3, tuyen);
-    const tong = giaHang + phiMua + phiVC;
+    const tong = giaHang + phiMua + phiVC + dongGoi;
     const coc = Math.round(tong * pctCoc / 100 / 1000) * 1000;
     return { giaHang, sl, kg, m3, phiMua, phiVC, tong, coc };
-  }, [items, tuyen, pctCoc]);
+  }, [items, tuyen, pctCoc, dongGoi]);
 
   async function submit() {
     if (!kh) return showToast('Cần chọn KH', 'error');
@@ -55,6 +64,8 @@ export default function DatHangClient({ kh }: { kh: { maKH: string; tenKH: strin
     setBusy(true);
     const r = await callServer('createOrder', {
       maKH: kh.maKH, tuyen, pctCoc, ghiChu,
+      lineVC, kiemDem, phiDongGoi: dongGoi,
+      nguoiNhan, sdtNhan, diaChiNhan,
       chiTiet: valid.map((it) => ({
         tenSP: it.tenSP, soLuong: it.soLuong,
         donGiaNDT: it.donGiaNDT, tyGia: it.tyGia,
@@ -116,10 +127,22 @@ export default function DatHangClient({ kh }: { kh: { maKH: string; tenKH: strin
                   <option value="HaNoi">Hà Nội</option><option value="HCM">HCM</option>
                 </select>
               </div>
-              <div className="erp-field w-sm">
-                <label>% Cọc</label>
-                <input type="number" min={0} max={100} value={pctCoc} onChange={(e) => setPctCoc(parseFloat(e.target.value) || 70)} />
+              <div className="erp-field">
+                <label>Line vận chuyển</label>
+                <select value={lineVC} onChange={(e) => setLineVC(e.target.value as any)}>
+                  <option value="LineNhanh">Nhanh (3-5 ngày)</option>
+                  <option value="LineThuong">Thường (7-10 ngày)</option>
+                  <option value="LineRe">Tiết kiệm (15-20 ngày)</option>
+                </select>
               </div>
+              {isCustomer ? (
+                <div className="erp-field locked w-sm"><label>% Cọc</label><input readOnly value={pctCoc} /></div>
+              ) : (
+                <div className="erp-field w-sm">
+                  <label>% Cọc</label>
+                  <input type="number" min={0} max={100} value={pctCoc} onChange={(e) => setPctCoc(parseFloat(e.target.value) || 70)} />
+                </div>
+              )}
               {kh && <>
                 <div className="erp-field locked w-md"><label>Mã KH</label><input readOnly value={kh.maKH} /></div>
                 <div className="erp-field locked w-lg"><label>Tên khách hàng</label><input readOnly value={kh.tenKH} /></div>
@@ -130,6 +153,22 @@ export default function DatHangClient({ kh }: { kh: { maKH: string; tenKH: strin
                 <FiUser /> Đơn khách tự đặt — CSKH sẽ xác nhận và gán mã khách hàng.
               </div>
             )}
+          </ErpSection>
+
+          {/* NGƯỜI NHẬN HÀNG & DỊCH VỤ */}
+          <ErpSection icon={<FiPackage />} title="Người nhận hàng & dịch vụ">
+            <div className="erp-fields">
+              <div className="erp-field w-md"><label>Tên người nhận</label>
+                <input value={nguoiNhan} onChange={(e) => setNguoiNhan(e.target.value)} placeholder="Mặc định theo KH (sửa được)" /></div>
+              <div className="erp-field w-sm"><label>SĐT nhận</label>
+                <input value={sdtNhan} onChange={(e) => setSdtNhan(e.target.value)} placeholder="SĐT người nhận" /></div>
+              <div className="erp-field w-lg"><label>Địa chỉ nhận hàng</label>
+                <input value={diaChiNhan} onChange={(e) => setDiaChiNhan(e.target.value)} placeholder="Địa chỉ chi tiết để giao hàng VN" /></div>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, cursor: 'pointer' }}>
+              <input type="checkbox" checked={kiemDem} onChange={(e) => setKiemDem(e.target.checked)} style={{ width: 16, height: 16 }} />
+              <span>Dịch vụ <b>kiểm đếm (GTGT)</b> — kho TQ mở kiểm tra số lượng/chất lượng từng link hàng</span>
+            </label>
           </ErpSection>
 
           {/* ITEMS */}
@@ -153,7 +192,7 @@ export default function DatHangClient({ kh }: { kh: { maKH: string; tenKH: strin
                     <th rowSpan={2} style={{ width: 42 }}></th>
                   </tr>
                   <tr>
-                    <th className="num" style={{ width: 96 }}>¥ / sp</th>
+                    <th className="num" style={{ width: 96 }}>Giá tệ / sp (¥)</th>
                     <th className="num" style={{ width: 90 }}>Tỷ giá</th>
                     <th className="num" style={{ width: 72 }}>Kg</th>
                     <th className="num" style={{ width: 80 }}>M³</th>
@@ -234,9 +273,16 @@ export default function DatHangClient({ kh }: { kh: { maKH: string; tenKH: strin
 
           {/* FEES */}
           <ErpSection icon={<FiDollarSign />} title="Chi phí & thanh toán">
+            <div className="erp-fields" style={{ marginBottom: 10 }}>
+              <div className="erp-field"><label>Phí đóng gỗ / bọt khí</label>
+                <select value={dongGoi} onChange={(e) => setDongGoi(parseFloat(e.target.value) || 0)}>
+                  <option value={0}>Không</option><option value={5000}>5.000đ</option><option value={10000}>10.000đ</option>
+                </select></div>
+            </div>
             <div className="erp-fee-row"><span className="lbl">Tiền hàng</span><span className="v">{fmtVND(tot.giaHang)}đ</span></div>
             <div className="erp-fee-row"><span className="lbl">Phí mua hàng (2%)</span><span className="v">{fmtVND(tot.phiMua)}đ</span></div>
             <div className="erp-fee-row"><span className="lbl">Phí vận chuyển ({tot.kg.toFixed(2)} kg / {tot.m3.toFixed(4)} m³)</span><span className="v">{fmtVND(tot.phiVC)}đ</span></div>
+            {dongGoi > 0 && <div className="erp-fee-row"><span className="lbl">Phí đóng gỗ / bọt khí</span><span className="v">{fmtVND(dongGoi)}đ</span></div>}
             <div className="erp-fee-row total"><span className="lbl">Tổng tiền (ước tính)</span><span className="v">{fmtVND(tot.tong)}đ</span></div>
             <div className="erp-fee-row coc"><span className="lbl">Cọc ({pctCoc}%)</span><span className="v">{fmtVND(tot.coc)}đ</span></div>
           </ErpSection>

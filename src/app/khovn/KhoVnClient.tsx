@@ -19,13 +19,24 @@ type WeighLine = { stt: number; tenSP: string; soLuong: number; kg: string; m3: 
 type Row = {
   maDH: string; maVD: string; maBao: string; tenKH: string;
   tenHang: string; tuyen: string; conLai: number; shipND: number;
-  diaChiNhan: string; nguoiNhan: string; sdtNhan: string;
+  diaChiNhan: string; nguoiNhan: string; sdtNhan: string; lineNoiDia: string;
 };
 type Bao = {
   maBao: string; line: string; trangThai: string;
   tongKg: number; tongM3: number; soKien: number; daNhan: number; tong: number;
 };
 const LINE_LABEL: Record<string, string> = { LineNhanh: 'Nhanh', LineThuong: 'Thường', LineRe: 'Tiết kiệm' };
+// Góp ý NV #41: line vận chuyển nội địa VN do kho VN chọn khi giao hàng.
+const LINE_NOI_DIA = ['Viettel Post', 'GHTK', 'J&T Express', 'Xe khách', 'Xe tải nhà', 'Khách tự lấy'];
+
+// Góp ý NV #35: bắn (quét) mã vận đơn để tìm nhanh đơn trong danh sách kho.
+function filterByScan(rows: Row[], q: string) {
+  const k = q.trim().toLowerCase();
+  if (!k) return rows;
+  return rows.filter((o) =>
+    o.maVD.toLowerCase().includes(k) || o.maDH.toLowerCase().includes(k) ||
+    o.maBao.toLowerCase().includes(k) || o.tenKH.toLowerCase().includes(k));
+}
 
 export default function KhoVnClient({ user, incomingShipments, atWarehouse, readyToDeliver, baos }:
   { user: SessionUser; incomingShipments: Row[]; atWarehouse: Row[]; readyToDeliver: Row[]; baos: Bao[] }) {
@@ -74,6 +85,9 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
   // Đợt 5 — nhận cả bao + ship nội địa VN
   const [baoInput, setBaoInput] = useState('');
   const [shipInputs, setShipInputs] = useState<Record<string, string>>({});
+  const [lineInputs, setLineInputs] = useState<Record<string, string>>({});
+  // Ô bắn mã vận đơn — lọc nhanh mọi tab (góp ý #35).
+  const [scan, setScan] = useState('');
 
   async function receiveBao(maBao: string) {
     const ma = (maBao || baoInput).trim();
@@ -88,7 +102,7 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
 
   async function saveShipVN(maDH: string) {
     const v = parseFloat(shipInputs[maDH] || '0') || 0;
-    const r = await callServer('updateShipVN', maDH, v);
+    const r = await callServer('updateShipVN', maDH, v, lineInputs[maDH] ?? '');
     if (r?.success) { showToast('Đã cập nhật ship nội địa VN', 'success'); reload(); }
     else showToast(r?.message || 'Lỗi', 'error');
   }
@@ -96,6 +110,14 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
   function ShipVN({ o }: { o: Row }) {
     return (
       <div className="form-grid" style={{ marginTop: 8 }}>
+        <div className="form-field">
+          <label>Line vận chuyển nội địa</label>
+          <select value={lineInputs[o.maDH] ?? o.lineNoiDia ?? ''}
+            onChange={(e) => setLineInputs((p) => ({ ...p, [o.maDH]: e.target.value }))}>
+            <option value="">-- Chọn line --</option>
+            {LINE_NOI_DIA.map((l) => <option key={l} value={l}>{l}</option>)}
+          </select>
+        </div>
         <div className="form-field">
           <label>Ship nội địa VN (VNĐ)</label>
           <div style={{ display: 'flex', gap: 6 }}>
@@ -108,6 +130,16 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
     );
   }
 
+  // JSX const (không phải component con) để ô quét không bị remount và mất focus mỗi lần gõ.
+  const scanBox = (
+    <div className="form-field" style={{ marginBottom: 12 }}>
+      <label><FiTarget /> Bắn / nhập mã vận đơn để tìm nhanh</label>
+      <input value={scan} onChange={(e) => setScan(e.target.value)}
+        placeholder="Quét mã VĐ, mã bao, mã đơn hoặc tên khách…" />
+      {scan.trim() && <div className="hint">Đang lọc theo “{scan.trim()}” — xoá ô để xem lại tất cả.</div>}
+    </div>
+  );
+
   function DiaChi({ o }: { o: Row }) {
     if (!o.diaChiNhan && !o.nguoiNhan) return null;
     return (
@@ -117,12 +149,17 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
     );
   }
 
+  const incomingFiltered = filterByScan(incomingShipments, scan);
+  const atWarehouseFiltered = filterByScan(atWarehouse, scan);
+  const readyFiltered = filterByScan(readyToDeliver, scan);
+
   const tabIncoming = (
     <div className="form-section">
       <div className="section-title"><FiDownload /> Hàng từ TQ đang về kho VN</div>
-      {incomingShipments.length === 0 ? (
-        <div className="empty-state"><FiPackage /><p>Không có hàng đang về.</p></div>
-      ) : incomingShipments.map((o) => (
+      {scanBox}
+      {incomingFiltered.length === 0 ? (
+        <div className="empty-state"><FiPackage /><p>{scan.trim() ? 'Không có đơn khớp mã đã bắn.' : 'Không có hàng đang về.'}</p></div>
+      ) : incomingFiltered.map((o) => (
         <div key={o.maDH} className="action-card">
           <div className="ac-header">
             <div className="ac-title">Mã VĐ: {o.maVD || '(chưa có)'}</div>
@@ -152,9 +189,10 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
   const tabAtVN = (
     <div className="form-section">
       <div className="section-title"><FiPackage /> Hàng tại kho VN — chờ KH thanh toán</div>
-      {atWarehouse.length === 0 ? (
-        <div className="empty-state"><FiCheckCircle /><p>Không có đơn chờ thanh toán.</p></div>
-      ) : atWarehouse.map((o) => (
+      {scanBox}
+      {atWarehouseFiltered.length === 0 ? (
+        <div className="empty-state"><FiCheckCircle /><p>{scan.trim() ? 'Không có đơn khớp mã đã bắn.' : 'Không có đơn chờ thanh toán.'}</p></div>
+      ) : atWarehouseFiltered.map((o) => (
         <div key={o.maDH} className="action-card">
           <div className="ac-header">
             <div className="ac-title">Đơn: <b style={{ cursor: 'pointer', textDecoration: 'underline', color: '#1E3A8A' }}
@@ -178,9 +216,10 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
   const tabReady = (
     <div className="form-section">
       <div className="section-title"><FiTruck /> Đơn đã thanh toán đủ — chờ giao khách</div>
-      {readyToDeliver.length === 0 ? (
-        <div className="empty-state"><FiPackage /><p>Không có đơn nào chờ giao.</p></div>
-      ) : readyToDeliver.map((o) => (
+      {scanBox}
+      {readyFiltered.length === 0 ? (
+        <div className="empty-state"><FiPackage /><p>{scan.trim() ? 'Không có đơn khớp mã đã bắn.' : 'Không có đơn nào chờ giao.'}</p></div>
+      ) : readyFiltered.map((o) => (
         <div key={o.maDH} className="action-card">
           <div className="ac-header">
             <div className="ac-title">Đơn: <b style={{ cursor: 'pointer', textDecoration: 'underline', color: '#1E3A8A' }}

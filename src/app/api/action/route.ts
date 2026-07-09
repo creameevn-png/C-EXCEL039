@@ -24,6 +24,10 @@ function normTuyen(v: any): Tuyen {
   return String(v).toUpperCase() === 'HCM' ? 'HCM' : 'HaNoi';
 }
 
+const LINE_VC: LineVC[] = ['LineNhanh', 'LineThuong', 'LineRe'];
+// Các gói đóng gỗ/bọt khí khách được chọn — khớp select trên form CSKH và form khách.
+const DONG_GO_GOI = [0, 5000, 10000];
+
 type ChiTietInput = {
   tenSP: string;
   soLuong?: number;
@@ -96,9 +100,12 @@ async function recomputeBao(maBao: string) {
 const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnType<typeof getSession>>>) => Promise<Resp>> = {
   // ============== CSKH ==============
   async createOrder(args, user) {
-    if (!allow(user.vaiTro, ['CSKH'])) return err('Không có quyền');
+    // Khách hàng tự đặt đơn trên /dat-hang (góp ý NV #1-8). Khách chỉ được đặt cho
+    // chính mình: maKH lấy từ tài khoản đăng nhập, không nhận từ client.
+    const isCustomer = user.vaiTro === 'Customer';
+    if (!isCustomer && !allow(user.vaiTro, ['CSKH'])) return err('Không có quyền');
     const d = args[0] || {};
-    if (!d.maKH) return err('Vui lòng chọn khách hàng');
+    if (!isCustomer && !d.maKH) return err('Vui lòng chọn khách hàng');
     const items: ChiTietInput[] = Array.isArray(d.chiTiet) && d.chiTiet.length > 0
       ? d.chiTiet
       : (d.tenHang ? [{
@@ -113,11 +120,18 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         }] : []);
     if (items.length === 0) return err('Đơn phải có ít nhất 1 sản phẩm');
 
-    const kh = await prisma.khachHang.findUnique({ where: { maKH: d.maKH } });
-    if (!kh) return err('KH không tồn tại');
+    const kh = isCustomer
+      ? await prisma.khachHang.findFirst({ where: { email: user.email } })
+      : await prisma.khachHang.findUnique({ where: { maKH: d.maKH } });
+    if (!kh) return err(isCustomer ? 'Tài khoản chưa liên kết khách hàng. Liên hệ CSKH.' : 'KH không tồn tại');
 
     const maDH = await nextMaDH();
     const tuyen = normTuyen(d.tuyen ?? kh.tuyen);
+    const lineVC: LineVC = LINE_VC.includes(d.lineVC) ? d.lineVC : 'LineThuong';
+    // Khách chỉ chọn được gói đóng gỗ có sẵn; các phí nội bộ và % cọc do CSKH/kế toán quyết.
+    const dongGo = isCustomer
+      ? (DONG_GO_GOI.includes(Number(d.phiDongGoi)) ? Number(d.phiDongGoi) : 0)
+      : Number(d.phiDongGoi) || 0;
 
     await prisma.donHang.create({
       data: {
@@ -126,18 +140,18 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         nvTao: user.email,
         nvId: user.id,
         tuyen,
-        lineVC: (d.lineVC as LineVC) || 'LineThuong',
+        lineVC,
         loaiHang: d.loaiHang || 'Thường',
-        pctCoc: Number(d.pctCoc) || kh.pctCoc || 70,
-        shipND: Number(d.phiShipND) || 0,
-        dongGo: Number(d.phiDongGoi) || 0,
-        phuThu: Number(d.phiPhuThu) || 0,
-        phiPhatSinh: Number(d.phiPhatSinh) || 0,
-        ngachHQ: d.ngachHQ || 'Tiểu ngạch',
-        thueNK: Number(d.thueNK) || 0,
-        vat: Number(d.vat) || 0,
-        phiKiemHoa: Number(d.phiKiemHoa) || 0,
-        phiLuuKho: Number(d.phiLuuKho) || 0,
+        pctCoc: isCustomer ? (kh.pctCoc || 70) : (Number(d.pctCoc) || kh.pctCoc || 70),
+        shipND: isCustomer ? 0 : Number(d.phiShipND) || 0,
+        dongGo,
+        phuThu: isCustomer ? 0 : Number(d.phiPhuThu) || 0,
+        phiPhatSinh: isCustomer ? 0 : Number(d.phiPhatSinh) || 0,
+        ngachHQ: isCustomer ? 'Tiểu ngạch' : (d.ngachHQ || 'Tiểu ngạch'),
+        thueNK: isCustomer ? 0 : Number(d.thueNK) || 0,
+        vat: isCustomer ? 0 : Number(d.vat) || 0,
+        phiKiemHoa: isCustomer ? 0 : Number(d.phiKiemHoa) || 0,
+        phiLuuKho: isCustomer ? 0 : Number(d.phiLuuKho) || 0,
         kiemDem: !!d.kiemDem,
         nguoiNhan: (d.nguoiNhan && String(d.nguoiNhan).trim()) || kh.tenKH,
         sdtNhan: (d.sdtNhan && String(d.sdtNhan).trim()) || kh.sdt || null,
@@ -171,13 +185,20 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     }
 
     await recomputeDonHang(maDH);
-    await logActivity(user.email, 'CREATE_ORDER', maDH, { maKH: kh.maKH, items: items.length });
-    await pushNotify({
-      vaiTro: ['GDV', 'MuaHang'], loai: 'info', maDH,
-      tieuDe: `Đơn mới ${maDH}`,
-      noiDung: `${kh.tenKH} · ${items.length} SP · chờ đặt cọc / xử lý`,
-      link: '/gdv', nguoiTao: user.email
-    });
+    await logActivity(user.email, 'CREATE_ORDER', maDH, { maKH: kh.maKH, items: items.length, khachTuDat: isCustomer });
+    await pushNotify(isCustomer
+      ? {
+          vaiTro: ['CSKH'], loai: 'info', maDH,
+          tieuDe: `Khách tự đặt đơn ${maDH}`,
+          noiDung: `${kh.maKH} · ${kh.tenKH} · ${items.length} SP · chờ CSKH xác nhận`,
+          link: '/cskh', nguoiTao: user.email
+        }
+      : {
+          vaiTro: ['GDV', 'MuaHang'], loai: 'info', maDH,
+          tieuDe: `Đơn mới ${maDH}`,
+          noiDung: `${kh.tenKH} · ${items.length} SP · chờ đặt cọc / xử lý`,
+          link: '/gdv', nguoiTao: user.email
+        });
     return ok({ maDH });
   },
 
@@ -250,7 +271,8 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
   },
 
   async topupWallet(args, user) {
-    if (!allow(user.vaiTro, ['CSKH', 'KeToan'])) return err('Không có quyền');
+    // Góp ý NV #10: chỉ Kế toán được nạp ví (CSKH đã bị gỡ quyền).
+    if (!allow(user.vaiTro, ['KeToan'])) return err('Chỉ Kế toán được nạp ví');
     const [maKH, amount, note] = args;
     const amt = Number(amount) || 0;
     if (!maKH) return err('Thiếu mã KH');
@@ -337,9 +359,30 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     // Tệ khách trả trên đơn = Σ(đơn giá NDT × số lượng) của các dòng hàng.
     const tongThuNDT = o.chiTiet.reduce((s, c) => s + c.donGiaNDT * c.soLuong, 0);
     const loiNhuanNDT = tongThuNDT - (vonNDT + shipNDTQ);
-    await prisma.donHang.update({ where: { maDH }, data: { vonNDT, shipNDTQ, loiNhuanNDT } });
+    // Góp ý NV #14: ghi chú riêng của GDV cho đơn hàng.
+    const ghiChuGDV = patch?.ghiChuGDV !== undefined ? (String(patch.ghiChuGDV).trim() || null) : undefined;
+    await prisma.donHang.update({ where: { maDH }, data: { vonNDT, shipNDTQ, loiNhuanNDT, ...(ghiChuGDV !== undefined && { ghiChuGDV }) } });
     await logActivity(user.email, 'UPDATE_VON_GDV', maDH, { vonNDT, shipNDTQ, loiNhuanNDT });
     return ok({ vonNDT, shipNDTQ, tongThuNDT, loiNhuanNDT });
+  },
+
+  // Góp ý NV #17: GDV sửa số lượng còn của shop trong chi tiết đơn (shop hết hàng → giảm SL).
+  async updateChiTietSoLuong(args, user) {
+    if (!allow(user.vaiTro, ['GDV', 'MuaHang'])) return err('Không có quyền');
+    const [maDH, stt, soLuong] = args;
+    if (!maDH || !stt) return err('Thiếu thông tin dòng hàng');
+    const sl = Math.floor(Number(soLuong));
+    if (!Number.isFinite(sl) || sl < 0) return err('Số lượng không hợp lệ');
+    const line = await prisma.chiTietDon.findFirst({ where: { maDH, stt: Number(stt) } });
+    if (!line) return err('Không tìm thấy dòng hàng');
+    if (sl === line.soLuong) return ok();
+    await prisma.chiTietDon.update({
+      where: { id: line.id },
+      data: { soLuong: sl, thanhTien: line.donGiaVND * sl }
+    });
+    await recomputeDonHang(maDH);
+    await logActivity(user.email, 'SUA_SO_LUONG', maDH, { stt, soLuong: `${line.soLuong}→${sl}` });
+    return ok();
   },
 
   // ============== KE TOAN ==============
@@ -624,12 +667,17 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
 
   async updateShipVN(args, user) {
     if (!allow(user.vaiTro, ['KhoVN', 'CSKH'])) return err('Không có quyền');
-    const [maDH, shipVN] = args;
+    // Góp ý NV #41: kho VN chọn line vận chuyển nội địa kèm phí ship.
+    const [maDH, shipVN, lineNoiDia] = args;
     const o = await prisma.donHang.findUnique({ where: { maDH } });
     if (!o) return err('Đơn không tồn tại');
-    await prisma.donHang.update({ where: { maDH }, data: { shipND: Math.max(0, Number(shipVN) || 0) } });
+    const line = lineNoiDia !== undefined ? (String(lineNoiDia).trim() || null) : undefined;
+    await prisma.donHang.update({
+      where: { maDH },
+      data: { shipND: Math.max(0, Number(shipVN) || 0), ...(line !== undefined && { lineNoiDia: line }) }
+    });
     await recomputeDonHang(maDH);
-    await logActivity(user.email, 'UPDATE_SHIP_VN', maDH, { shipVN });
+    await logActivity(user.email, 'UPDATE_SHIP_VN', maDH, { shipVN, lineNoiDia: line });
     return ok();
   },
 

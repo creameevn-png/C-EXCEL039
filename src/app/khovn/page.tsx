@@ -42,7 +42,8 @@ export default async function KhoVnPage() {
     tenHang: o.chiTiet.map((c: any) => `${c.tenSP} (x${c.soLuong})`).join(' · '),
     tuyen: o.tuyen,
     conLai: o.conLai, shipND: o.shipND,
-    diaChiNhan: o.diaChiNhan || '', nguoiNhan: o.nguoiNhan || '', sdtNhan: o.sdtNhan || ''
+    diaChiNhan: o.diaChiNhan || '', nguoiNhan: o.nguoiNhan || '', sdtNhan: o.sdtNhan || '',
+    lineNoiDia: o.lineNoiDia || ''
   });
 
   return <KhoVnClient user={user}

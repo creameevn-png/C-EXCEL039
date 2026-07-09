@@ -63,6 +63,8 @@ function mkLine(p?: Partial<LineItem>, tyGia = 3650): LineItem {
 
 export default function CskhClient({ initial }: Props) {
   const { user, customers: customersInit, products: productsInit, myOrders, kpi, tyGia } = initial;
+  // Góp ý NV #10: chỉ Kế toán được nạp ví — CSKH chỉ xem số dư.
+  const canTopup = user.vaiTro === 'KeToan' || user.vaiTro === 'Admin';
   const tyGiaByWeb = initial.tyGiaByWeb || {};
   // Tỷ giá riêng theo sàn: có cấu hình cho sàn → trả về, không thì null (giữ tỷ giá đang có).
   const webRateOrNull = (web: string): number | null => {
@@ -678,9 +680,13 @@ export default function CskhClient({ initial }: Props) {
                 {fmtVND(c.congNo)}
               </td>
               <td>
-                <button className="btn btn-success btn-sm" onClick={() => openTopupModal(c)}>
-                  <FiDollarSign /> Nạp ví
-                </button>
+                {canTopup ? (
+                  <button className="btn btn-success btn-sm" onClick={() => openTopupModal(c)}>
+                    <FiDollarSign /> Nạp ví
+                  </button>
+                ) : (
+                  <span className="hint">Kế toán nạp ví</span>
+                )}
               </td>
             </tr>
           ))}

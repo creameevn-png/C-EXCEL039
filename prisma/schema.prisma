@@ -228,6 +228,12 @@ model DonHang {
   anhGiaoKH   String?      @map("anh_giao_kh") @db.Text
 
   ghiChu      String?      @map("ghi_chu") @db.Text
+
+  // Đợt 11 — góp ý NV #14, #41: ghi chú riêng của GDV (tách khỏi ghi chú CSKH/khách)
+  // và line vận chuyển nội địa VN do kho VN chọn khi giao hàng.
+  ghiChuGDV   String?      @map("ghi_chu_gdv") @db.Text
+  lineNoiDia  String?      @map("line_noi_dia")
+
   updatedAt   DateTime     @updatedAt @map("updated_at")
 
   khachHang KhachHang   @relation(fields: [maKH], references: [maKH])

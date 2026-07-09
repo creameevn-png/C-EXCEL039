@@ -14,11 +14,13 @@ import { callServer, reload } from '@/lib/client';
 import { fmtVND, fmtDateDDMM } from '@/lib/format';
 import { KN_LABEL } from '@/lib/status';
 
+type ChiTiet = { stt: number; tenSP: string; soLuong: number; donGiaNDT: number; linkTaobao: string };
 type Pending = {
   maDH: string; tenKH: string; web: string; tongKg: number; tuyen: string;
   tongTien: number; daTra: number; tenHang: string;
   maGD: string; maVD: string; trangThai: string;
   vonNDT: number; shipNDTQ: number; loiNhuanNDT: number; tongThuNDT: number;
+  ghiChuGDV: string; chiTiet: ChiTiet[];
 };
 type KhieuNai = {
   maKN: string; ngayTao: string; maDH: string; maKH: string; tenKH: string;
@@ -43,6 +45,12 @@ export default function GdvClient({ user, pendingOrders, khieuNai }: { user: Ses
     Object.fromEntries(pendingOrders.map((o) => [o.maDH, o.vonNDT ? String(o.vonNDT) : ''])));
   const [shipTqInputs, setShipTqInputs] = useState<Record<string, string>>(() =>
     Object.fromEntries(pendingOrders.map((o) => [o.maDH, o.shipNDTQ ? String(o.shipNDTQ) : ''])));
+  // Góp ý NV #14: ghi chú riêng của GDV cho từng đơn.
+  const [noteInputs, setNoteInputs] = useState<Record<string, string>>(() =>
+    Object.fromEntries(pendingOrders.map((o) => [o.maDH, o.ghiChuGDV || ''])));
+  // Góp ý NV #17: số lượng còn của shop theo từng dòng hàng — khoá "maDH:stt".
+  const [slInputs, setSlInputs] = useState<Record<string, string>>(() =>
+    Object.fromEntries(pendingOrders.flatMap((o) => o.chiTiet.map((c) => [`${o.maDH}:${c.stt}`, String(c.soLuong)]))));
   const [busy, setBusy] = useState<Record<string, boolean>>({});
 
   function fmtNDT(n: number) { return Number(n || 0).toLocaleString('zh-CN') + '¥'; }
@@ -52,10 +60,57 @@ export default function GdvClient({ user, pendingOrders, khieuNai }: { user: Ses
     const shipNDTQ = parseFloat(shipTqInputs[maDH] || '0') || 0;
     if (vonNDT <= 0) return showToast('Nhập tổng tệ mua thực tế (¥)', 'error');
     setBusy((p) => ({ ...p, [maDH]: true }));
-    const r = await callServer('updateVonGDV', maDH, { vonNDT, shipNDTQ });
+    const r = await callServer('updateVonGDV', maDH, { vonNDT, shipNDTQ, ghiChuGDV: noteInputs[maDH] ?? '' });
     setBusy((p) => ({ ...p, [maDH]: false }));
     if (r?.success) { showToast(`Đã lưu giá vốn ${maDH} · LN ${fmtNDT(r.loiNhuanNDT)}`, 'success'); reload(); }
     else showToast(r?.message || 'Lỗi', 'error');
+  }
+
+  // Shop báo hết hàng / còn ít → GDV sửa số lượng thực đặt, hệ thống tự tính lại tiền đơn.
+  async function submitSoLuong(maDH: string, stt: number) {
+    const sl = parseInt(slInputs[`${maDH}:${stt}`] ?? '', 10);
+    if (!Number.isFinite(sl) || sl < 0) return showToast('Số lượng không hợp lệ', 'error');
+    setBusy((p) => ({ ...p, [maDH]: true }));
+    const r = await callServer('updateChiTietSoLuong', maDH, stt, sl);
+    setBusy((p) => ({ ...p, [maDH]: false }));
+    if (r?.success) { showToast(`Đã cập nhật SL dòng ${stt} · đơn ${maDH}`, 'success'); reload(); }
+    else showToast(r?.message || 'Lỗi', 'error');
+  }
+
+  function ChiTietSL({ o }: { o: Pending }) {
+    if (o.chiTiet.length === 0) return null;
+    return (
+      <div style={{ marginTop: 10 }}>
+        <div className="ac-meta" style={{ marginBottom: 6 }}>
+          <b>Số lượng còn của shop</b> — sửa nếu shop hết hàng; tổng tiền đơn tự tính lại.
+        </div>
+        <table className="data-table">
+          <thead><tr><th>#</th><th>Sản phẩm</th><th className="number">Giá tệ</th><th style={{ width: 150 }}>SL còn</th><th style={{ width: 60 }}></th></tr></thead>
+          <tbody>
+            {o.chiTiet.map((c) => (
+              <tr key={c.stt}>
+                <td>{c.stt}</td>
+                <td>
+                  {c.tenSP}
+                  {c.linkTaobao && <> · <a href={c.linkTaobao} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}><FiExternalLink /></a></>}
+                </td>
+                <td className="number">{fmtNDT(c.donGiaNDT)}</td>
+                <td>
+                  <input type="number" min={0} value={slInputs[`${o.maDH}:${c.stt}`] ?? ''}
+                    onChange={(e) => setSlInputs((p) => ({ ...p, [`${o.maDH}:${c.stt}`]: e.target.value }))}
+                    disabled={busy[o.maDH]} />
+                </td>
+                <td>
+                  <button className="btn btn-secondary btn-sm" onClick={() => submitSoLuong(o.maDH, c.stt)} disabled={busy[o.maDH]}>
+                    <FiSave />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
   }
 
   function VonGDV({ o }: { o: Pending }) {
@@ -81,10 +136,16 @@ export default function GdvClient({ user, pendingOrders, khieuNai }: { user: Ses
               placeholder="VD: 30" disabled={busy[o.maDH]} />
           </div>
         </div>
+        <div className="form-field" style={{ marginTop: 8 }}>
+          <label>Ghi chú đơn hàng (GDV)</label>
+          <textarea value={noteInputs[o.maDH] ?? ''} rows={2}
+            onChange={(e) => setNoteInputs((p) => ({ ...p, [o.maDH]: e.target.value }))}
+            placeholder="VD: shop hết màu đỏ, đã đổi sang xanh; hẹn phát hàng 12/07…" disabled={busy[o.maDH]} />
+        </div>
         <div className="ac-meta" style={{ marginTop: 8 }}>
           Lợi nhuận GDV (ước tính): <b style={{ color: ln >= 0 ? '#059669' : '#DC2626' }}>{fmtNDT(ln)}</b>
           <button className="btn btn-secondary btn-sm" style={{ marginLeft: 10 }} onClick={() => submitVonGDV(o.maDH)} disabled={busy[o.maDH]}>
-            <FiSave /> Lưu giá vốn
+            <FiSave /> Lưu giá vốn + ghi chú
           </button>
         </div>
       </div>
@@ -158,6 +219,7 @@ export default function GdvClient({ user, pendingOrders, khieuNai }: { user: Ses
               <div className="hint">Mã đơn hàng bên NCC — có thể nhập nhiều mã, cách nhau dấu phẩy</div>
             </div>
           </div>
+          <ChiTietSL o={o} />
           <VonGDV o={o} />
           <div className="ac-actions">
             <button className="btn btn-primary" onClick={() => submitMaGD(o.maDH)} disabled={busy[o.maDH]}>
@@ -192,6 +254,7 @@ export default function GdvClient({ user, pendingOrders, khieuNai }: { user: Ses
               <div className="hint" style={{ color: '#92400E' }}>NCC gửi mã này khi phát hàng — có thể nhập nhiều mã VĐ, cách nhau dấu phẩy</div>
             </div>
           </div>
+          <ChiTietSL o={o} />
           <VonGDV o={o} />
           <div className="ac-actions">
             <button className="btn btn-warning" onClick={() => submitMaVD(o.maDH)} disabled={busy[o.maDH]}>

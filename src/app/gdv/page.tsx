@@ -29,7 +29,12 @@ export default async function GdvPage() {
       tenHang: o.chiTiet.slice(0, 3).map((c) => `${c.tenSP} (x${c.soLuong})`).join(' · '),
       maGD: o.maGD || '', maVD: o.maVD || '', trangThai: o.trangThai,
       vonNDT: o.vonNDT, shipNDTQ: o.shipNDTQ, loiNhuanNDT: o.loiNhuanNDT,
-      tongThuNDT: o.chiTiet.reduce((s, c) => s + c.donGiaNDT * c.soLuong, 0)
+      ghiChuGDV: o.ghiChuGDV || '',
+      tongThuNDT: o.chiTiet.reduce((s, c) => s + c.donGiaNDT * c.soLuong, 0),
+      chiTiet: o.chiTiet.map((c) => ({
+        stt: c.stt, tenSP: c.tenSP, soLuong: c.soLuong,
+        donGiaNDT: c.donGiaNDT, linkTaobao: c.linkTaobao || ''
+      }))
     }))}
     khieuNai={khieuNai.map((k) => ({
       maKN: k.maKN, ngayTao: k.ngayTao.toISOString(), maDH: k.maDH || '', maKH: k.maKH || '',

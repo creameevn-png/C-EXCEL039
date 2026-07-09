@@ -23,7 +23,13 @@ export default async function DatHangPage({ searchParams }: { searchParams: Prom
           <div className="empty-state"><FiInbox /><p>Tài khoản chưa liên kết KH. Liên hệ CSKH.</p></div>
         </div>
       ) : (
-        <DatHangClient kh={kh ? { maKH: kh.maKH, tenKH: kh.tenKH, pctCoc: kh.pctCoc, tuyen: kh.tuyen } : null} />
+        <DatHangClient
+          isCustomer={user.vaiTro === 'Customer'}
+          kh={kh ? {
+            maKH: kh.maKH, tenKH: kh.tenKH, pctCoc: kh.pctCoc, tuyen: kh.tuyen,
+            sdt: kh.sdt || '', diaChi: kh.diaChi || ''
+          } : null}
+        />
       )}
     </AppShell>
   );

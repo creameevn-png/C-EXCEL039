@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import {
   FiInfo, FiClock, FiPackage, FiTruck, FiCheckCircle, FiDownload, FiCheck, FiLock,
-  FiAlertTriangle, FiPlus, FiLink, FiTrash2, FiHelpCircle, FiBox, FiSend
+  FiAlertTriangle, FiPlus, FiLink, FiTrash2, FiHelpCircle, FiBox, FiSend, FiTarget
 } from 'react-icons/fi';
 import type { SessionUser } from '@/lib/auth';
 import AppShell from '@/components/AppShell';
@@ -29,11 +29,22 @@ type Bao = {
 };
 const LINE_LABEL: Record<string, string> = { LineNhanh: 'Nhanh', LineThuong: 'Thường', LineRe: 'Tiết kiệm' };
 
+// Góp ý NV #35: bắn (quét) mã vận đơn để tìm nhanh đơn trong danh sách kho.
+function filterByScan(rows: Row[], q: string) {
+  const k = q.trim().toLowerCase();
+  if (!k) return rows;
+  return rows.filter((o) =>
+    o.maVD.toLowerCase().includes(k) || o.maDH.toLowerCase().includes(k) ||
+    o.maBao.toLowerCase().includes(k) || o.tenHang.toLowerCase().includes(k));
+}
+
 export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu, baos }:
   { user: SessionUser; pendingArrivals: Row[]; atWarehouse: Row[]; voChu: VoChu[]; baos: Bao[] }) {
 
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [keNote, setKeNote] = useState<Record<string, string>>({});
+  // Ô bắn mã vận đơn — lọc nhanh (góp ý #35).
+  const [scan, setScan] = useState('');
 
   function confirmKhoTQ(maDH: string) {
     (window as any).openImageUploadModal?.('Xác nhận nhận hàng tại Kho TQ', maDH, async (img: string | null) => {
@@ -165,12 +176,26 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
     );
   }
 
+  // JSX const (không phải component con) để ô quét không bị remount và mất focus mỗi lần gõ.
+  const scanBox = (
+    <div className="form-field" style={{ marginBottom: 12 }}>
+      <label><FiTarget /> Bắn / nhập mã vận đơn để tìm nhanh</label>
+      <input value={scan} onChange={(e) => setScan(e.target.value)}
+        placeholder="Quét mã VĐ, mã đơn, mã bao hoặc tên hàng…" />
+      {scan.trim() && <div className="hint">Đang lọc theo “{scan.trim()}” — xoá ô để xem lại tất cả.</div>}
+    </div>
+  );
+
+  const pendingFiltered = filterByScan(pendingArrivals, scan);
+  const atWarehouseFiltered = filterByScan(atWarehouse, scan);
+
   const tabReceive = (
     <div className="form-section">
       <div className="section-title"><FiDownload /> Hàng chờ nhận từ NCC</div>
-      {pendingArrivals.length === 0 ? (
-        <div className="empty-state"><FiCheckCircle /><p>Không có hàng nào đang chờ.</p></div>
-      ) : pendingArrivals.map((o) => (
+      {scanBox}
+      {pendingFiltered.length === 0 ? (
+        <div className="empty-state"><FiCheckCircle /><p>{scan.trim() ? 'Không có đơn khớp mã đã bắn.' : 'Không có hàng nào đang chờ.'}</p></div>
+      ) : pendingFiltered.map((o) => (
         <div key={o.maDH} className="action-card">
           <div className="ac-header">
             <div className="ac-title">Mã VĐ: {o.maVD || '(chưa có)'}</div>
@@ -196,15 +221,16 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
   const tabShip = (
     <div className="form-section">
       <div className="section-title"><FiTruck /> Hàng tại kho TQ — chuẩn bị chuyển về VN</div>
-      {atWarehouse.length === 0 ? (
-        <div className="empty-state"><FiPackage /><p>Không có hàng tại kho.</p></div>
+      {scanBox}
+      {atWarehouseFiltered.length === 0 ? (
+        <div className="empty-state"><FiPackage /><p>{scan.trim() ? 'Không có đơn khớp mã đã bắn.' : 'Không có hàng tại kho.'}</p></div>
       ) : (
         <table className="data-table">
           <thead><tr>
             <th>Mã VĐ</th><th>Mã đơn</th><th>Hàng</th><th>Kg/M³</th><th>Người nhận TQ</th><th>DV</th><th>Thao tác</th>
           </tr></thead>
           <tbody>
-            {atWarehouse.map((o) => (
+            {atWarehouseFiltered.map((o) => (
               <tr key={o.maDH}>
                 <td className="ma-don">{o.maVD}</td>
                 <td><span className="ma-don" style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => (window as any).openOrderDetail?.(o.maDH)}>{o.maDH}</span></td>

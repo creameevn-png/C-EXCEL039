@@ -259,7 +259,7 @@ export default function GdvClient({ user, pendingOrders, khieuNai }: { user: Ses
   return (
     <AppShell user={user}>
       <div className="alert alert-info">
-        <FiInfo /><span>Bạn là <b>GDV</b>. Sửa <b>Mã GD</b>, <b>Mã VĐ</b> và xử lý <b>khiếu nại</b> với NCC.</span>
+        <FiInfo /><span>Bạn là <b>GDV / Mua hàng</b>. Sửa <b>Mã GD</b>, <b>Mã VĐ</b>, nhập <b>giá vốn</b> và xử lý <b>khiếu nại</b> với NCC. Quản lý nguồn hàng / NCC ở <b>Trang Mua hàng</b>.</span>
       </div>
 
       <div className="kpi-row">

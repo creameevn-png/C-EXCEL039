@@ -32,7 +32,7 @@ export default async function AdminYeuCauPage() {
         trangThai: y.trangThai, nvXuLy: y.nvXuLy || '',
         ghiChuXuLy: y.ghiChuXuLy || '', maDH: y.maDH || ''
       }))} />
-      <OrderDetailModalHost canSeeMoney={['Admin', 'CSKH', 'KeToan'].includes(user.vaiTro)} canSeeProfit={['Admin', 'KeToan', 'GDV'].includes(user.vaiTro)} />
+      <OrderDetailModalHost canSeeMoney={['Admin', 'CSKH', 'KeToan'].includes(user.vaiTro)} canSeeProfit={['Admin', 'KeToan', 'GDV', 'MuaHang'].includes(user.vaiTro)} />
     </AppShell>
   );
 }

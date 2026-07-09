@@ -7,7 +7,7 @@ import GioMuaHoClient from './GioMuaHoClient';
 export const dynamic = 'force-dynamic';
 
 export default async function GioMuaHoPage() {
-  const user = await requireRole(['MuaHang', 'CSKH']);
+  const user = await requireRole(['MuaHang', 'GDV', 'CSKH']);
 
   const where: any = user.vaiTro === 'Admin' ? { daXuLy: false } : { nvId: user.id, daXuLy: false };
 

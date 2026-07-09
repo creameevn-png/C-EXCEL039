@@ -23,7 +23,7 @@ export default async function AdminKhieuNaiPage() {
         doiTacNCC: k.doiTacNCC || '', daTruNCC: k.daTruNCC,
         ghiChuXuLy: k.ghiChuXuLy || ''
       }))} />
-      <OrderDetailModalHost canSeeMoney={['Admin', 'CSKH', 'KeToan'].includes(user.vaiTro)} canSeeProfit={['Admin', 'KeToan', 'GDV'].includes(user.vaiTro)} />
+      <OrderDetailModalHost canSeeMoney={['Admin', 'CSKH', 'KeToan'].includes(user.vaiTro)} canSeeProfit={['Admin', 'KeToan', 'GDV', 'MuaHang'].includes(user.vaiTro)} />
     </AppShell>
   );
 }

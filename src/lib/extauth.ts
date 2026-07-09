@@ -12,8 +12,9 @@ import { getSessionSecret } from './secret';
 
 const MAX_AGE = 60 * 60 * 24 * 30; // 30 ngày
 
-/** Vai trò được phép dùng extension mua hộ. (Admin luôn được.) */
-export const EXT_ALLOWED_ROLES: VaiTro[] = ['MuaHang', 'CSKH'];
+/** Vai trò được phép dùng extension mua hộ. (Admin luôn được.)
+ *  GDV = MuaHang (đã gộp) nên cả hai đều dùng được extension. */
+export const EXT_ALLOWED_ROLES: VaiTro[] = ['MuaHang', 'GDV', 'CSKH'];
 
 export function extRoleAllowed(role: VaiTro): boolean {
   return role === 'Admin' || EXT_ALLOWED_ROLES.includes(role);

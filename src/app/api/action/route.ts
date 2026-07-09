@@ -173,7 +173,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     await recomputeDonHang(maDH);
     await logActivity(user.email, 'CREATE_ORDER', maDH, { maKH: kh.maKH, items: items.length });
     await pushNotify({
-      vaiTro: ['GDV'], loai: 'info', maDH,
+      vaiTro: ['GDV', 'MuaHang'], loai: 'info', maDH,
       tieuDe: `Đơn mới ${maDH}`,
       noiDung: `${kh.tenKH} · ${items.length} SP · chờ đặt cọc / xử lý`,
       link: '/gdv', nguoiTao: user.email
@@ -223,7 +223,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
   },
 
   async updateSanPham(args, user) {
-    if (!allow(user.vaiTro, ['CSKH', 'MuaHang'])) return err('Không có quyền');
+    if (!allow(user.vaiTro, ['CSKH', 'MuaHang', 'GDV'])) return err('Không có quyền');
     const [maSP, patch] = args;
     if (!maSP) return err('Thiếu mã SP');
     const data: any = {};
@@ -288,7 +288,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     await recomputePhieuGiao(o.maPhieuGiao);
     await logActivity(user.email, 'CONFIRM_DEPOSIT', maDH, { tienCoc: coc });
     await pushNotify({
-      vaiTro: 'GDV', loai: 'info', maDH,
+      vaiTro: ['GDV', 'MuaHang'], loai: 'info', maDH,
       tieuDe: `Đơn ${maDH} đã đặt cọc`,
       noiDung: 'Cần tiến hành mua hàng (nhập mã GD).', link: '/gdv', nguoiTao: user.email
     });
@@ -297,7 +297,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
 
   // ============== GDV ==============
   async updateMaGD(args, user) {
-    if (!allow(user.vaiTro, ['GDV'])) return err('Không có quyền');
+    if (!allow(user.vaiTro, ['GDV', 'MuaHang'])) return err('Không có quyền');
     const [maDH, maGD] = args;
     if (!maGD) return err('Thiếu mã GD');
     const o = await prisma.donHang.findUnique({ where: { maDH } });
@@ -309,7 +309,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
   },
 
   async updateMaVD(args, user) {
-    if (!allow(user.vaiTro, ['GDV'])) return err('Không có quyền');
+    if (!allow(user.vaiTro, ['GDV', 'MuaHang'])) return err('Không có quyền');
     const [maDH, maVD] = args;
     if (!maVD) return err('Thiếu mã VĐ');
     const o = await prisma.donHang.findUnique({ where: { maDH } });
@@ -327,7 +327,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
 
   // GDV nhập giá vốn thực mua (tệ) + ship nội địa TQ → tự tính lợi nhuận GDV.
   async updateVonGDV(args, user) {
-    if (!allow(user.vaiTro, ['GDV', 'KeToan'])) return err('Không có quyền');
+    if (!allow(user.vaiTro, ['GDV', 'MuaHang', 'KeToan'])) return err('Không có quyền');
     const [maDH, patch] = args;
     if (!maDH) return err('Thiếu mã đơn');
     const o = await prisma.donHang.findUnique({ where: { maDH }, include: { chiTiet: true } });
@@ -743,7 +743,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
   },
 
   async updateKhieuNai(args, user) {
-    if (!allow(user.vaiTro, ['CSKH', 'KeToan', 'GDV'])) return err('Không có quyền');
+    if (!allow(user.vaiTro, ['CSKH', 'KeToan', 'GDV', 'MuaHang'])) return err('Không có quyền');
     const [maKN, patch] = args;
     if (!maKN) return err('Thiếu mã KN');
     const data: any = {};
@@ -1027,7 +1027,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     }
     const canSeeMoney = ['Admin', 'CSKH', 'KeToan', 'Customer'].includes(user?.vaiTro || 'Customer');
     // Giá vốn & lợi nhuận: CHỈ Admin / Kế toán / GDV được xem (CSKH không thấy).
-    const canSeeProfit = ['Admin', 'KeToan', 'GDV'].includes(user?.vaiTro || '');
+    const canSeeProfit = ['Admin', 'KeToan', 'GDV', 'MuaHang'].includes(user?.vaiTro || '');
     const tongThuNDT = o.chiTiet.reduce((s, c) => s + c.donGiaNDT * c.soLuong, 0);
     return ok({
       data: {
@@ -1096,7 +1096,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
 
   // ============== MUA HANG: NGUON HANG / NCC ==============
   async addNguonHang(args, user) {
-    if (!allow(user.vaiTro, ['MuaHang'])) return err('Không có quyền');
+    if (!allow(user.vaiTro, ['MuaHang', 'GDV'])) return err('Không có quyền');
     const d = args[0] || {};
     if (!d.tenSP || !String(d.tenSP).trim()) return err('Vui lòng nhập tên sản phẩm');
     const n = await prisma.nguonHang.create({
@@ -1118,7 +1118,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
   },
 
   async updateNguonHang(args, user) {
-    if (!allow(user.vaiTro, ['MuaHang'])) return err('Không có quyền');
+    if (!allow(user.vaiTro, ['MuaHang', 'GDV'])) return err('Không có quyền');
     const [id, patch] = args;
     if (!id) return err('Thiếu id');
     const data: any = {};
@@ -1137,7 +1137,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
   },
 
   async deleteNguonHang(args, user) {
-    if (!allow(user.vaiTro, ['MuaHang'])) return err('Không có quyền');
+    if (!allow(user.vaiTro, ['MuaHang', 'GDV'])) return err('Không có quyền');
     const [id] = args;
     if (!id) return err('Thiếu id');
     await prisma.nguonHang.delete({ where: { id: Number(id) } });
@@ -1146,7 +1146,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
   },
 
   async addNcc(args, user) {
-    if (!allow(user.vaiTro, ['MuaHang'])) return err('Không có quyền');
+    if (!allow(user.vaiTro, ['MuaHang', 'GDV'])) return err('Không có quyền');
     const d = args[0] || {};
     if (!d.tenNCC || !String(d.tenNCC).trim()) return err('Vui lòng nhập tên NCC');
     const maNCC = await nextMaNCC();
@@ -1158,7 +1158,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
   },
 
   async updateNcc(args, user) {
-    if (!allow(user.vaiTro, ['MuaHang'])) return err('Không có quyền');
+    if (!allow(user.vaiTro, ['MuaHang', 'GDV'])) return err('Không có quyền');
     const [id, patch] = args;
     if (!id) return err('Thiếu id');
     const data: any = {};
@@ -1171,7 +1171,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
   },
 
   async deleteNcc(args, user) {
-    if (!allow(user.vaiTro, ['MuaHang'])) return err('Không có quyền');
+    if (!allow(user.vaiTro, ['MuaHang', 'GDV'])) return err('Không có quyền');
     const [id] = args;
     if (!id) return err('Thiếu id');
     await prisma.nCC.delete({ where: { id: Number(id) } });
@@ -1181,7 +1181,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
 
   // ============== GIO MUA HO (extension) ==============
   async deleteGioMuaHo(args, user) {
-    if (!allow(user.vaiTro, ['MuaHang', 'CSKH'])) return err('Không có quyền');
+    if (!allow(user.vaiTro, ['MuaHang', 'GDV', 'CSKH'])) return err('Không có quyền');
     const [id] = args;
     if (!id) return err('Thiếu id');
     // Mua hàng/CSKH chỉ xóa item của mình; Admin xóa được tất cả.
@@ -1194,7 +1194,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
   },
 
   async clearGioMuaHo(_args, user) {
-    if (!allow(user.vaiTro, ['MuaHang', 'CSKH'])) return err('Không có quyền');
+    if (!allow(user.vaiTro, ['MuaHang', 'GDV', 'CSKH'])) return err('Không có quyền');
     const where: any = user.vaiTro === 'Admin' ? {} : { nvId: user.id };
     const r = await prisma.gioMuaHo.deleteMany({ where });
     await logActivity(user.email, 'CLEAR_GIO_MUA_HO', String(r.count));
@@ -1230,7 +1230,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
 
   // ============== ĐỢT 8: CONG NO NCC / SHOP ==============
   async addCongNoNCC(args, user) {
-    if (!allow(user.vaiTro, ['MuaHang', 'KeToan'])) return err('Không có quyền');
+    if (!allow(user.vaiTro, ['MuaHang', 'GDV', 'KeToan'])) return err('Không có quyền');
     const d = args[0] || {};
     const doiTac = String(d.doiTac || '').trim();
     if (!doiTac) return err('Vui lòng nhập tên shop / NCC');
@@ -1252,7 +1252,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
   },
 
   async deleteCongNoNCC(args, user) {
-    if (!allow(user.vaiTro, ['MuaHang', 'KeToan'])) return err('Không có quyền');
+    if (!allow(user.vaiTro, ['MuaHang', 'GDV', 'KeToan'])) return err('Không có quyền');
     const [id] = args;
     if (!id) return err('Thiếu id');
     await prisma.congNoNCC.delete({ where: { id: Number(id) } });

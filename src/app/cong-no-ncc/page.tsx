@@ -7,7 +7,7 @@ import OrderDetailModalHost from '@/components/OrderDetailModal';
 export const dynamic = 'force-dynamic';
 
 export default async function CongNoNccPage() {
-  const user = await requireRole(['MuaHang', 'KeToan']);
+  const user = await requireRole(['MuaHang', 'GDV', 'KeToan']);
 
   const [ledger, nccs, webs] = await Promise.all([
     prisma.congNoNCC.findMany({ orderBy: { ngay: 'desc' }, take: 500 }),
@@ -26,7 +26,7 @@ export default async function CongNoNccPage() {
         partners={nccs.map((n) => n.tenNCC)}
         webs={webs.map((w) => w.web)}
       />
-      <OrderDetailModalHost canSeeMoney={['Admin', 'CSKH', 'KeToan'].includes(user.vaiTro)} canSeeProfit={['Admin', 'KeToan', 'GDV'].includes(user.vaiTro)} />
+      <OrderDetailModalHost canSeeMoney={['Admin', 'CSKH', 'KeToan'].includes(user.vaiTro)} canSeeProfit={['Admin', 'KeToan', 'GDV', 'MuaHang'].includes(user.vaiTro)} />
     </AppShell>
   );
 }

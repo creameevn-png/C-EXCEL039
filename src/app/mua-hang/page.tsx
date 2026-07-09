@@ -7,7 +7,7 @@ import { FiInfo, FiPackage, FiHome, FiStar, FiCalendar } from 'react-icons/fi';
 export const dynamic = 'force-dynamic';
 
 export default async function MuaHangPage() {
-  const user = await requireRole(['MuaHang']);
+  const user = await requireRole(['MuaHang', 'GDV']);
 
   const ncc = await prisma.nCC.findMany({ orderBy: { tenNCC: 'asc' } });
 
@@ -31,7 +31,7 @@ export default async function MuaHangPage() {
     <AppShell user={user}>
       <div className="alert alert-info">
         <FiInfo />
-        <span>Bạn là <b>Mua hàng</b>. Quản lý nguồn hàng + NCC để CSKH có data tạo đơn.</span>
+        <span>Bạn là <b>GDV / Mua hàng</b>. Quản lý nguồn hàng + NCC để CSKH có data tạo đơn. Sang <b>Trang GDV</b> để nhập mã GD / mã VĐ.</span>
       </div>
 
       <div className="kpi-row">

@@ -63,9 +63,10 @@ export const LINE_LABEL: Record<LineVC, string> = {
 export const VAITRO_LABEL: Record<VaiTro, string> = {
   Admin: 'Admin',
   CSKH: 'CSKH',
-  GDV: 'GDV',
+  // GDV & MuaHang đã gộp thành một vai trò duy nhất.
+  GDV: 'GDV / Mua hàng',
   KeToan: 'Kế toán',
-  MuaHang: 'Mua hàng',
+  MuaHang: 'GDV / Mua hàng',
   KhoTQ: 'Kho TQ',
   KhoVN: 'Kho VN',
   Customer: 'Khách hàng'

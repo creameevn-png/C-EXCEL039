@@ -8,7 +8,18 @@ import { VAITRO_LABEL } from '@/lib/status';
 
 type U = { id: number; email: string; hoTen: string; vaiTro: string; trangThai: string };
 
-const ROLES = ['Admin', 'CSKH', 'GDV', 'KeToan', 'MuaHang', 'KhoTQ', 'KhoVN', 'Customer'] as const;
+/**
+ * 'MuaHang' đã gộp vào 'GDV' (một người làm cả hai) nên KHÔNG còn là lựa chọn khi
+ * tạo/sửa. Các tài khoản cũ mang vai trò 'MuaHang' vẫn chạy bình thường (alias) và
+ * sẽ tự chuẩn hoá về 'GDV' ở lần lưu tiếp theo.
+ */
+const ROLES = ['Admin', 'CSKH', 'GDV', 'KeToan', 'KhoTQ', 'KhoVN', 'Customer'] as const;
+
+/** Lọc theo 'GDV' phải bắt cả các tài khoản còn mang vai trò cũ 'MuaHang'. */
+function roleMatches(vaiTro: string, filter: string): boolean {
+  if (filter === 'GDV') return vaiTro === 'GDV' || vaiTro === 'MuaHang';
+  return vaiTro === filter;
+}
 
 export default function UsersClient({ users }: { users: U[] }) {
   const [createOpen, setCreateOpen] = useState(false);
@@ -23,7 +34,7 @@ export default function UsersClient({ users }: { users: U[] }) {
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
     return users.filter((u) => {
-      if (roleF && u.vaiTro !== roleF) return false;
+      if (roleF && !roleMatches(u.vaiTro, roleF)) return false;
       if (statusF && u.trangThai !== statusF) return false;
       if (!s) return true;
       return [u.email, u.hoTen].some((v) => (v || '').toLowerCase().includes(s));
@@ -41,7 +52,9 @@ export default function UsersClient({ users }: { users: U[] }) {
 
   function openEdit(u: U) {
     setEditing(u);
-    setEdit({ hoTen: u.hoTen, vaiTro: u.vaiTro, trangThai: u.trangThai, password: '' });
+    // Vai trò cũ 'MuaHang' không còn trong danh sách chọn → quy về 'GDV'.
+    const vaiTro = u.vaiTro === 'MuaHang' ? 'GDV' : u.vaiTro;
+    setEdit({ hoTen: u.hoTen, vaiTro, trangThai: u.trangThai, password: '' });
   }
 
   async function save() {

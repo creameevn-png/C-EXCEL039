@@ -73,9 +73,10 @@ export function roleHomePath(role: VaiTro): string {
   switch (role) {
     case 'Admin': return '/admin';
     case 'CSKH': return '/cskh';
+    // GDV & MuaHang đã gộp làm một vai trò → cùng vào trang GDV.
     case 'GDV': return '/gdv';
+    case 'MuaHang': return '/gdv';
     case 'KeToan': return '/ketoan';
-    case 'MuaHang': return '/mua-hang';
     case 'KhoTQ': return '/khotq';
     case 'KhoVN': return '/khovn';
     case 'Customer': return '/customer';
@@ -84,8 +85,8 @@ export function roleHomePath(role: VaiTro): string {
 
 export function roleLabel(role: VaiTro): string {
   const map: Record<VaiTro, string> = {
-    Admin: 'ADMIN', CSKH: 'CSKH', GDV: 'GDV', KeToan: 'KẾ TOÁN',
-    MuaHang: 'MUA HÀNG', KhoTQ: 'KHO TQ', KhoVN: 'KHO VN', Customer: 'KHÁCH'
+    Admin: 'ADMIN', CSKH: 'CSKH', GDV: 'GDV / MUA HÀNG', KeToan: 'KẾ TOÁN',
+    MuaHang: 'GDV / MUA HÀNG', KhoTQ: 'KHO TQ', KhoVN: 'KHO VN', Customer: 'KHÁCH'
   };
   return map[role];
 }

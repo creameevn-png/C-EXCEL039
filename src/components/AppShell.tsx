@@ -11,9 +11,10 @@ import NotifyBell from '@/components/NotifyBell';
 const ROLE_BADGE: Record<VaiTro, { label: string; bg: string; color: string }> = {
   Admin: { label: 'ADMIN', bg: '#fee2e2', color: '#991b1b' },
   CSKH: { label: 'CSKH', bg: '#dbeafe', color: '#1e40af' },
-  GDV: { label: 'GDV', bg: '#cffafe', color: '#155e75' },
+  // GDV & MuaHang = một vai trò (đã gộp) → cùng nhãn, cùng màu.
+  GDV: { label: 'GDV / MUA HÀNG', bg: '#cffafe', color: '#155e75' },
   KeToan: { label: 'KẾ TOÁN', bg: '#fef3c7', color: '#92400e' },
-  MuaHang: { label: 'MUA HÀNG', bg: '#ede9fe', color: '#5b21b6' },
+  MuaHang: { label: 'GDV / MUA HÀNG', bg: '#cffafe', color: '#155e75' },
   KhoTQ: { label: 'KHO TQ', bg: '#ccfbf1', color: '#115e59' },
   KhoVN: { label: 'KHO VN', bg: '#dcfce7', color: '#166534' },
   Customer: { label: 'KHÁCH', bg: '#fce7f3', color: '#9d174d' }

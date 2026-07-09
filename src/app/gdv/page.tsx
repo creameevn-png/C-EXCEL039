@@ -5,7 +5,7 @@ import GdvClient from './GdvClient';
 export const dynamic = 'force-dynamic';
 
 export default async function GdvPage() {
-  const user = await requireRole(['GDV']);
+  const user = await requireRole(['GDV', 'MuaHang']);
   const [pending, khieuNai] = await Promise.all([
     prisma.donHang.findMany({
       where: { trangThai: { in: ['DatCoc', 'DaMuaHang'] } },

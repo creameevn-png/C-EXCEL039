@@ -6,7 +6,7 @@ import SanPhamClient from './SanPhamClient';
 export const dynamic = 'force-dynamic';
 
 export default async function AdminSanPhamPage() {
-  const user = await requireRole(['Admin', 'CSKH', 'MuaHang']);
+  const user = await requireRole(['Admin', 'CSKH', 'MuaHang', 'GDV']);
   const products = await prisma.sanPham.findMany({ orderBy: { maSP: 'asc' } });
 
   return (

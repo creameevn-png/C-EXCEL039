@@ -54,6 +54,15 @@ const ADMIN_OPS: NavItem[] = [
   item('/mua-hang'), item('/cong-no-ncc'), item('/gio-mua-ho'), item('/khotq'), item('/khovn'), item('/phieu-giao')
 ];
 
+/**
+ * GDV và Mua hàng là MỘT vai trò (thực tế một người làm cả hai việc): vừa quản lý
+ * nguồn hàng/NCC, vừa đặt mua và nhập mã GD/mã VĐ. `MuaHang` giữ lại làm alias của
+ * `GDV` cho các tài khoản cũ — hai vai trò dùng chung menu này.
+ */
+const GDV_MUAHANG: NavItem[] = [
+  item('/gdv'), item('/mua-hang'), item('/cong-no-ncc'), item('/gio-mua-ho'), item('/admin/san-pham')
+];
+
 /** Sidebar groups for a given role. Admin sees everything. */
 export function navForRole(role: VaiTro): NavGroup[] {
   switch (role) {
@@ -70,11 +79,10 @@ export function navForRole(role: VaiTro): NavGroup[] {
         ]
       }];
     case 'GDV':
-      return [{ items: [item('/gdv')] }];
+    case 'MuaHang':
+      return [{ items: GDV_MUAHANG }];
     case 'KeToan':
       return [{ items: [item('/ketoan'), item('/bao-cao'), item('/cong-no-ncc'), item('/admin/khach-hang'), item('/admin/khieu-nai')] }];
-    case 'MuaHang':
-      return [{ items: [item('/mua-hang'), item('/cong-no-ncc'), item('/gio-mua-ho'), item('/admin/san-pham')] }];
     case 'KhoTQ':
       return [{ items: [item('/khotq'), item('/in-tem')] }];
     case 'KhoVN':

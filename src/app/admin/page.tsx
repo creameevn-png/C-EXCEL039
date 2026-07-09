@@ -31,9 +31,9 @@ export default async function AdminPage() {
 
   const rolePages = [
     { href: '/cskh', Icon: FiBriefcase, bg: '#4f46e5', title: 'Trang CSKH', desc: 'Tạo đơn · KH · ví' },
-    { href: '/gdv', Icon: FiTrendingUp, bg: '#0891b2', title: 'Trang GDV', desc: 'Mã GD · mã VĐ' },
+    { href: '/gdv', Icon: FiTrendingUp, bg: '#0891b2', title: 'GDV / Mua hàng', desc: 'Mã GD · mã VĐ · vốn' },
     { href: '/ketoan', Icon: FiDollarSign, bg: '#f59e0b', title: 'Kế toán', desc: 'Xác nhận TT' },
-    { href: '/mua-hang', Icon: FiShoppingCart, bg: '#7c3aed', title: 'Mua hàng', desc: 'NCC · nguồn hàng' },
+    { href: '/mua-hang', Icon: FiShoppingCart, bg: '#7c3aed', title: 'Nguồn hàng & NCC', desc: 'Thuộc GDV / Mua hàng' },
     { href: '/khotq', Icon: FiPackage, bg: '#0f766e', title: 'Kho TQ', desc: 'NCC · chuyển VN' },
     { href: '/khovn', Icon: FiTruck, bg: '#16a34a', title: 'Kho VN', desc: 'Giao khách' },
     { href: '/customer', Icon: FiUser, bg: '#ec4899', title: 'Customer', desc: 'Khách tự theo dõi' }

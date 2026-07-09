@@ -36,7 +36,7 @@ export default async function PhieuGiaoPage() {
       nguoiTao: p.nguoiTao || '', createdAt: p.createdAt.toISOString()
     }))}
   />
-    <OrderDetailModalHost canSeeMoney={['Admin', 'CSKH', 'KeToan'].includes(user.vaiTro)} canSeeProfit={['Admin', 'KeToan', 'GDV'].includes(user.vaiTro)} />
+    <OrderDetailModalHost canSeeMoney={['Admin', 'CSKH', 'KeToan'].includes(user.vaiTro)} canSeeProfit={['Admin', 'KeToan', 'GDV', 'MuaHang'].includes(user.vaiTro)} />
     </>
   );
 }

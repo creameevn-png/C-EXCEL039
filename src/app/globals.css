@@ -199,6 +199,16 @@ svg { flex-shrink: 0; }
 }
 .tb-burger:hover { background: var(--surface-2); }
 
+/* Chuông thông báo: luôn hiện. Trước đây dùng chung class .tb-burger nên bị
+   ẩn ở màn hình rộng hơn 920px — tức là mất hẳn trên máy tính để bàn. */
+.tb-bell {
+  display: flex;
+  background: transparent; border: none; color: var(--text); font-size: 22px;
+  width: 38px; height: 38px; border-radius: 9px;
+  align-items: center; justify-content: center; cursor: pointer;
+}
+.tb-bell:hover { background: var(--surface-2); }
+
 .page { padding: 22px 26px 48px; max-width: 1440px; width: 100%; margin: 0 auto; }
 
 .back-link {

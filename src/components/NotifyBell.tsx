@@ -57,7 +57,7 @@ export default function NotifyBell() {
 
   return (
     <div style={{ position: 'relative' }}>
-      <button className="tb-burger" onClick={toggle} aria-label="Thông báo" style={{ position: 'relative' }}>
+      <button className="tb-bell" onClick={toggle} aria-label="Thông báo" style={{ position: 'relative' }}>
         <FiBell />
         {unread > 0 && (
           <span style={{

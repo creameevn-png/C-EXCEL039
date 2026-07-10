@@ -305,7 +305,7 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
               <FiCheck /> Xác nhận đã nhận tại VN
             </button>
             <button className="btn btn-secondary" onClick={() => openWeigh(o.maDH)}>
-              <FiEdit2 /> Sửa cân (KG/M³)
+              <FiEdit2 /> Sửa cân (KG / kích thước)
             </button>
           </div>
         </div>
@@ -332,7 +332,7 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
           </div>
           <div className="ac-actions">
             <button className="btn btn-secondary btn-sm" onClick={() => openWeigh(o.maDH)}>
-              <FiEdit2 /> Sửa cân (KG/M³)
+              <FiEdit2 /> Sửa cân (KG / kích thước)
             </button>
           </div>
         </div>
@@ -681,9 +681,10 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
 
       {/* Modal sửa cân nặng (có lưu lịch sử) */}
       <div className={`modal-overlay ${weighMaDH ? 'show' : ''}`} onClick={(e) => { if (e.target === e.currentTarget) setWeighMaDH(null); }}>
-        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        {/* 760px: 7 cột (SP · SL · KG · D · R · C · M³) không lọt bề ngang mặc định 560px. */}
+        <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 760 }}>
           <div className="modal-header">
-            <h2><FiEdit2 /> Sửa cân nặng — {weighMaDH}</h2>
+            <h2><FiEdit2 /> Sửa cân & kích thước — {weighMaDH}</h2>
             <button className="modal-close" onClick={() => setWeighMaDH(null)}><FiX /></button>
           </div>
           <div className="modal-body">
@@ -694,10 +695,11 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
             {weighLines.length === 0 ? (
               <div className="empty-state"><FiClock /><p>Đang tải dòng hàng…</p></div>
             ) : (
-              <table className="data-table">
+              <div style={{ overflowX: 'auto' }}>
+              <table className="data-table" style={{ minWidth: 620 }}>
                 <thead><tr>
                   <th>Sản phẩm</th><th className="number">SL</th><th className="number">KG/sp</th>
-                  <th className="number">Dài</th><th className="number">Rộng</th><th className="number">Cao</th>
+                  <th className="number">Dài</th><th className="number">Rộng</th><th className="number">Cao (cm)</th>
                   <th className="number">M³/sp</th>
                 </tr></thead>
                 <tbody>
@@ -717,6 +719,7 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
                   })}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
           <div className="btn-row">

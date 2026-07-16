@@ -1719,6 +1719,54 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     });
   },
 
+  // Chi tiết đơn PHÍA KHÁCH (trang tra-cuu công khai). Xác thực lại bằng
+  // maKH + 4 số cuối SĐT (KHÔNG dùng session) và đơn phải thuộc chính KH đó.
+  // Chỉ trả thông tin khách được xem: KHÔNG có giá vốn (¥)/lợi nhuận/đơn giá NDT.
+  async getOrderDetailPublic(args) {
+    const maDH = String(args[0] || '').trim();
+    const ma = String(args[1] || '').trim().toUpperCase();
+    const sdt4 = String(args[2] || '').trim();
+    if (!maDH || !ma || sdt4.length < 4) return err('Thiếu thông tin xác thực');
+    // Chống dò mã đơn/SĐT — rate-limit theo mã KH (không né được bằng đổi IP).
+    const rl = rateLimit(`pubdetail:${ma}`, 30, 300_000);
+    if (!rl.ok) return err(`Thử quá nhiều lần. Đợi ${rl.retryAfter}s rồi thử lại.`);
+    const kh = await prisma.khachHang.findUnique({ where: { maKH: ma } });
+    if (!kh || (kh.sdt || '').slice(-4) !== sdt4) return err('Xác thực không hợp lệ');
+    const o = await prisma.donHang.findUnique({
+      where: { maDH },
+      include: { chiTiet: { orderBy: { stt: 'asc' } }, payments: { orderBy: { ngay: 'asc' } } }
+    });
+    if (!o || o.maKH !== ma) return err('Không tìm thấy đơn của bạn');
+    return ok({
+      data: {
+        maDH: o.maDH,
+        ngayTao: o.ngayTao.toISOString(),
+        trangThai: o.trangThai,
+        tuyen: o.tuyen, lineVC: o.lineVC, loaiHang: o.loaiHang,
+        maVD: o.maVD || '',
+        chiTiet: o.chiTiet.map((c) => ({
+          stt: c.stt, tenSP: c.tenSP, soLuong: c.soLuong,
+          thanhTien: c.thanhTien, kg: c.kg, m3: c.m3,
+          webNguon: c.webNguon, linkTaobao: c.linkTaobao
+        })),
+        tongKg: o.tongKg, tongM3: o.tongM3,
+        tongGiaHang: o.tongGiaHang, phiMua: o.phiMua, phiVC: o.phiVC, shipND: o.shipND,
+        dongGo: o.dongGo, phuThu: o.phuThu, phiBH: o.phiBH,
+        phiPhatSinh: o.phiPhatSinhDuyet ? o.phiPhatSinh : 0,
+        phiKhieuNai: o.phiKhieuNai,
+        thueNK: o.thueNK, vat: o.vat,
+        tongTien: o.tongTien, tienCoc: o.tienCoc, pctCoc: o.pctCoc,
+        daTra: o.daTra, conLai: o.conLai,
+        ghiChu: o.ghiChu || '',
+        payments: o.payments.map((p) => ({ soTien: p.soTien, ghiChu: p.ghiChu, ngay: p.ngay.toISOString() })),
+        anh: {
+          khoTQ: o.anhKhoTQ || undefined, roiTQ: o.anhRoiTQ || undefined,
+          khoVN: o.anhKhoVN || undefined, giaoKH: o.anhGiaoKH || undefined
+        }
+      }
+    });
+  },
+
   // ============== MUA HANG: NGUON HANG / NCC ==============
   async addNguonHang(args, user) {
     if (!allow(user.vaiTro, ['MuaHang', 'GDV'])) return err('Không có quyền');
@@ -2042,7 +2090,7 @@ export async function POST(req: Request) {
     const h = handlers[action];
     if (!h) return NextResponse.json(err(`Hành động không hợp lệ: ${action}`), { status: 400 });
 
-    const PUBLIC = new Set(['lookupCustomer', 'createKhieuNai', 'createYeuCauMua']);
+    const PUBLIC = new Set(['lookupCustomer', 'createKhieuNai', 'createYeuCauMua', 'getOrderDetailPublic']);
     if (!user && !PUBLIC.has(action)) {
       return NextResponse.json(err('Phiên đăng nhập đã hết'), { status: 401 });
     }

@@ -57,6 +57,8 @@ export default function TraCuuPage() {
   const [err, setErr] = useState('');
   const [cust, setCust] = useState<Cust | null>(null);
   const [orders, setOrders] = useState<Ord[]>([]);
+  const [detail, setDetail] = useState<any>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   async function onSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -65,6 +67,17 @@ export default function TraCuuPage() {
     setLoading(false);
     if (r?.success) { setCust(r.customer); setOrders(r.orders); }
     else setErr(r?.message || 'Không tra cứu được');
+  }
+
+  // Mở chi tiết 1 đơn — gọi endpoint public, xác thực lại bằng maKH + 4 số cuối SĐT
+  // mà khách vừa dùng để tra cứu (chỉ xem được đơn của chính mình, không có giá vốn).
+  async function openDetail(maDH: string) {
+    if (!cust) return;
+    setDetail(null); setDetailLoading(true);
+    const r = await callServer('getOrderDetailPublic', maDH, cust.maKH, sdt4);
+    setDetailLoading(false);
+    if (r?.success) setDetail(r.data);
+    else setErr(r?.message || 'Không xem được chi tiết đơn');
   }
 
   return (
@@ -143,7 +156,7 @@ export default function TraCuuPage() {
                 <div key={o.maDH} className="order-card">
                   <div className="order-card-head">
                     <div className="oc-left">
-                      <div className="ma">{o.maDH}</div>
+                      <div className="ma" style={{ cursor: 'pointer', textDecoration: 'underline' }} title="Bấm xem chi tiết đơn" onClick={() => openDetail(o.maDH)}>{o.maDH}</div>
                       <div className="dt"><FiCalendar /> {formatDate(o.ngayTao)}</div>
                     </div>
                     <span className="role-badge" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}>
@@ -161,6 +174,87 @@ export default function TraCuuPage() {
             </div>
           </>
         )}
+
+        {/* Chi tiết 1 đơn — phía khách, KHÔNG có giá vốn/lợi nhuận */}
+        <div className={`modal-overlay ${detail || detailLoading ? 'show' : ''}`} onClick={(e) => { if (e.target === e.currentTarget) setDetail(null); }}>
+          <div className="modal-content" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2><FiPackage /> Đơn {detail?.maDH || ''}</h2>
+              <button className="modal-close" onClick={() => setDetail(null)}><FiXCircle /></button>
+            </div>
+            <div className="modal-body">
+              {detailLoading && <p style={{ textAlign: 'center', color: '#94A3B8' }}>Đang tải...</p>}
+              {detail && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <div style={{ fontSize: 12, color: '#64748B' }}>Ngày tạo: <b>{formatDate(detail.ngayTao)}</b></div>
+                    <span className="role-badge" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}>{statusToLabel(detail.trangThai)}</span>
+                  </div>
+                  <div style={{ background: '#F8FAFC', padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 12, color: '#64748B' }}>
+                    Tuyến: <b>{detail.tuyen === 'HCM' ? 'HCM' : 'Hà Nội'}</b> · Line: <b>{detail.lineVC}</b> · Loại: <b>{detail.loaiHang}</b>
+                    {detail.maVD && <> · Mã VĐ: <b>{detail.maVD}</b></>}
+                  </div>
+                  <table className="data-table" style={{ fontSize: 12 }}>
+                    <thead><tr><th>#</th><th>Sản phẩm</th><th className="number">SL</th><th className="number">Kg</th><th className="number">m³</th><th className="number">Thành tiền</th></tr></thead>
+                    <tbody>
+                      {detail.chiTiet.map((c: any) => (
+                        <tr key={c.stt}>
+                          <td>{c.stt}</td>
+                          <td>{c.tenSP}{c.linkTaobao && <a href={c.linkTaobao} target="_blank" style={{ marginLeft: 6, color: 'var(--primary)' }}>↗</a>}</td>
+                          <td className="number">{c.soLuong}</td>
+                          <td className="number">{c.kg}</td>
+                          <td className="number">{c.m3}</td>
+                          <td className="number">{formatCurrency(c.thanhTien)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div style={{ textAlign: 'right', fontSize: 12, color: '#64748B', marginTop: 4 }}>Tổng: <b>{detail.tongKg.toFixed(2)}kg / {detail.tongM3.toFixed(4)}m³</b></div>
+
+                  <div className="fee-summary" style={{ marginTop: 12 }}>
+                    <div className="fee-row"><span>Tổng giá hàng</span><span className="fee-value">{formatCurrency(detail.tongGiaHang)}</span></div>
+                    <div className="fee-row"><span>Phí mua hàng</span><span className="fee-value">{formatCurrency(detail.phiMua)}</span></div>
+                    <div className="fee-row"><span>Phí vận chuyển</span><span className="fee-value">{formatCurrency(detail.phiVC)}</span></div>
+                    {detail.shipND > 0 && <div className="fee-row"><span>Phí ship VN</span><span className="fee-value">{formatCurrency(detail.shipND)}</span></div>}
+                    {detail.dongGo > 0 && <div className="fee-row"><span>Phí đóng gói</span><span className="fee-value">{formatCurrency(detail.dongGo)}</span></div>}
+                    {detail.phuThu > 0 && <div className="fee-row"><span>Phụ thu</span><span className="fee-value">{formatCurrency(detail.phuThu)}</span></div>}
+                    {detail.phiBH > 0 && <div className="fee-row"><span>Bảo hiểm</span><span className="fee-value">{formatCurrency(detail.phiBH)}</span></div>}
+                    {detail.phiPhatSinh > 0 && <div className="fee-row"><span>Phí phát sinh</span><span className="fee-value">{formatCurrency(detail.phiPhatSinh)}</span></div>}
+                    {detail.phiKhieuNai > 0 && <div className="fee-row"><span>Phí đổi trả</span><span className="fee-value">{formatCurrency(detail.phiKhieuNai)}</span></div>}
+                    {detail.thueNK > 0 && <div className="fee-row"><span>Thuế NK</span><span className="fee-value">{formatCurrency(detail.thueNK)}</span></div>}
+                    {detail.vat > 0 && <div className="fee-row"><span>VAT</span><span className="fee-value">{formatCurrency(detail.vat)}</span></div>}
+                    <div className="fee-row" style={{ borderTop: '1px solid #CBD5E1' }}><span><b>Tổng tiền</b></span><span className="fee-value" style={{ color: '#1E3A8A' }}>{formatCurrency(detail.tongTien)}</span></div>
+                    <div className="fee-row"><span>Cọc ({detail.pctCoc}%)</span><span className="fee-value" style={{ color: '#92400E' }}>{formatCurrency(detail.tienCoc)}</span></div>
+                    <div className="fee-row"><span>Đã trả</span><span className="fee-value" style={{ color: '#059669' }}>{formatCurrency(detail.daTra)}</span></div>
+                    <div className="fee-row"><span><b>Còn lại</b></span><span className="fee-value" style={{ color: detail.conLai > 0 ? '#DC2626' : '#059669' }}>{formatCurrency(detail.conLai)}</span></div>
+                  </div>
+
+                  {detail.payments.length > 0 && (
+                    <div style={{ marginTop: 12 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>Lịch sử thanh toán</div>
+                      <table className="data-table" style={{ fontSize: 12 }}>
+                        <thead><tr><th>Ngày</th><th className="number">Số tiền</th><th>Ghi chú</th></tr></thead>
+                        <tbody>{detail.payments.map((p: any, i: number) => (<tr key={i}><td>{formatDate(p.ngay)}</td><td className="number">{formatCurrency(p.soTien)}</td><td>{p.ghiChu || ''}</td></tr>))}</tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {(detail.anh.khoTQ || detail.anh.roiTQ || detail.anh.khoVN || detail.anh.giaoKH) && (
+                    <div style={{ marginTop: 12 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>Ảnh xử lý</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
+                        {detail.anh.khoTQ && <div><div style={{ fontSize: 11, color: '#64748B' }}>Nhận tại Kho TQ</div><img src={detail.anh.khoTQ} style={{ width: '100%', borderRadius: 6 }} /></div>}
+                        {detail.anh.roiTQ && <div><div style={{ fontSize: 11, color: '#64748B' }}>Rời TQ</div><img src={detail.anh.roiTQ} style={{ width: '100%', borderRadius: 6 }} /></div>}
+                        {detail.anh.khoVN && <div><div style={{ fontSize: 11, color: '#64748B' }}>Nhận tại Kho VN</div><img src={detail.anh.khoVN} style={{ width: '100%', borderRadius: 6 }} /></div>}
+                        {detail.anh.giaoKH && <div><div style={{ fontSize: 11, color: '#64748B' }}>Đã giao</div><img src={detail.anh.giaoKH} style={{ width: '100%', borderRadius: 6 }} /></div>}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
 
         <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.6)', fontSize: 11.5, marginTop: 22 }}>
           Powered by Excel Khởi Nghiệp · <a href="/login" style={{ color: 'rgba(255,255,255,0.9)' }}>Đăng nhập nhân viên</a>

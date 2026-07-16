@@ -493,7 +493,8 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
                 {baoOpen.kien.map((k) => (
                   <tr key={k.maVD}>
                     <td><b>{k.maVD}</b></td>
-                    <td>{k.maDH}</td>
+                    <td style={{ cursor: 'pointer', textDecoration: 'underline', color: '#1E3A8A' }}
+                      onClick={() => (window as any).openOrderDetail?.(k.maDH)}>{k.maDH}</td>
                     <td><span className={`status-badge ${KIEN_CLASS[k.trangThai] || 's-waiting'}`}>{KIEN_LABEL[k.trangThai] || k.trangThai}</span></td>
                   </tr>
                 ))}
@@ -632,7 +633,7 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
                 <td><span className={`status-badge ${q.loai === 'Thu' ? 's-done' : 's-cancel'}`}>{q.loai === 'Thu' ? 'Thu' : 'Chi'}</span></td>
                 <td>{q.danhMuc || '—'}</td>
                 <td>{q.noiDung}</td>
-                <td>{q.maDH || '—'}</td>
+                <td>{q.maDH ? <span style={{ cursor: 'pointer', textDecoration: 'underline', color: '#1E3A8A' }} onClick={() => (window as any).openOrderDetail?.(q.maDH)}>{q.maDH}</span> : '—'}</td>
                 <td className="number" style={{ color: q.loai === 'Thu' ? '#166534' : '#991B1B', fontWeight: 700 }}>
                   {q.loai === 'Thu' ? '+' : '−'}{fmtVND(q.soTien)}đ
                 </td>

@@ -419,7 +419,9 @@ export default function KeToanClient({ user, pendingPayments, customers, walletT
                   <td>{r.danhMuc || '-'}</td>
                   <td style={{ fontSize: 12 }}>
                     {r.noiDung || '-'}
-                    {(r.maDH || r.maKH) && <span style={{ fontSize: 10, color: 'var(--text-faint)' }}><br />{[r.maDH, r.maKH].filter(Boolean).join(' · ')}</span>}
+                    {(r.maDH || r.maKH) && <span style={{ fontSize: 10, color: 'var(--text-faint)' }}><br />
+                      {r.maDH && <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openOrderDetail?.(r.maDH)}>{r.maDH}</span>}
+                      {r.maDH && r.maKH ? ' · ' : ''}{r.maKH || ''}</span>}
                   </td>
                   <td style={{ fontSize: 11 }}>{r.nguoiTao || '-'}</td>
                   <td>
@@ -466,7 +468,9 @@ export default function KeToanClient({ user, pendingPayments, customers, walletT
                   <td>{r.danhMuc || '-'}</td>
                   <td style={{ fontSize: 12 }}>
                     {r.noiDung || '-'}
-                    {(r.maDH || r.maKH) && <span style={{ fontSize: 10, color: 'var(--text-faint)' }}><br />{[r.maDH, r.maKH].filter(Boolean).join(' · ')}</span>}
+                    {(r.maDH || r.maKH) && <span style={{ fontSize: 10, color: 'var(--text-faint)' }}><br />
+                      {r.maDH && <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openOrderDetail?.(r.maDH)}>{r.maDH}</span>}
+                      {r.maDH && r.maKH ? ' · ' : ''}{r.maKH || ''}</span>}
                   </td>
                   <td style={{ fontSize: 11 }}>{r.nguoiTao || '-'}</td>
                 </tr>

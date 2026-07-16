@@ -527,7 +527,7 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
                 </td>
                 <td>{q.danhMuc || '-'}</td>
                 <td>{q.noiDung}</td>
-                <td className="ma-don">{q.maDH || '-'}</td>
+                <td className="ma-don">{q.maDH ? <span style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => (window as any).openOrderDetail?.(q.maDH)}>{q.maDH}</span> : '-'}</td>
                 <td>{q.nguoiTao}</td>
               </tr>
             ))}

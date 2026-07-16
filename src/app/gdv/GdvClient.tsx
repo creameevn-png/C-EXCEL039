@@ -411,8 +411,7 @@ export default function GdvClient({ user, pendingOrders, allOrders, khieuNai }: 
             </span>
           </div>
           <div className="ac-meta">
-            Loại: <b>{KN_LOAI[k.loai] || k.loai}</b> · Đơn: <b>{k.maDH || '-'}</b> · KH: <b>{k.tenKH || k.maKH || '-'}</b> · {fmtDateDDMM(k.ngayTao)}
-            {k.maDH && <> · <span style={{ cursor: 'pointer', color: 'var(--primary)', textDecoration: 'underline' }} onClick={() => (window as any).openOrderDetail?.(k.maDH)}>Xem đơn</span></>}
+            Loại: <b>{KN_LOAI[k.loai] || k.loai}</b> · Đơn: <b>{k.maDH ? <span style={{ cursor: 'pointer', color: 'var(--primary)', textDecoration: 'underline' }} onClick={() => (window as any).openOrderDetail?.(k.maDH)}>{k.maDH}</span> : '-'}</b> · KH: <b>{k.tenKH || k.maKH || '-'}</b> · {fmtDateDDMM(k.ngayTao)}
           </div>
           <div style={{ background: 'var(--surface-2)', padding: 10, borderRadius: 8, margin: '10px 0', fontSize: 13 }}>
             <b>Khách phản ánh:</b> {k.moTa}

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import AppShell from '@/components/AppShell';
 import BaoCaoClient from './BaoCaoClient';
 import OrderDetailModalHost from '@/components/OrderDetailModal';
+import CustomerDetailModalHost from '@/components/CustomerDetailModal';
 
 export const dynamic = 'force-dynamic';
 
@@ -93,6 +94,7 @@ export default async function BaoCaoPage() {
   return (
     <AppShell user={user}>
       <BaoCaoClient rows={rows} knRows={knRows} cashRows={cashRows} tonKhoRows={tonKhoRows} nvList={nvList} soQuyRows={soQuyRows} />
+      <CustomerDetailModalHost canSeeMoney />
       <OrderDetailModalHost canSeeMoney={['Admin', 'CSKH', 'KeToan'].includes(user.vaiTro)} canSeeProfit={['Admin', 'KeToan', 'GDV', 'MuaHang'].includes(user.vaiTro)} />
     </AppShell>
   );

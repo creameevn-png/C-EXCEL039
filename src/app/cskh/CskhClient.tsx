@@ -13,6 +13,7 @@ import Tabs from '@/components/Tabs';
 import ErpSection from '@/components/ErpSection';
 import Combobox from '@/components/Combobox';
 import OrderDetailModalHost from '@/components/OrderDetailModal';
+import CustomerDetailModalHost from '@/components/CustomerDetailModal';
 import ImageUploadModalHost from '@/components/ImageUploadModal';
 import { showToast } from '@/components/Toast';
 import { callServer, reload } from '@/lib/client';
@@ -780,12 +781,12 @@ export default function CskhClient({ initial }: Props) {
         <tbody>
           {customers.map((c) => (
             <tr key={c.maKH}>
-              <td className="ma-don">{c.maKH}</td>
-              <td>{c.tenKH}</td>
+              <td className="ma-don"><span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(c.maKH)}>{c.maKH}</span></td>
+              <td><span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(c.maKH)}>{c.tenKH}</span></td>
               <td>{c.sdt}</td>
               <td>{Math.round(c.pctCoc)}%</td>
               <td className="number" style={{ color: '#059669', fontWeight: 600 }}>{fmtVND(c.soDuVi)}</td>
-              <td className="number" style={{ color: c.congNo > 0 ? '#DC2626' : undefined, fontWeight: c.congNo > 0 ? 600 : 400 }}>
+              <td className="number" title="Xem đơn của khách" style={{ cursor: 'pointer', color: c.congNo > 0 ? '#DC2626' : undefined, fontWeight: c.congNo > 0 ? 600 : 400 }} onClick={() => (window as any).openCustomerDetail?.(c.maKH)}>
                 {fmtVND(c.congNo)}
               </td>
               <td>
@@ -920,6 +921,7 @@ export default function CskhClient({ initial }: Props) {
         </div>
       </div>
 
+      <CustomerDetailModalHost canSeeMoney />
       <OrderDetailModalHost canSeeMoney={true} />
       <ImageUploadModalHost />
     </AppShell>

@@ -1671,6 +1671,54 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     });
   },
 
+  // Chi tiết 1 khách hàng + danh sách đơn (drill-down từ báo cáo/danh sách KH).
+  // Staff-only (thấy tiền/công nợ). Không cho Customer/kho gọi.
+  async getCustomerDetail(args, user) {
+    if (!allow(user.vaiTro, ['CSKH', 'KeToan'])) return err('Không có quyền');
+    const ma = String(args[0] || '').trim().toUpperCase();
+    if (!ma) return err('Thiếu mã KH');
+    const kh = await prisma.khachHang.findUnique({ where: { maKH: ma } });
+    if (!kh) return err('Không tìm thấy khách hàng: ' + ma);
+    const dons = await prisma.donHang.findMany({
+      where: { maKH: ma },
+      orderBy: { ngayTao: 'desc' },
+      take: 100,
+      select: { maDH: true, ngayTao: true, trangThai: true, tongTien: true, daTra: true, conLai: true }
+    });
+    // Công nợ thật = tổng còn lại các đơn chưa hủy (không đọc field congNo có thể lệch).
+    const noAgg = await prisma.donHang.aggregate({
+      where: { maKH: ma, conLai: { gt: 0 }, trangThai: { not: 'Huy' } },
+      _sum: { conLai: true }
+    });
+    const dtAgg = await prisma.donHang.aggregate({
+      where: { maKH: ma, trangThai: { not: 'Huy' } },
+      _sum: { tongTien: true }
+    });
+    // Kế toán không cần thông tin liên lạc (đồng bộ getOrderDetail — góp ý NV #21).
+    const canSeeLienHe = user.vaiTro !== 'KeToan';
+    return ok({
+      data: {
+        maKH: kh.maKH,
+        tenKH: kh.tenKH,
+        sdt: canSeeLienHe ? (kh.sdt || '') : '',
+        diaChi: canSeeLienHe ? (kh.diaChi || '') : '',
+        tuyen: kh.tuyen,
+        soDuVi: kh.soDuVi,
+        congNo: Math.round(noAgg._sum.conLai || 0),
+        doanhThu: Math.round(dtAgg._sum.tongTien || 0),
+        tongDon: dons.length,
+        orders: dons.map((o) => ({
+          maDH: o.maDH,
+          ngayTao: o.ngayTao.toISOString(),
+          trangThai: o.trangThai,
+          tongTien: o.tongTien,
+          daTra: o.daTra,
+          conLai: o.conLai
+        }))
+      }
+    });
+  },
+
   // ============== MUA HANG: NGUON HANG / NCC ==============
   async addNguonHang(args, user) {
     if (!allow(user.vaiTro, ['MuaHang', 'GDV'])) return err('Không có quyền');

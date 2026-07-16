@@ -2,6 +2,8 @@ import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import AppShell from '@/components/AppShell';
 import KhachHangClient from './KhachHangClient';
+import OrderDetailModalHost from '@/components/OrderDetailModal';
+import CustomerDetailModalHost from '@/components/CustomerDetailModal';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +28,12 @@ export default async function AdminKhachHangPage() {
           tuyen: c.tuyen, pctCoc: c.pctCoc, soDuVi: c.soDuVi, congNo: noMap.get(c.maKH) || 0,
           tongDon: c.tongDon, doanhThu: c.doanhThu
         }))}
+      />
+      {/* Customer host TRƯỚC, Order host SAU: bấm đơn trong modal KH thì modal đơn nổi lên trên. */}
+      <CustomerDetailModalHost canSeeMoney />
+      <OrderDetailModalHost
+        canSeeMoney={['Admin', 'CSKH', 'KeToan'].includes(user.vaiTro)}
+        canSeeProfit={['Admin', 'KeToan', 'GDV', 'MuaHang'].includes(user.vaiTro)}
       />
     </AppShell>
   );

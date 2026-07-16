@@ -79,16 +79,16 @@ export default function KhachHangClient({ list, canEdit }: { list: KH[]; canEdit
           <tbody>
             {filtered.map((c) => (
               <tr key={c.maKH}>
-                <td className="ma-don">{c.maKH}</td>
-                <td>{c.tenKH}</td>
+                <td className="ma-don"><span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(c.maKH)}>{c.maKH}</span></td>
+                <td><span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(c.maKH)}>{c.tenKH}</span></td>
                 <td>{c.sdt || '-'}</td>
                 <td>{c.email || '-'}</td>
                 <td>{c.tuyen === 'HCM' ? 'HCM' : 'Hà Nội'}</td>
                 <td>{Math.round(c.pctCoc)}%</td>
                 <td className="number text-success" style={{ fontWeight: 600 }}>{formatCurrency(c.soDuVi)}</td>
-                <td className="number" style={{ color: c.congNo > 0 ? 'var(--danger-dark)' : undefined, fontWeight: c.congNo > 0 ? 600 : 400 }}>{formatCurrency(c.congNo)}</td>
-                <td className="number">{c.tongDon}</td>
-                <td className="number">{formatCurrency(c.doanhThu)}</td>
+                <td className="number" title="Xem đơn của khách" style={{ cursor: 'pointer', color: c.congNo > 0 ? 'var(--danger-dark)' : undefined, fontWeight: c.congNo > 0 ? 600 : 400 }} onClick={() => (window as any).openCustomerDetail?.(c.maKH)}>{formatCurrency(c.congNo)}</td>
+                <td className="number" title="Xem đơn của khách" style={{ cursor: 'pointer' }} onClick={() => (window as any).openCustomerDetail?.(c.maKH)}>{c.tongDon}</td>
+                <td className="number" title="Xem đơn của khách" style={{ cursor: 'pointer' }} onClick={() => (window as any).openCustomerDetail?.(c.maKH)}>{formatCurrency(c.doanhThu)}</td>
                 {canEdit && <td><button className="btn btn-primary btn-sm" onClick={() => openEdit(c)}><FiEdit2 /> Sửa</button></td>}
               </tr>
             ))}

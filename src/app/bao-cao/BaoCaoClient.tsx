@@ -311,7 +311,7 @@ export default function BaoCaoClient({ rows, knRows, cashRows, tonKhoRows, nvLis
           <tbody>
             {khData.map((d) => (
               <tr key={d.maKH}>
-                <td>{d.tenKH}<br /><span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{d.maKH}</span></td>
+                <td><span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(d.maKH)}>{d.tenKH}</span><br /><span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{d.maKH}</span></td>
                 <td className="number">{d.a.soDon}</td>
                 <td className="number">{d.a.tongKg.toFixed(1)}</td>
                 <td className="number">{d.a.tongM3.toFixed(3)}</td>
@@ -345,10 +345,10 @@ export default function BaoCaoClient({ rows, knRows, cashRows, tonKhoRows, nvLis
           <tbody>
             {congNoData.map((d) => (
               <tr key={d.maKH}>
-                <td>{d.tenKH}<br /><span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{d.maKH}</span></td>
-                <td className="number">{d.soDonNo}</td>
+                <td><span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(d.maKH)}>{d.tenKH}</span><br /><span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{d.maKH}</span></td>
+                <td className="number" title="Xem đơn của khách" style={{ cursor: 'pointer' }} onClick={() => (window as any).openCustomerDetail?.(d.maKH)}>{d.soDonNo}</td>
                 <td className="number">{fmtVND(d.tongTien)}đ</td>
-                <td className="number" style={{ color: '#DC2626', fontWeight: 700 }}>{fmtVND(d.conLai)}đ</td>
+                <td className="number" title="Xem đơn của khách" style={{ cursor: 'pointer', color: '#DC2626', fontWeight: 700 }} onClick={() => (window as any).openCustomerDetail?.(d.maKH)}>{fmtVND(d.conLai)}đ</td>
               </tr>
             ))}
           </tbody>
@@ -406,7 +406,7 @@ export default function BaoCaoClient({ rows, knRows, cashRows, tonKhoRows, nvLis
             {lnOrders.map((r) => (
               <tr key={r.maDH}>
                 <td className="ma-don" style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => (window as any).openOrderDetail?.(r.maDH)}>{r.maDH}</td>
-                <td>{r.tenKH}</td>
+                <td><span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(r.maKH)}>{r.tenKH}</span></td>
                 <td className="number">{r.thuNDT.toLocaleString()} ¥</td>
                 <td className="number">{r.vonNDT.toLocaleString()} ¥</td>
                 <td className="number">{r.shipNDTQ.toLocaleString()} ¥</td>
@@ -503,7 +503,7 @@ export default function BaoCaoClient({ rows, knRows, cashRows, tonKhoRows, nvLis
             {tonKhoRows.map((r) => (
               <tr key={r.maDH}>
                 <td className="ma-don" style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => (window as any).openOrderDetail?.(r.maDH)}>{r.maDH}</td>
-                <td>{r.tenKH}<br /><span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{r.maKH}</span></td>
+                <td><span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(r.maKH)}>{r.tenKH}</span><br /><span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{r.maKH}</span></td>
                 <td>{TT_LABEL[r.trangThai] || r.trangThai}</td>
                 <td className="number">{r.tongKg.toFixed(1)}</td>
                 <td className="number">{r.tongM3.toFixed(3)}</td>

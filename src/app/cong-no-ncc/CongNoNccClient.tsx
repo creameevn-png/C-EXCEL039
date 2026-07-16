@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import {
   FiTruck, FiPlus, FiSave, FiTrash2, FiInfo, FiInbox, FiArrowUpCircle, FiArrowDownCircle, FiSearch,
-  FiDownload, FiPrinter
+  FiDownload, FiPrinter, FiX
 } from 'react-icons/fi';
 import Tabs from '@/components/Tabs';
 import { callServer, reload } from '@/lib/client';
@@ -24,6 +24,9 @@ export default function CongNoNccClient({ ledger, partners, webs }:
   const [form, setForm] = useState({ ...blank });
   const [busy, setBusy] = useState(false);
   const [q, setQ] = useState('');
+  // Đối tác đang xem chi tiết (bấm tên shop/NCC để mở). Tái dùng dữ liệu + phép
+  // tính công nợ đã có ngay trong client — không cần backend, không nối fuzzy.
+  const [nccView, setNccView] = useState<string | null>(null);
 
   // Tổng hợp công nợ theo đối tác: phát sinh − đã trả = còn nợ.
   const summary = useMemo(() => {
@@ -208,7 +211,7 @@ export default function CongNoNccClient({ ledger, partners, webs }:
           <tbody>
             {summary.map((r) => (
               <tr key={r.doiTac}>
-                <td><b>{r.doiTac}</b></td>
+                <td><b style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => setNccView(r.doiTac)}>{r.doiTac}</b></td>
                 <td className="number">{r.n}</td>
                 <td className="number">{fmtVND(r.phatSinh)}đ</td>
                 <td className="number" style={{ color: '#059669' }}>{fmtVND(r.thanhToan)}đ</td>
@@ -244,7 +247,7 @@ export default function CongNoNccClient({ ledger, partners, webs }:
             {filteredLedger.map((e) => (
               <tr key={e.id}>
                 <td style={{ fontSize: 12 }}>{formatDate(e.ngay)}</td>
-                <td><b>{e.doiTac}</b></td>
+                <td><b style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => setNccView(e.doiTac)}>{e.doiTac}</b></td>
                 <td>{e.web}</td>
                 <td className="ma-don">{e.maDH ? <span style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => (window as any).openOrderDetail?.(e.maDH)}>{e.maDH}</span> : ''}</td>
                 <td>{e.loai === 'ThanhToan'
@@ -272,6 +275,44 @@ export default function CongNoNccClient({ ledger, partners, webs }:
         { id: 'add', label: <><FiPlus /> Ghi sổ</>, content: tabAdd },
         { id: 'led', label: <><FiInbox /> Sổ chi tiết</>, content: tabLedger }
       ]} />
+
+      {/* Chi tiết công nợ 1 đối tác — tái dùng ledger + summary đã tính ở client */}
+      {nccView && (() => {
+        const entries = ledger.filter((e) => e.doiTac === nccView);
+        const s = summary.find((x) => x.doiTac === nccView);
+        return (
+          <div className="modal-overlay show" onClick={(e) => { if (e.target === e.currentTarget) setNccView(null); }}>
+            <div className="modal-content" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header"><h2><FiTruck /> {nccView}</h2><button className="modal-close" onClick={() => setNccView(null)}><FiX /></button></div>
+              <div className="modal-body">
+                {s && (
+                  <div className="fee-summary" style={{ marginBottom: 12 }}>
+                    <div className="fee-row"><span>Tổng phát sinh</span><span className="fee-value">{fmtVND(s.phatSinh)}đ</span></div>
+                    <div className="fee-row"><span>Đã thanh toán</span><span className="fee-value" style={{ color: '#059669' }}>{fmtVND(s.thanhToan)}đ</span></div>
+                    <div className="fee-row" style={{ fontWeight: 700 }}><span>CÒN NỢ</span><span className="fee-value" style={{ color: s.conNo > 0.5 ? '#DC2626' : '#059669' }}>{fmtVND(s.conNo)}đ</span></div>
+                  </div>
+                )}
+                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>Bút toán ({entries.length})</div>
+                <table className="data-table" style={{ fontSize: 12 }}>
+                  <thead><tr><th>Ngày</th><th>Đơn</th><th>Loại</th><th className="number">Tệ</th><th className="number">Số tiền</th><th>Ghi chú</th></tr></thead>
+                  <tbody>
+                    {entries.map((e) => (
+                      <tr key={e.id}>
+                        <td>{formatDate(e.ngay)}</td>
+                        <td className="ma-don">{e.maDH ? <span style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => (window as any).openOrderDetail?.(e.maDH)}>{e.maDH}</span> : ''}</td>
+                        <td>{e.loai === 'ThanhToan' ? 'Trả NCC' : 'Phát sinh'}</td>
+                        <td className="number">{e.soTienNDT ? e.soTienNDT.toLocaleString() : ''}</td>
+                        <td className="number">{fmtVND(e.soTien)}đ</td>
+                        <td>{e.ghiChu}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </>
   );
 }

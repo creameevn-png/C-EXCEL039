@@ -95,8 +95,8 @@ export default function SanPhamClient({ list, canDelete }: { list: SP[]; canDele
           <tbody>
             {filtered.map((p) => (
               <tr key={p.maSP}>
-                <td className="ma-don">{p.maSP}</td>
-                <td>{p.tenSP}{p.linkTaobao && <a href={p.linkTaobao} target="_blank" className="icon-inline" style={{ marginLeft: 6, color: 'var(--primary)' }}><FiExternalLink /></a>}</td>
+                <td className="ma-don"><span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => openEdit(p)}>{p.maSP}</span></td>
+                <td><span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => openEdit(p)}>{p.tenSP}</span>{p.linkTaobao && <a href={p.linkTaobao} target="_blank" className="icon-inline" style={{ marginLeft: 6, color: 'var(--primary)' }}><FiExternalLink /></a>}</td>
                 <td>{p.danhMuc || '-'}</td>
                 <td>{p.webNguon || '-'}</td>
                 <td className="number">{p.kgGoiY}</td>

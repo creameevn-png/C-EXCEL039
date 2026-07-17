@@ -12,20 +12,33 @@ export default async function CskhPage() {
 
   const normWeb = (s: string) => String(s || '').toLowerCase().replace(/\s+/g, '').replace(/\.com.*$/, '');
 
-  const [customers, products, myOrders, kpiMyToday, kpiCompleted, kpiInProgress, kpiCustomers, tyGia, bangGiaWebs, gdvs] = await Promise.all([
+  // Đơn CSKH cần xử lý = đơn mình tạo + MỌI đơn khách tự đặt trên /dat-hang.
+  // Đơn khách tự đặt mang nvId = tài khoản của khách, nếu chỉ lọc theo nvId thì
+  // không CSKH nào nhìn thấy nó — mà nút "Xác nhận cọc" chỉ có ở màn này, nên đơn
+  // khách tự đặt sẽ kẹt vĩnh viễn ở "Đơn mới tạo".
+  const scopeDon = { OR: [{ nvId: user.id }, { nv: { vaiTro: 'Customer' as const } }] };
+
+  const [customers, products, myOrders, kpiMyToday, kpiCompleted, kpiInProgress, kpiCustomers, tyGia, pctMua, pctBH, bangGiaWebs, gdvs] = await Promise.all([
     prisma.khachHang.findMany({ orderBy: { maKH: 'asc' } }),
     prisma.sanPham.findMany({ orderBy: { maSP: 'asc' } }),
     prisma.donHang.findMany({
-      where: { nvId: user.id },
+      where: scopeDon,
       orderBy: { ngayTao: 'desc' },
       take: 200,
-      include: { khachHang: true, chiTiet: { take: 1, orderBy: { stt: 'asc' } }, gdv: { select: { hoTen: true } } }
+      include: {
+        khachHang: true,
+        chiTiet: { take: 1, orderBy: { stt: 'asc' } },
+        gdv: { select: { hoTen: true } },
+        nv: { select: { vaiTro: true } }
+      }
     }),
-    prisma.donHang.count({ where: { nvId: user.id, ngayTao: { gte: todayStart } } }),
-    prisma.donHang.count({ where: { nvId: user.id, trangThai: 'HoanThanh' } }),
-    prisma.donHang.count({ where: { nvId: user.id, trangThai: { notIn: ['HoanThanh', 'Huy'] } } }),
+    prisma.donHang.count({ where: { ...scopeDon, ngayTao: { gte: todayStart } } }),
+    prisma.donHang.count({ where: { ...scopeDon, trangThai: 'HoanThanh' } }),
+    prisma.donHang.count({ where: { ...scopeDon, trangThai: { notIn: ['HoanThanh', 'Huy'] } } }),
     prisma.khachHang.count(),
     getNumber('ty_gia_ndt_vnd', 3650),
+    getNumber('phi_mua_pct', 2),
+    getNumber('phi_bh_pct', 1),
     prisma.bangGiaWeb.findMany({ where: { hoatDong: true } }),
     prisma.nhanVien.findMany({ where: { vaiTro: { in: ['GDV', 'MuaHang'] }, trangThai: 'HoatDong' }, select: { id: true, hoTen: true } })
   ]);
@@ -39,6 +52,8 @@ export default async function CskhPage() {
     user,
     appName: process.env.APP_NAME || 'Quản Lý Ship Trung Việt',
     tyGia,
+    pctMua,
+    pctBH,
     tyGiaByWeb,
     customers: customers.map((c) => ({
       maKH: c.maKH, tenKH: c.tenKH, sdt: c.sdt || '', diaChi: c.diaChi || '',
@@ -52,10 +67,13 @@ export default async function CskhPage() {
     gdvs: gdvs.map((g) => ({ id: g.id, hoTen: g.hoTen })),
     myOrders: myOrders.map((o) => ({
       maDH: o.maDH, ngayTao: o.ngayTao.toISOString(),
+      maKH: o.maKH,
       tenKH: o.khachHang?.tenKH || '',
       tenHang: o.chiTiet[0]?.tenSP || '',
       tongTien: o.tongTien, daTra: o.daTra, conLai: o.conLai,
       trangThai: o.trangThai,
+      // Đơn do chính khách tự gửi lên từ /dat-hang — CSKH cần biết để gọi xác nhận cọc.
+      khachTuDat: o.nv?.vaiTro === 'Customer',
       gdvId: o.gdvId,
       gdvTen: o.gdv?.hoTen || '',
       phiPhatSinh: o.phiPhatSinh,

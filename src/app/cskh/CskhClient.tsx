@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   FiPlusCircle, FiPlus, FiX, FiPackage, FiDollarSign, FiUsers, FiUserPlus,
   FiInbox, FiClipboard, FiCheckCircle, FiClock, FiLock, FiCheck, FiEdit3, FiShoppingCart,
-  FiUser, FiBox, FiSend, FiRefreshCw, FiDatabase
+  FiUser, FiBox, FiSend, FiRefreshCw, FiDatabase, FiSearch
 } from 'react-icons/fi';
 import type { SessionUser } from '@/lib/auth';
 import { detectWeb } from '@/lib/source';
@@ -18,7 +18,7 @@ import ImageUploadModalHost from '@/components/ImageUploadModal';
 import { showToast } from '@/components/Toast';
 import { callServer, reload } from '@/lib/client';
 import { fmtVND, fmtDateDDMM, formatNDT } from '@/lib/format';
-import { statusToLabel, statusToClass } from '@/lib/status';
+import { statusToLabel, statusToClass, TRANG_THAI_LABEL } from '@/lib/status';
 import { calcPhiVCPanama } from '@/lib/shipping-fee';
 import { DANH_MUC_HANG, DANH_MUC_LIST_ID } from '@/lib/danh-muc';
 
@@ -29,8 +29,9 @@ type Customer = { maKH: string; tenKH: string; sdt: string; diaChi: string; pctC
 type Product = { maSP: string; tenSP: string; kgGoiY: number; m3GoiY: number; giaThamKhao: number; webNguon: string };
 type Gdv = { id: number; hoTen: string };
 type MyOrder = {
-  maDH: string; ngayTao: string; tenKH: string; tenHang: string;
+  maDH: string; ngayTao: string; maKH: string; tenKH: string; tenHang: string;
   tongTien: number; daTra: number; conLai: number; trangThai: string;
+  khachTuDat: boolean;
   gdvId: number | null; gdvTen: string;
   phiPhatSinh: number; phiPhatSinhDuyet: boolean;
   shipND: number; lineNoiDia: string;
@@ -54,6 +55,9 @@ type Props = {
     user: SessionUser;
     appName: string;
     tyGia: number;
+    /** % phí mua & % bảo hiểm lấy từ Cài đặt — không hard-code, để đổi ở Cài đặt là ăn ngay. */
+    pctMua?: number;
+    pctBH?: number;
     tyGiaByWeb?: Record<string, number>;
     customers: Customer[];
     products: Product[];
@@ -76,6 +80,8 @@ function mkLine(p?: Partial<LineItem>, tyGia = 3650): LineItem {
 
 export default function CskhClient({ initial }: Props) {
   const { user, customers: customersInit, products: productsInit, myOrders, kpi, tyGia } = initial;
+  const pctMua = initial.pctMua ?? 2;
+  const pctBH = initial.pctBH ?? 1;
   const gdvs = initial.gdvs || [];
   // Góp ý NV #10: chỉ Kế toán được nạp ví — CSKH chỉ xem số dư.
   const canTopup = user.vaiTro === 'KeToan' || user.vaiTro === 'Admin';
@@ -116,6 +122,13 @@ export default function CskhClient({ initial }: Props) {
 
   // Tab "Đơn của tôi": bản sao cục bộ để đổi GDV / phí phát sinh ngay trên bảng.
   const [orders, setOrders] = useState<MyOrder[]>(myOrders);
+
+  // Góp ý NV #11: lọc đơn theo trạng thái / ngày tạo / mã KH — trước đây chỉ màn Admin
+  // mới có, trong khi CSKH mới là người phải lọc đơn hằng ngày.
+  const [fTrangThai, setFTrangThai] = useState('');
+  const [fTuNgay, setFTuNgay] = useState('');
+  const [fDenNgay, setFDenNgay] = useState('');
+  const [fTim, setFTim] = useState('');
   const [phiDraft, setPhiDraft] = useState<Record<string, number>>({});
   // #36: bản nháp phí ship nội địa + line nội địa cho từng đơn trên bảng "Đơn của tôi".
   const [shipDraft, setShipDraft] = useState<Record<string, number>>({});
@@ -235,9 +248,10 @@ export default function CskhClient({ initial }: Props) {
     const tongSL = items.reduce((s, it) => s + (Number(it.soLuong) || 0), 0);
     const totalKg = items.reduce((s, it) => s + (Number(it.kg) || 0) * (Number(it.soLuong) || 0), 0);
     const totalM3 = items.reduce((s, it) => s + (Number(it.m3) || 0) * (Number(it.soLuong) || 0), 0);
-    // Tạm tính: phí mua 2% chung (server có thể tính theo từng sàn), bảo hiểm 1% giá hàng.
-    const phiMua = Math.round((tongGiaHang * 0.02) / 1000) * 1000;
-    const phiBH = Math.round((tongGiaHang * 0.01) / 1000) * 1000;
+    // Tạm tính theo ĐÚNG % của Cài đặt (server có thể tính phí mua theo từng sàn).
+    // Bảo hiểm đặt 0 ở Cài đặt thì dòng này bằng 0 và bị ẩn khỏi bảng phí (góp ý #9).
+    const phiMua = Math.round((tongGiaHang * pctMua) / 100 / 1000) * 1000;
+    const phiBH = Math.round((tongGiaHang * pctBH) / 100 / 1000) * 1000;
     // Phí phát sinh (#9) chờ Kế toán duyệt → KHÔNG cộng vào tổng tiền, chỉ hiển thị riêng.
     const phiPS = Math.round(Number(phiPhatSinh) || 0);
     const phiVC = calcPhiVCPanama(totalKg, totalM3, tuyen);
@@ -245,7 +259,7 @@ export default function CskhClient({ initial }: Props) {
     const tong = tongGiaHang + phiMua + phiBH + phiVC + (Number(shipND) || 0) + (Number(dongGoi) || 0) + (Number(phuThu) || 0) + phiThue;
     const coc = Math.round((tong * pctCoc) / 100 / 1000) * 1000;
     return { tongGiaHang, tongNDT, tongSL, totalKg, totalM3, phiMua, phiBH, phiPS, phiVC, phiThue, tong, coc };
-  }, [items, tuyen, shipND, dongGoi, phuThu, phiPhatSinh, thueNK, vat, phiKiemHoa, phiLuuKho, pctCoc]);
+  }, [items, tuyen, shipND, dongGoi, phuThu, phiPhatSinh, thueNK, vat, phiKiemHoa, phiLuuKho, pctCoc, pctMua, pctBH]);
 
   function resetCreateForm() {
     setMaKH(''); setTuyen('HaNoi'); setLineVC('LineThuong'); setLoaiHang('Thường');
@@ -695,8 +709,8 @@ export default function CskhClient({ initial }: Props) {
             <div style={{ marginTop: 14 }}>
               <div className="erp-fee-row"><span className="lbl">Tổng giá hàng</span><span className="v">{fmtVND(totals.tongGiaHang)}đ <small style={{ color: 'var(--text-faint)', fontWeight: 500 }}>≈ {formatNDT(totals.tongNDT)}</small></span></div>
               <div className="erp-fee-row"><span className="lbl">Tổng KG / M³</span><span className="v">{totals.totalKg.toFixed(2)} kg / {totals.totalM3.toFixed(4)} m³</span></div>
-              <div className="erp-fee-row"><span className="lbl">Phí mua (tạm tính 2%)</span><span className="v">{fmtVND(totals.phiMua)}đ</span></div>
-              <div className="erp-fee-row"><span className="lbl">Phí bảo hiểm (1%)</span><span className="v">{fmtVND(totals.phiBH)}đ</span></div>
+              <div className="erp-fee-row"><span className="lbl">Phí mua (tạm tính {pctMua}%)</span><span className="v">{fmtVND(totals.phiMua)}đ</span></div>
+              {pctBH > 0 && <div className="erp-fee-row"><span className="lbl">Phí bảo hiểm ({pctBH}%)</span><span className="v">{fmtVND(totals.phiBH)}đ</span></div>}
               <div className="erp-fee-row"><span className="lbl">Phí vận chuyển (Panama)</span><span className="v">{fmtVND(totals.phiVC)}đ</span></div>
               {totals.phiPS > 0 && <div className="erp-fee-row"><span className="lbl">Phí phát sinh khác <small style={{ color: 'var(--warning-dark, #92400e)', fontWeight: 600 }}>(chờ Kế toán duyệt — chưa cộng vào tổng)</small></span><span className="v">{fmtVND(totals.phiPS)}đ</span></div>}
               {totals.phiThue > 0 && <div className="erp-fee-row"><span className="lbl">Thuế / VAT / kiểm hóa / lưu kho ({ngachHQ})</span><span className="v">{fmtVND(totals.phiThue)}đ</span></div>}
@@ -726,11 +740,63 @@ export default function CskhClient({ initial }: Props) {
     </div>
   );
 
+  const ordersView = useMemo(() => {
+    const s = fTim.trim().toLowerCase();
+    return orders.filter((o) => {
+      if (fTrangThai && o.trangThai !== fTrangThai) return false;
+      const ngay = o.ngayTao.slice(0, 10);
+      if (fTuNgay && ngay < fTuNgay) return false;
+      if (fDenNgay && ngay > fDenNgay) return false;
+      if (!s) return true;
+      return [o.maDH, o.maKH, o.tenKH, o.tenHang].some((v) => (v || '').toLowerCase().includes(s));
+    });
+  }, [orders, fTrangThai, fTuNgay, fDenNgay, fTim]);
+
+  const soKhachTuDat = useMemo(
+    () => orders.filter((o) => o.khachTuDat && o.trangThai === 'DonMoiTao').length, [orders]);
+
   const tabOrders = (
     <div className="form-section">
-      <div className="section-title"><FiClipboard /> Đơn hàng tôi đã tạo ({orders.length} đơn)</div>
-      {orders.length === 0 ? (
-        <div className="empty-state"><FiInbox /><p>Bạn chưa tạo đơn nào.</p></div>
+      <div className="section-title" style={{ justifyContent: 'space-between' }}>
+        <span className="icon-inline"><FiClipboard /> Đơn của tôi &amp; khách tự đặt ({ordersView.length}/{orders.length} đơn)</span>
+        {soKhachTuDat > 0 && (
+          <span className="status-badge" style={{ background: '#fef3c7', color: '#92400e' }}>
+            {soKhachTuDat} đơn khách tự đặt chờ xác nhận cọc
+          </span>
+        )}
+      </div>
+
+      {/* Góp ý NV #11 — lọc trạng thái · ngày tạo · mã KH */}
+      <div className="form-grid" style={{ marginBottom: 14 }}>
+        <div className="form-field"><label>Lọc theo trạng thái</label>
+          <select value={fTrangThai} onChange={(e) => setFTrangThai(e.target.value)}>
+            <option value="">— Mọi trạng thái —</option>
+            {/* Bỏ 'KHTuDat': enum còn khai nhưng không luồng nào set (đơn khách tự đặt
+                vẫn vào 'DonMoiTao'), để trong danh sách thì lọc ra rỗng gây hiểu nhầm. */}
+            {Object.entries(TRANG_THAI_LABEL)
+              .filter(([k]) => k !== 'KHTuDat')
+              .map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select></div>
+        <div className="form-field"><label>Từ ngày</label>
+          <input type="date" value={fTuNgay} onChange={(e) => setFTuNgay(e.target.value)} /></div>
+        <div className="form-field"><label>Đến ngày</label>
+          <input type="date" value={fDenNgay} onChange={(e) => setFDenNgay(e.target.value)} /></div>
+        <div className="form-field"><label>Tìm mã đơn / mã KH / tên KH</label>
+          <div style={{ position: 'relative' }}>
+            <FiSearch style={{ position: 'absolute', left: 10, top: 10, color: 'var(--text-faint)' }} />
+            <input style={{ paddingLeft: 32 }} value={fTim} onChange={(e) => setFTim(e.target.value)}
+                   placeholder="VD: DH-260601-001 hoặc KH001…" />
+          </div></div>
+      </div>
+      {(fTrangThai || fTuNgay || fDenNgay || fTim) && (
+        <button className="btn btn-secondary btn-sm" style={{ marginBottom: 12 }}
+                onClick={() => { setFTrangThai(''); setFTuNgay(''); setFDenNgay(''); setFTim(''); }}>
+          <FiX /> Xoá lọc
+        </button>
+      )}
+
+      {ordersView.length === 0 ? (
+        <div className="empty-state"><FiInbox /><p>{orders.length === 0 ? 'Chưa có đơn nào.' : 'Không có đơn khớp bộ lọc.'}</p></div>
       ) : (
         <table className="data-table">
           <thead><tr>
@@ -739,12 +805,19 @@ export default function CskhClient({ initial }: Props) {
             <th>Trạng thái</th><th>GDV xử lý</th><th>Phí phát sinh</th><th>Ship nội địa VN</th><th>Thao tác</th>
           </tr></thead>
           <tbody>
-            {orders.map((o) => (
+            {ordersView.map((o) => (
               <tr key={o.maDH}>
                 <td className="ma-don" style={{ cursor: 'pointer', textDecoration: 'underline' }}
                     onClick={() => (window as any).openOrderDetail?.(o.maDH)}>{o.maDH}</td>
                 <td>{fmtDateDDMM(o.ngayTao)}</td>
-                <td>{o.tenKH}</td>
+                <td>
+                  {o.tenKH}
+                  {o.khachTuDat && (
+                    <div><span className="status-badge" style={{ background: '#fef3c7', color: '#92400e', fontSize: 10 }}>
+                      Khách tự đặt
+                    </span></div>
+                  )}
+                </td>
                 <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.tenHang}</td>
                 <td className="number">{fmtVND(o.tongTien)}</td>
                 <td className="number">{fmtVND(o.daTra)}</td>

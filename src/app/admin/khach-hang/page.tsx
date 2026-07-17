@@ -18,13 +18,19 @@ export default async function AdminKhachHangPage() {
   });
   const noMap = new Map(noRows.map((r) => [r.maKH, Math.round(r._sum.conLai || 0)]));
   const canEdit = user.vaiTro === 'Admin' || user.vaiTro === 'CSKH';
+  // Góp ý NV #21: Kế toán không cần nhìn SĐT / email khách. Lớp /api/action đã ẩn
+  // (canSeeLienHe), nhưng trang này query Prisma thẳng nên phải tự chặn ở đây.
+  const canSeeLienHe = user.vaiTro !== 'KeToan';
 
   return (
     <AppShell user={user} subtitle={`${customers.length} khách hàng`}>
       <KhachHangClient
         canEdit={canEdit}
+        canSeeLienHe={canSeeLienHe}
         list={customers.map((c) => ({
-          maKH: c.maKH, tenKH: c.tenKH, sdt: c.sdt || '', email: c.email || '',
+          maKH: c.maKH, tenKH: c.tenKH,
+          sdt: canSeeLienHe ? (c.sdt || '') : '',
+          email: canSeeLienHe ? (c.email || '') : '',
           tuyen: c.tuyen, pctCoc: c.pctCoc, soDuVi: c.soDuVi, congNo: noMap.get(c.maKH) || 0,
           tongDon: c.tongDon, doanhThu: c.doanhThu
         }))}

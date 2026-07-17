@@ -11,7 +11,10 @@ type KH = {
   pctCoc: number; soDuVi: number; congNo: number; tongDon: number; doanhThu: number;
 };
 
-export default function KhachHangClient({ list, canEdit }: { list: KH[]; canEdit: boolean }) {
+export default function KhachHangClient(
+  { list, canEdit, canSeeLienHe = true }:
+  { list: KH[]; canEdit: boolean; canSeeLienHe?: boolean }
+) {
   const [q, setQ] = useState('');
   const [tuyenF, setTuyenF] = useState('');
   const [editing, setEditing] = useState<KH | null>(null);
@@ -71,7 +74,9 @@ export default function KhachHangClient({ list, canEdit }: { list: KH[]; canEdit
       ) : (
         <table className="data-table">
           <thead><tr>
-            <th>Mã KH</th><th>Tên</th><th>SĐT</th><th>Email</th><th>Tuyến</th>
+            <th>Mã KH</th><th>Tên</th>
+            {canSeeLienHe && <><th>SĐT</th><th>Email</th></>}
+            <th>Tuyến</th>
             <th>% Cọc</th><th className="number">Số dư ví</th><th className="number">Công nợ</th>
             <th className="number">Tổng đơn</th><th className="number">Doanh thu</th>
             {canEdit && <th>Thao tác</th>}
@@ -81,8 +86,7 @@ export default function KhachHangClient({ list, canEdit }: { list: KH[]; canEdit
               <tr key={c.maKH}>
                 <td className="ma-don"><span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(c.maKH)}>{c.maKH}</span></td>
                 <td><span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(c.maKH)}>{c.tenKH}</span></td>
-                <td>{c.sdt || '-'}</td>
-                <td>{c.email || '-'}</td>
+                {canSeeLienHe && <><td>{c.sdt || '-'}</td><td>{c.email || '-'}</td></>}
                 <td>{c.tuyen === 'HCM' ? 'HCM' : 'Hà Nội'}</td>
                 <td>{Math.round(c.pctCoc)}%</td>
                 <td className="number text-success" style={{ fontWeight: 600 }}>{formatCurrency(c.soDuVi)}</td>

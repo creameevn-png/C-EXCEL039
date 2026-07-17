@@ -327,9 +327,13 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
             <span className="status-badge s-waiting">Chờ thanh toán</span>
           </div>
           <div className="ac-meta">KH: <b>{o.tenKH}</b> · {o.tenHang} · Tuyến: <b>{o.tuyen === 'HCM' ? 'HCM' : 'Hà Nội'}</b></div>
+          {diaChi(o)}
           <div className="icon-inline" style={{ background: '#FEF3C7', padding: 8, borderRadius: 6, marginTop: 8, fontSize: 12, color: '#92400E' }}>
             <FiClock /> Đợi Kế toán xác nhận khách đã thanh toán đủ trước khi giao.
           </div>
+          {/* Góp ý NV #36/#41: phí ship nội địa phát sinh LÚC GIAO, nên ô nhập phải còn
+              ở đây và ở tab "Sẵn sàng giao" — không chỉ ở tab "Đang về VN". */}
+          {shipVN(o)}
           <div className="ac-actions">
             <button className="btn btn-secondary btn-sm" onClick={() => openWeigh(o.maDH)}>
               <FiEdit2 /> Sửa cân (KG / kích thước)
@@ -360,6 +364,7 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
               <FiAlertCircle /> Còn nợ {fmtVND(o.conLai)}đ — không thể giao đến khi thanh toán đủ
             </div>
           )}
+          {shipVN(o)}
           <div className="ac-actions">
             <button className="btn btn-success" onClick={() => confirmDelivered(o.maDH)} disabled={o.conLai > 0.5}>
               <FiTarget /> Đã giao tới KH

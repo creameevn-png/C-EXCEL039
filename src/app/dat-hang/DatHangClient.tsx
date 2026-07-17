@@ -22,7 +22,10 @@ const mk = (): Item => ({ tempId: SEQ++, tenSP: '', soLuong: 1, donGiaNDT: 0, ty
 
 type KH = { maKH: string; tenKH: string; pctCoc: number; tuyen: string; sdt: string; diaChi: string };
 
-export default function DatHangClient({ kh, isCustomer }: { kh: KH | null; isCustomer: boolean }) {
+export default function DatHangClient(
+  { kh, isCustomer, pctMua = 2, pctBH = 1 }:
+  { kh: KH | null; isCustomer: boolean; pctMua?: number; pctBH?: number }
+) {
   const [items, setItems] = useState<Item[]>([mk()]);
   const [tuyen, setTuyen] = useState<'HaNoi' | 'HCM'>((kh?.tuyen as any) || 'HaNoi');
   const [lineVC, setLineVC] = useState<'LineNhanh' | 'LineThuong' | 'LineRe'>('LineThuong');
@@ -50,12 +53,15 @@ export default function DatHangClient({ kh, isCustomer }: { kh: KH | null; isCus
     const sl = items.reduce((s, it) => s + it.soLuong, 0);
     const kg = items.reduce((s, it) => s + it.kg * it.soLuong, 0);
     const m3 = items.reduce((s, it) => s + it.m3 * it.soLuong, 0);
-    const phiMua = Math.round(giaHang * 0.02 / 1000) * 1000;
+    // Phải khớp công thức server (src/lib/shipping-fee.ts): phí mua % + bảo hiểm %
+    // đều lấy từ Cài đặt. Thiếu bảo hiểm ở đây thì khách thấy tổng thấp hơn đơn thật.
+    const phiMua = Math.round(giaHang * pctMua / 100 / 1000) * 1000;
+    const phiBH = Math.round(giaHang * pctBH / 100 / 1000) * 1000;
     const phiVC = calcPhiVCPanama(kg, m3, tuyen);
-    const tong = giaHang + phiMua + phiVC + dongGoi;
+    const tong = giaHang + phiMua + phiBH + phiVC + dongGoi;
     const coc = Math.round(tong * pctCoc / 100 / 1000) * 1000;
-    return { giaHang, sl, kg, m3, phiMua, phiVC, tong, coc };
-  }, [items, tuyen, pctCoc, dongGoi]);
+    return { giaHang, sl, kg, m3, phiMua, phiBH, phiVC, tong, coc };
+  }, [items, tuyen, pctCoc, dongGoi, pctMua, pctBH]);
 
   async function submit() {
     if (!kh) return showToast('Cần chọn KH', 'error');
@@ -280,7 +286,8 @@ export default function DatHangClient({ kh, isCustomer }: { kh: KH | null; isCus
                 </select></div>
             </div>
             <div className="erp-fee-row"><span className="lbl">Tiền hàng</span><span className="v">{fmtVND(tot.giaHang)}đ</span></div>
-            <div className="erp-fee-row"><span className="lbl">Phí mua hàng (2%)</span><span className="v">{fmtVND(tot.phiMua)}đ</span></div>
+            <div className="erp-fee-row"><span className="lbl">Phí mua hàng ({pctMua}%)</span><span className="v">{fmtVND(tot.phiMua)}đ</span></div>
+            {pctBH > 0 && <div className="erp-fee-row"><span className="lbl">Phí bảo hiểm ({pctBH}%)</span><span className="v">{fmtVND(tot.phiBH)}đ</span></div>}
             <div className="erp-fee-row"><span className="lbl">Phí vận chuyển ({tot.kg.toFixed(2)} kg / {tot.m3.toFixed(4)} m³)</span><span className="v">{fmtVND(tot.phiVC)}đ</span></div>
             {dongGoi > 0 && <div className="erp-fee-row"><span className="lbl">Phí đóng gỗ / bọt khí</span><span className="v">{fmtVND(dongGoi)}đ</span></div>}
             <div className="erp-fee-row total"><span className="lbl">Tổng tiền (ước tính)</span><span className="v">{fmtVND(tot.tong)}đ</span></div>

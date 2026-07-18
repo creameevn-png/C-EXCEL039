@@ -4,6 +4,7 @@ const DEFAULTS: Record<string, string> = {
   ty_gia_ndt_vnd: '3650',
   phi_mua_pct: '2',
   phi_bh_pct: '1',
+  bh_mac_dinh: '1',
   ten_cong_ty: 'Quản Lý Ship Trung Việt',
   zalo_lien_he: '',
   gdv_chi_thay_don_minh: '0'
@@ -31,6 +32,13 @@ export async function getSetting(key: string): Promise<string> {
 export async function getNumber(key: string, fallback = 0): Promise<number> {
   const v = parseFloat(await getSetting(key));
   return isNaN(v) ? fallback : v;
+}
+
+/** Cài đặt bật/tắt (lưu dạng '1'/'0'). Trả fallback khi key chưa có giá trị nào
+ *  (getSetting trả '' — không có trong DB lẫn DEFAULTS); '1' → true, còn lại → false. */
+export async function getBool(key: string, fb: boolean): Promise<boolean> {
+  const v = await getSetting(key);
+  return v === '' ? fb : v === '1';
 }
 
 export async function setSetting(key: string, value: string, note?: string): Promise<void> {

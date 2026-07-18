@@ -81,6 +81,9 @@ async function recomputeDonHang(maDH: string) {
     // Z6 — % riêng của khách; null → hàm tính tự dùng % chung.
     phiMuaPctKH: khDon?.phiMuaPctRieng ?? undefined,
     phiBhPctKH: khDon?.phiBhPctRieng ?? undefined,
+    // 3B — bật/tắt bảo hiểm theo ưu tiên ĐƠN > KHÁCH > CÔNG TY (hàm tính lo phần ??).
+    coBaoHiem: o.coBaoHiem,
+    baoHiemKH: khDon?.baoHiemRieng,
     thueNK: o.thueNK, vat: o.vat, phiKiemHoa: o.phiKiemHoa, phiLuuKho: o.phiLuuKho,
     pctCoc: o.pctCoc,
     lineVC: o.lineVC, loaiHang: o.loaiHang
@@ -232,6 +235,9 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         nvId: user.id,
         // Góp ý NV #12: CSKH chọn GDV phụ trách ngay khi lên đơn (khách tự đặt thì để trống).
         gdvId: isCustomer ? null : (Number(d.gdvId) || null),
+        // 3B — bật/tắt bảo hiểm cấp ĐƠN. Khách tự đặt → null (theo khách/công ty);
+        // CSKH tạo → tri-state từ payload (true/false đè riêng đơn, còn lại null).
+        coBaoHiem: isCustomer ? null : (d.coBaoHiem === true ? true : d.coBaoHiem === false ? false : null),
         tuyen,
         lineVC,
         loaiHang: d.loaiHang || 'Thường',
@@ -732,9 +738,14 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (o.trangThai !== 'DangVanChuyen') return err('Đơn không đang vận chuyển');
     // Hàng về kho VN: trả đủ → sẵn sàng giao (KhoVnNhan); còn nợ → chờ thanh toán.
     const newStatus: TrangThaiDon = o.conLai <= 0.5 ? 'KhoVnNhan' : 'ChoThanhToan';
+    // 3B — Kho VN xác nhận nhận hàng = mốc CHỐT CÂN: sau đây chỉ Admin sửa được cân.
+    // Không đè lại nếu cân đã chốt trước đó (giữ nguyên người/thời điểm chốt gốc).
     await prisma.donHang.update({
       where: { maDH },
-      data: { trangThai: newStatus, anhKhoVN: imageBase64 || null }
+      data: {
+        trangThai: newStatus, anhKhoVN: imageBase64 || null,
+        ...(o.canDaChot ? {} : { canDaChot: true, canChotBy: user.hoTen || user.email, canChotAt: new Date() })
+      }
     });
     // Xác nhận cả đơn = mọi kiện của đơn đã về. Không đồng bộ ở đây thì khối
     // "Giao khách theo kiện" (#37) sẽ chặn với lý do "kiện chưa về kho VN".
@@ -746,7 +757,10 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       where: { maDH, trangThai: 'ChuaVe' },
       data: { trangThai: 'DaVeVN', ngayVeVN: new Date(), nguoiNhan: user.hoTen || user.email }
     });
-    await logActivity(user.email, 'KHO_VN_NHAN', maDH, { trangThai: { truoc: o.trangThai, sau: newStatus } });
+    await logActivity(user.email, 'KHO_VN_NHAN', maDH, {
+      trangThai: { truoc: o.trangThai, sau: newStatus },
+      ...(o.canDaChot ? {} : { canDaChot: { truoc: false, sau: true } })
+    });
     if (newStatus === 'ChoThanhToan') {
       await pushNotify({
         vaiTro: ['KeToan', 'CSKH'], loai: 'warning', maDH,
@@ -761,6 +775,22 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         noiDung: 'Đã thanh toán đủ — sẵn sàng giao khách', link: '/khovn', nguoiTao: user.email
       });
     }
+    return ok();
+  },
+
+  // 3B — Chốt cân chủ động: nhân viên kho bấm để khóa cân trước khi Kho VN xác nhận
+  // (vd cân xong ở kho TQ). Sau khi chốt, chỉ Admin được sửa cân/kích thước.
+  async chotCan(args, user) {
+    if (!allow(user.vaiTro, ['KhoTQ', 'KhoVN'])) return err('Không có quyền chốt cân');
+    const [maDH] = args;
+    const don = await prisma.donHang.findUnique({ where: { maDH } });
+    if (!don) return err('Không tìm thấy đơn');
+    if (don.canDaChot) return err('Cân đã được chốt trước đó');
+    await prisma.donHang.update({
+      where: { maDH },
+      data: { canDaChot: true, canChotBy: user.hoTen || user.email, canChotAt: new Date() }
+    });
+    await logActivity(user.email, 'CHOT_CAN', maDH, { canDaChot: { truoc: false, sau: true } });
     return ok();
   },
 
@@ -1623,6 +1653,9 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       data.phiMuaPctRieng = patch.phiMuaPctRieng === null ? null : clampPct(patch.phiMuaPctRieng);
     if (patch.phiBhPctRieng !== undefined)
       data.phiBhPctRieng = patch.phiBhPctRieng === null ? null : clampPct(patch.phiBhPctRieng);
+    // 3B — bật/tắt bảo hiểm mặc định của khách (tri-state; null = theo công ty).
+    if (patch.baoHiemRieng !== undefined)
+      data.baoHiemRieng = patch.baoHiemRieng === true ? true : patch.baoHiemRieng === false ? false : null;
     // GDV phụ trách (null = chưa phân). Ép về số nguyên hợp lệ, không thì để null.
     if (patch.gdvPhuTrachId !== undefined) {
       const gid = patch.gdvPhuTrachId === null ? null : Math.trunc(Number(patch.gdvPhuTrachId));
@@ -1632,7 +1665,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     const cur = await prisma.khachHang.findUnique({ where: { maKH } });
     await prisma.khachHang.update({ where: { maKH }, data });
     await logActivity(user.email, 'UPDATE_CUSTOMER', maKH,
-      cur ? diffFields(cur, data, ['tenKH', 'sdt', 'email', 'diaChi', 'tuyen', 'pctCoc', 'phiMuaPctRieng', 'phiBhPctRieng', 'gdvPhuTrachId']) : {});
+      cur ? diffFields(cur, data, ['tenKH', 'sdt', 'email', 'diaChi', 'tuyen', 'pctCoc', 'phiMuaPctRieng', 'phiBhPctRieng', 'baoHiemRieng', 'gdvPhuTrachId']) : {});
     return ok();
   },
 
@@ -1753,6 +1786,12 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         phiLuuKho: canSeeMoney ? o.phiLuuKho : 0,
         ngachHQ: o.ngachHQ,
         kiemDem: o.kiemDem,
+        // 3B — trạng thái bật/tắt bảo hiểm cấp đơn (null = theo khách/công ty) để UI hiển thị/sửa.
+        coBaoHiem: o.coBaoHiem,
+        // 3B — khóa cân: đơn đã chốt cân thì kho không sửa được nữa (chỉ Admin).
+        canDaChot: o.canDaChot,
+        canChotBy: o.canChotBy || '',
+        canChotAt: o.canChotAt ? o.canChotAt.toISOString() : null,
         nguoiNhan: canSeeTenKH ? (o.nguoiNhan || '') : '',
         sdtNhan: canSeeLienHe ? (o.sdtNhan || '') : '',
         diaChiNhan: canSeeTenKH ? (o.diaChiNhan || '') : '',
@@ -2113,6 +2152,8 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     const don = await prisma.donHang.findUnique({ where: { maDH } });
     if (!don) return err('Đơn không tồn tại');
     if (donDaChot(don.trangThai)) return err('Đơn đã hoàn thành / đã hủy — không sửa được cân / kích thước');
+    // 3B — khóa cân: sau khi cân đã chốt, chỉ Admin được chỉnh sửa (nhân viên kho bị chặn).
+    if (don.canDaChot && user.vaiTro !== 'Admin') return err('Cân đã được chốt — chỉ Quản trị được chỉnh sửa. Vui lòng liên hệ quản trị.');
     const line = await prisma.chiTietDon.findFirst({ where: { maDH, stt: Number(stt) } });
     if (!line) return err('Không tìm thấy dòng hàng');
     const data: any = {};
@@ -2143,7 +2184,8 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     await recomputeDonHang(maDH);
     const o = await prisma.donHang.findUnique({ where: { maDH } });
     await recomputePhieuGiao(o?.maPhieuGiao);
-    await logActivity(user.email, 'SUA_KG', maDH, { stt, ...changes });
+    // 3B — Admin sửa cân SAU khi đã chốt: gắn cờ để nhật ký tách bạch trường hợp này.
+    await logActivity(user.email, 'SUA_KG', maDH, { stt, ...changes, ...(don.canDaChot ? { suaSauChot: true } : {}) });
     return ok({ m3: data.m3 ?? line.m3 });
   },
 
@@ -2177,6 +2219,10 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (patch?.phiKiemHoa !== undefined) data.phiKiemHoa = Number(patch.phiKiemHoa) || 0;
     if (patch?.phiLuuKho !== undefined) data.phiLuuKho = Number(patch.phiLuuKho) || 0;
     if (patch?.kiemDem !== undefined) data.kiemDem = !!patch.kiemDem;
+    // 3B — Admin đè bật/tắt bảo hiểm cho đơn đã tạo (tri-state; null = theo khách/công ty).
+    if (patch?.coBaoHiem !== undefined) {
+      data.coBaoHiem = patch.coBaoHiem === true ? true : patch.coBaoHiem === false ? false : null;
+    }
     if (patch?.nguoiNhan !== undefined) data.nguoiNhan = patch.nguoiNhan || null;
     if (patch?.sdtNhan !== undefined) data.sdtNhan = patch.sdtNhan || null;
     if (patch?.diaChiNhan !== undefined) data.diaChiNhan = patch.diaChiNhan || null;
@@ -2186,7 +2232,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     // So sánh giá trị đã chuẩn hoá (data) với bản ghi cũ (o) → log "trước → sau" chuẩn.
     await logActivity(user.email, 'SUA_DON', maDH, diffFields(o, data, [
       'tuyen', 'lineVC', 'loaiHang', 'pctCoc', 'shipND', 'dongGo', 'phuThu',
-      'ngachHQ', 'thueNK', 'vat', 'phiKiemHoa', 'phiLuuKho', 'kiemDem',
+      'ngachHQ', 'thueNK', 'vat', 'phiKiemHoa', 'phiLuuKho', 'kiemDem', 'coBaoHiem',
       'nguoiNhan', 'sdtNhan', 'diaChiNhan', 'ghiChu'
     ]));
     return ok();

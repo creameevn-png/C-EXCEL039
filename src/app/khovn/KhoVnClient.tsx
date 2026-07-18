@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import {
   FiInfo, FiTruck, FiPackage, FiCheckCircle, FiDownload, FiClock, FiCheck, FiAlertCircle, FiTarget,
-  FiEdit2, FiX, FiBox, FiMapPin, FiSave, FiLayers, FiRotateCcw, FiDollarSign, FiPlus
+  FiEdit2, FiX, FiBox, FiMapPin, FiSave, FiLayers, FiRotateCcw, FiDollarSign, FiPlus, FiLock
 } from 'react-icons/fi';
 import type { SessionUser } from '@/lib/auth';
 import AppShell from '@/components/AppShell';
@@ -59,13 +59,19 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
   const [weighMaDH, setWeighMaDH] = useState<string | null>(null);
   const [weighLines, setWeighLines] = useState<WeighLine[]>([]);
   const [weighBusy, setWeighBusy] = useState(false);
+  // Trạng thái khoá cân của đơn đang mở (server trả trong chi tiết đơn).
+  const [weighChot, setWeighChot] = useState<{ canDaChot: boolean; canChotBy: string }>({ canDaChot: false, canChotBy: '' });
+  const isAdmin = user.vaiTro === 'Admin';
+  // Đã chốt cân + không phải Admin → khoá mọi ô nhập cân và nút lưu.
+  const lockCan = weighChot.canDaChot && !isAdmin;
 
   const soHoacRong = (v: any) => (Number(v) > 0 ? String(v) : '');
 
   async function openWeigh(maDH: string) {
-    setWeighMaDH(maDH); setWeighLines([]);
+    setWeighMaDH(maDH); setWeighLines([]); setWeighChot({ canDaChot: false, canChotBy: '' });
     const r = await callServer('getOrderDetail', maDH);
     if (r?.success) {
+      setWeighChot({ canDaChot: !!r.data.canDaChot, canChotBy: r.data.canChotBy || '' });
       setWeighLines(r.data.chiTiet.map((c: any) => ({
         stt: c.stt, tenSP: c.tenSP, soLuong: c.soLuong,
         kg: String(c.kg ?? ''),
@@ -92,6 +98,14 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
     setWeighBusy(false);
     showToast('Đã cập nhật cân nặng (lưu lịch sử sửa)', 'success');
     reload();
+  }
+
+  // ===== Chốt cân: sau khi chốt chỉ Admin sửa được cân (Đợt 3B) =====
+  async function chotCan(maDH: string) {
+    if (!confirm(`Chốt cân đơn ${maDH}?\n\nSau khi chốt, nhân viên kho không sửa được cân nữa — chỉ Quản trị mới sửa được.`)) return;
+    const r = await callServer('chotCan', maDH);
+    if (r?.success) { showToast('Đã chốt cân', 'success'); reload(); }
+    else showToast(r?.message || 'Lỗi', 'error');
   }
 
   function confirmKhoVN(maDH: string) {
@@ -705,6 +719,14 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
               <FiInfo /><span>Kho VN cân lại thực tế. Mỗi thay đổi được <b>lưu lịch sử</b> (Audit log) và tự tính lại phí VC.
                 Nhập đủ <b>Dài × Rộng × Cao (cm)</b> thì ô <b>M³</b> tự tính theo hệ số trong Cài đặt và bị khoá; bỏ trống kích thước thì gõ M³ tay.</span>
             </div>
+            {weighChot.canDaChot && (
+              <div className="alert alert-lock" style={{ marginBottom: 12 }}>
+                <FiLock /><span>
+                  <b>Đã chốt cân{weighChot.canChotBy ? ` · bởi ${weighChot.canChotBy}` : ''}.</b>{' '}
+                  {isAdmin ? 'Quản trị đang sửa sau chốt.' : 'Nhân viên kho không sửa được cân — liên hệ Quản trị nếu cần sửa.'}
+                </span>
+              </div>
+            )}
             {weighLines.length === 0 ? (
               <div className="empty-state"><FiClock /><p>Đang tải dòng hàng…</p></div>
             ) : (
@@ -722,11 +744,11 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
                       <tr key={l.stt}>
                         <td>{l.tenSP}</td>
                         <td className="number">{l.soLuong}</td>
-                        <td className="number"><input type="number" step="0.01" value={l.kg} style={{ width: 80, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { kg: e.target.value })} /></td>
-                        <td className="number"><input type="number" value={l.dai} style={{ width: 60, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { dai: e.target.value })} /></td>
-                        <td className="number"><input type="number" value={l.rong} style={{ width: 60, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { rong: e.target.value })} /></td>
-                        <td className="number"><input type="number" value={l.cao} style={{ width: 60, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { cao: e.target.value })} /></td>
-                        <td className="number"><input type="number" step="0.0001" value={l.m3} readOnly={hasKT} style={{ width: 100, textAlign: 'right', background: hasKT ? '#F3F4F6' : undefined }} onChange={(e) => patchWeigh(l.stt, { m3: e.target.value })} /></td>
+                        <td className="number"><input type="number" step="0.01" value={l.kg} disabled={lockCan} style={{ width: 80, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { kg: e.target.value })} /></td>
+                        <td className="number"><input type="number" value={l.dai} disabled={lockCan} style={{ width: 60, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { dai: e.target.value })} /></td>
+                        <td className="number"><input type="number" value={l.rong} disabled={lockCan} style={{ width: 60, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { rong: e.target.value })} /></td>
+                        <td className="number"><input type="number" value={l.cao} disabled={lockCan} style={{ width: 60, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { cao: e.target.value })} /></td>
+                        <td className="number"><input type="number" step="0.0001" value={l.m3} readOnly={hasKT} disabled={lockCan} style={{ width: 100, textAlign: 'right', background: hasKT ? '#F3F4F6' : undefined }} onChange={(e) => patchWeigh(l.stt, { m3: e.target.value })} /></td>
                       </tr>
                     );
                   })}
@@ -737,7 +759,10 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
           </div>
           <div className="btn-row">
             <button className="btn btn-secondary" onClick={() => setWeighMaDH(null)}>Hủy</button>
-            <button className="btn btn-success" onClick={saveWeigh} disabled={weighBusy || weighLines.length === 0}>
+            {weighMaDH && !weighChot.canDaChot && (
+              <button className="btn btn-primary" onClick={() => chotCan(weighMaDH)}><FiLock /> Chốt cân</button>
+            )}
+            <button className="btn btn-success" onClick={saveWeigh} disabled={weighBusy || weighLines.length === 0 || lockCan}>
               {weighBusy ? <FiClock /> : <FiCheck />} Lưu cân nặng
             </button>
           </div>

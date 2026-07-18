@@ -46,6 +46,7 @@ export default async function AdminKhachHangPage() {
           tongDon: c.tongDon, doanhThu: c.doanhThu,
           phiMuaPctRieng: c.phiMuaPctRieng ?? null,
           phiBhPctRieng: c.phiBhPctRieng ?? null,
+          baoHiemRieng: c.baoHiemRieng ?? null,
           gdvPhuTrachId: c.gdvPhuTrachId ?? null
         }))}
       />

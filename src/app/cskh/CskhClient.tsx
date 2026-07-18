@@ -113,6 +113,8 @@ export default function CskhClient({ initial }: Props) {
   const [sdtNhan, setSdtNhan] = useState('');
   const [diaChiNhan, setDiaChiNhan] = useState('');
   const [pctCoc, setPctCoc] = useState(70);
+  // Bảo hiểm cho riêng đơn này — tri-state: '' = theo khách/công ty · '1' = bật · '0' = tắt.
+  const [coBaoHiemDon, setCoBaoHiemDon] = useState('');
   const [gdvId, setGdvId] = useState('');
   const [ghiChu, setGhiChu] = useState('');
   const [hintCoc, setHintCoc] = useState('% cọc sẽ tự động lấy từ thông tin KH');
@@ -263,7 +265,7 @@ export default function CskhClient({ initial }: Props) {
 
   function resetCreateForm() {
     setMaKH(''); setTuyen('HaNoi'); setLineVC('LineThuong'); setLoaiHang('Thường');
-    setShipND(0); setDongGoi(0); setPhuThu(0); setPctCoc(70); setGdvId(''); setGhiChu('');
+    setShipND(0); setDongGoi(0); setPhuThu(0); setPctCoc(70); setCoBaoHiemDon(''); setGdvId(''); setGhiChu('');
     setPhiPhatSinh(0); setNgachHQ('Tiểu ngạch'); setThueNK(0); setVat(0); setPhiKiemHoa(0); setPhiLuuKho(0);
     setKiemDem(false); setNguoiNhan(''); setSdtNhan(''); setDiaChiNhan('');
     setItems([mkLine({}, tyGia)]);
@@ -278,6 +280,8 @@ export default function CskhClient({ initial }: Props) {
     const r = await callServer('createOrder', {
       maKH, tuyen, lineVC, loaiHang,
       pctCoc,
+      // Bảo hiểm đè riêng đơn: '' → undefined (theo khách/công ty) · '1' → true · '0' → false.
+      coBaoHiem: coBaoHiemDon === '' ? undefined : (coBaoHiemDon === '1'),
       gdvId: gdvId ? Number(gdvId) : null,
       phiShipND: shipND, phiDongGoi: dongGoi, phiPhuThu: phuThu,
       phiPhatSinh, ngachHQ, thueNK, vat, phiKiemHoa, phiLuuKho,
@@ -541,6 +545,14 @@ export default function CskhClient({ initial }: Props) {
                 <select value={gdvId} onChange={(e) => setGdvId(e.target.value)}>
                   <option value="">— Chưa gán —</option>
                   {gdvs.map((g) => <option key={g.id} value={g.id}>{g.hoTen}</option>)}
+                </select>
+              </div>
+              <div className="erp-field w-md">
+                <label>Bảo hiểm đơn này</label>
+                <select value={coBaoHiemDon} onChange={(e) => setCoBaoHiemDon(e.target.value)}>
+                  <option value="">Theo khách</option>
+                  <option value="1">Bật</option>
+                  <option value="0">Tắt</option>
                 </select>
               </div>
             </div>

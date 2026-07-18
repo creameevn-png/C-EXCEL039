@@ -89,11 +89,17 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
   const [weighMaDH, setWeighMaDH] = useState<string | null>(null);
   const [weighLines, setWeighLines] = useState<WeighLine[]>([]);
   const [weighBusy, setWeighBusy] = useState<Record<number, boolean>>({});
+  // Trạng thái khoá cân của đơn đang mở (server trả trong chi tiết đơn).
+  const [weighChot, setWeighChot] = useState<{ canDaChot: boolean; canChotBy: string }>({ canDaChot: false, canChotBy: '' });
+  const isAdmin = user.vaiTro === 'Admin';
+  // Đã chốt cân + không phải Admin → khoá mọi ô nhập cân và nút lưu.
+  const lockCan = weighChot.canDaChot && !isAdmin;
 
   async function openWeigh(maDH: string) {
-    setWeighMaDH(maDH); setWeighLines([]); setWeighBusy({});
+    setWeighMaDH(maDH); setWeighLines([]); setWeighBusy({}); setWeighChot({ canDaChot: false, canChotBy: '' });
     const r = await callServer('getOrderDetail', maDH);
     if (r?.success) {
+      setWeighChot({ canDaChot: !!r.data.canDaChot, canChotBy: r.data.canChotBy || '' });
       // Hiện lại kích thước đã đo lần trước để kho sửa, không bắt nhập lại từ đầu.
       const soHoacRong = (v: any) => (Number(v) > 0 ? String(v) : '');
       setWeighLines(r.data.chiTiet.map((c: any) => ({
@@ -122,6 +128,14 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
       if (r.m3 !== undefined) patchWeigh(l.stt, { m3: String(r.m3) });
       showToast(`Đã lưu dòng ${l.stt} (kg / m³)`, 'success');
     } else showToast(r?.message || 'Lỗi', 'error');
+  }
+
+  // ===== Chốt cân: sau khi chốt chỉ Admin sửa được cân (Đợt 3B) =====
+  async function chotCan(maDH: string) {
+    if (!confirm(`Chốt cân đơn ${maDH}?\n\nSau khi chốt, nhân viên kho không sửa được cân nữa — chỉ Quản trị mới sửa được.`)) return;
+    const r = await callServer('chotCan', maDH);
+    if (r?.success) { showToast('Đã chốt cân', 'success'); reload(); }
+    else showToast(r?.message || 'Lỗi', 'error');
   }
 
   // ===== Người làm / phụ trách kho TQ (góp ý #32) =====
@@ -628,6 +642,14 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
             <div className="alert alert-info" style={{ marginBottom: 12 }}>
               <FiInfo /><span>Nhập đủ <b>Dài × Rộng × Cao (cm)</b> thì ô <b>M³</b> tự tính theo công thức trong Cài đặt và bị khoá. Bỏ trống kích thước thì gõ M³ tay. Bấm <FiSave /> để lưu từng dòng.</span>
             </div>
+            {weighChot.canDaChot && (
+              <div className="alert alert-lock" style={{ marginBottom: 12 }}>
+                <FiLock /><span>
+                  <b>Đã chốt cân{weighChot.canChotBy ? ` · bởi ${weighChot.canChotBy}` : ''}.</b>{' '}
+                  {isAdmin ? 'Quản trị đang sửa sau chốt.' : 'Nhân viên kho không sửa được cân — liên hệ Quản trị nếu cần sửa.'}
+                </span>
+              </div>
+            )}
             {weighLines.length === 0 ? (
               <div className="empty-state"><FiClock /><p>Đang tải dòng hàng…</p></div>
             ) : (
@@ -645,19 +667,19 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
                       <tr key={l.stt}>
                         <td>{l.tenSP}</td>
                         <td className="number">{l.soLuong}</td>
-                        <td className="number"><input type="number" step="0.01" value={l.kg} style={{ width: 72, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { kg: e.target.value })} /></td>
-                        <td className="number"><input type="number" value={l.dai} style={{ width: 60, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { dai: e.target.value })} /></td>
-                        <td className="number"><input type="number" value={l.rong} style={{ width: 60, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { rong: e.target.value })} /></td>
-                        <td className="number"><input type="number" value={l.cao} style={{ width: 60, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { cao: e.target.value })} /></td>
+                        <td className="number"><input type="number" step="0.01" value={l.kg} disabled={lockCan} style={{ width: 72, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { kg: e.target.value })} /></td>
+                        <td className="number"><input type="number" value={l.dai} disabled={lockCan} style={{ width: 60, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { dai: e.target.value })} /></td>
+                        <td className="number"><input type="number" value={l.rong} disabled={lockCan} style={{ width: 60, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { rong: e.target.value })} /></td>
+                        <td className="number"><input type="number" value={l.cao} disabled={lockCan} style={{ width: 60, textAlign: 'right' }} onChange={(e) => patchWeigh(l.stt, { cao: e.target.value })} /></td>
                         <td className="number">
-                          <input type="number" step="0.0001" value={l.m3} readOnly={hasKT}
+                          <input type="number" step="0.0001" value={l.m3} readOnly={hasKT} disabled={lockCan}
                             title={hasKT ? 'm³ tự tính từ kích thước theo công thức trong Cài đặt' : undefined}
                             style={{ width: 84, textAlign: 'right', background: hasKT ? '#F3F4F6' : undefined, cursor: hasKT ? 'not-allowed' : 'text' }}
                             onChange={(e) => patchWeigh(l.stt, { m3: e.target.value })} />
                           {hasKT && <div className="hint" style={{ fontSize: 10 }}>tự tính từ KT</div>}
                         </td>
-                        <td><input value={l.ghiChu} style={{ width: 140 }} placeholder="ghi chú kiện…" onChange={(e) => patchWeigh(l.stt, { ghiChu: e.target.value })} /></td>
-                        <td><button className="btn btn-success btn-sm" disabled={weighBusy[l.stt]} onClick={() => saveWeighLine(l)}><FiSave /></button></td>
+                        <td><input value={l.ghiChu} disabled={lockCan} style={{ width: 140 }} placeholder="ghi chú kiện…" onChange={(e) => patchWeigh(l.stt, { ghiChu: e.target.value })} /></td>
+                        <td><button className="btn btn-success btn-sm" disabled={weighBusy[l.stt] || lockCan} onClick={() => saveWeighLine(l)}><FiSave /></button></td>
                       </tr>
                     );
                   })}
@@ -668,6 +690,9 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
           </div>
           <div className="btn-row">
             <button className="btn btn-secondary" onClick={() => setWeighMaDH(null)}>Đóng</button>
+            {weighMaDH && !weighChot.canDaChot && (
+              <button className="btn btn-primary" onClick={() => chotCan(weighMaDH)}><FiLock /> Chốt cân</button>
+            )}
           </div>
         </div>
       </div>

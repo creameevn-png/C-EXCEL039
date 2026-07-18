@@ -10,7 +10,8 @@ type GDV = { id: number; hoTen: string };
 type KH = {
   maKH: string; tenKH: string; sdt: string; email: string; tuyen: string;
   pctCoc: number; soDuVi: number; congNo: number; tongDon: number; doanhThu: number;
-  phiMuaPctRieng: number | null; phiBhPctRieng: number | null; gdvPhuTrachId: number | null;
+  phiMuaPctRieng: number | null; phiBhPctRieng: number | null; baoHiemRieng: boolean | null;
+  gdvPhuTrachId: number | null;
 };
 
 export default function KhachHangClient(
@@ -26,7 +27,8 @@ export default function KhachHangClient(
   const [editing, setEditing] = useState<KH | null>(null);
   const [edit, setEdit] = useState({
     tenKH: '', sdt: '', email: '', diaChi: '', tuyen: 'HaNoi', pctCoc: 70,
-    phiMuaPctRieng: '', phiBhPctRieng: '', gdvPhuTrachId: ''
+    // baoHiemRieng dạng tri-state: '' = theo công ty · '1' = bật · '0' = tắt.
+    phiMuaPctRieng: '', phiBhPctRieng: '', baoHiemRieng: '', gdvPhuTrachId: ''
   });
   const [busy, setBusy] = useState(false);
 
@@ -47,6 +49,8 @@ export default function KhachHangClient(
       // Ô trống = dùng % chung hệ thống (cột null). Có số = % riêng của khách.
       phiMuaPctRieng: c.phiMuaPctRieng == null ? '' : String(c.phiMuaPctRieng),
       phiBhPctRieng: c.phiBhPctRieng == null ? '' : String(c.phiBhPctRieng),
+      // null → '' (theo công ty) · true → '1' (bật) · false → '0' (tắt).
+      baoHiemRieng: c.baoHiemRieng == null ? '' : (c.baoHiemRieng ? '1' : '0'),
       gdvPhuTrachId: c.gdvPhuTrachId == null ? '' : String(c.gdvPhuTrachId)
     });
   }
@@ -60,6 +64,8 @@ export default function KhachHangClient(
     // % riêng: ô trống → null (dùng % chung hệ thống). Có số → parse thuần.
     patch.phiMuaPctRieng = edit.phiMuaPctRieng.trim() === '' ? null : (parseFloat(edit.phiMuaPctRieng) || 0);
     patch.phiBhPctRieng = edit.phiBhPctRieng.trim() === '' ? null : (parseFloat(edit.phiBhPctRieng) || 0);
+    // Bảo hiểm riêng của khách: '' → null (theo công ty) · '1' → true (bật) · '0' → false (tắt).
+    patch.baoHiemRieng = edit.baoHiemRieng === '' ? null : (edit.baoHiemRieng === '1');
     // GDV phụ trách: '' → null (chưa phân).
     patch.gdvPhuTrachId = edit.gdvPhuTrachId === '' ? null : (parseInt(edit.gdvPhuTrachId, 10) || null);
     const r = await callServer('updateKhachHang', editing.maKH, patch);
@@ -190,6 +196,13 @@ export default function KhachHangClient(
                   onChange={(e) => setEdit({ ...edit, phiBhPctRieng: e.target.value })}
                   placeholder="Để trống = dùng chung hệ thống" />
                 <small style={{ color: 'var(--text-faint)' }}>Để trống = dùng % chung của hệ thống.</small></div>
+              <div className="form-field"><label>Bảo hiểm</label>
+                <select value={edit.baoHiemRieng} onChange={(e) => setEdit({ ...edit, baoHiemRieng: e.target.value })}>
+                  <option value="">Theo công ty</option>
+                  <option value="1">Bật</option>
+                  <option value="0">Tắt</option>
+                </select>
+                <small style={{ color: 'var(--text-faint)' }}>Để trống = theo mặc định công ty.</small></div>
             </div>
             <div className="form-field" style={{ marginTop: 10 }}><label>GDV phụ trách</label>
               <select value={edit.gdvPhuTrachId} onChange={(e) => setEdit({ ...edit, gdvPhuTrachId: e.target.value })}>

@@ -12,6 +12,7 @@ const KNOWN: Known[] = [
   { ten: 'ty_gia_ndt_vnd', nhan: 'Tỷ giá NDT → VND', ghiChu: 'Tỷ giá NDT → VND' },
   { ten: 'phi_mua_pct', nhan: 'Phí mua hàng (%)', ghiChu: 'Phí mua hàng (%)' },
   { ten: 'phi_bh_pct', nhan: 'Phí bảo hiểm (%)', ghiChu: 'Đặt 0 để bỏ thu phí bảo hiểm.' },
+  { ten: 'bh_mac_dinh', nhan: 'Mặc định có tính bảo hiểm', ghiChu: '1 = có tính bảo hiểm cho mọi đơn (trừ khách/đơn tắt riêng); 0 = mặc định không tính.', macDinh: '1' },
   { ten: 'm3_chia', nhan: 'Hệ số quy đổi m³', ghiChu: 'm³ = dài × rộng × cao (cm) ÷ hệ số. Mặc định 1.000.000 (đơn vị cm).', macDinh: '1000000' },
   { ten: 'ten_cong_ty', nhan: 'Tên doanh nghiệp', ghiChu: 'Tên doanh nghiệp' },
   { ten: 'zalo_lien_he', nhan: 'Zalo liên hệ', ghiChu: 'Zalo liên hệ' },

@@ -1,6 +1,6 @@
 import type { LineVC, Tuyen } from '@prisma/client';
 import { prisma } from './db';
-import { getNumber } from './settings';
+import { getNumber, getBool } from './settings';
 
 const PRICE_KG: Array<[number, number, number, number]> = [
   [0, 100, 4000, 6500],
@@ -104,6 +104,12 @@ export async function computeOrderTotals(input: {
   phiMuaPctKH?: number;
   /** Z6 — % phí bảo hiểm RIÊNG của khách (KhachHang.phiBhPctRieng). null/undefined → % chung (phi_bh_pct). */
   phiBhPctKH?: number;
+  /** Đợt 3B — bật/tắt bảo hiểm ở cấp ĐƠN (DonHang.coBaoHiem). null/undefined = không đè
+   *  cấp đơn → xuống khách rồi công ty. true = bật · false = tắt (phiBH = 0). */
+  coBaoHiem?: boolean | null;
+  /** Đợt 3B — bật/tắt bảo hiểm ở cấp KHÁCH (KhachHang.baoHiemRieng). null/undefined = không
+   *  đặt riêng cho khách → xuống mặc định công ty (bh_mac_dinh). Chỉ xét khi đơn không đè. */
+  baoHiemKH?: boolean | null;
   thueNK?: number;
   vat?: number;
   phiKiemHoa?: number;
@@ -118,7 +124,12 @@ export async function computeOrderTotals(input: {
     : Math.round((giaHang * pctMua) / 100 / 1000) * 1000;
   // Bảo hiểm: % theo cài đặt (mặc định 1% giá hàng) — tính THUẦN từ giá hàng nên
   // idempotent qua mọi lần recompute (không cộng dồn). Z6: khách có % riêng thì dùng % riêng.
-  const pctBH = input.phiBhPctKH != null ? input.phiBhPctKH : await getNumber('phi_bh_pct', 1);
+  // Đợt 3B — bật/tắt bảo hiểm theo ưu tiên: ĐƠN (coBaoHiem) > KHÁCH (baoHiemKH) > CÔNG TY
+  // (bh_mac_dinh). Dùng ?? nên chỉ khi cấp trên = null mới xuống cấp dưới. Khi mọi toggle
+  // null + bh_mac_dinh '1' + phi_bh_pct 1 ⇒ bhOn=true, pctBH=1 ⇒ phiBH giữ nguyên như cũ.
+  const bhCompanyOn = await getBool('bh_mac_dinh', true);
+  const bhOn = input.coBaoHiem ?? input.baoHiemKH ?? bhCompanyOn;
+  const pctBH = bhOn ? (input.phiBhPctKH != null ? input.phiBhPctKH : await getNumber('phi_bh_pct', 1)) : 0;
   const phiBH = Math.round((giaHang * pctBH) / 100 / 1000) * 1000;
   // Phí phát sinh khác do CSKH nhập tay (lưu ở cột riêng phi_phat_sinh).
   const phiPhatSinh = Math.round(Number(input.phiPhatSinh) || 0);

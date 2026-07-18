@@ -136,6 +136,8 @@ model KhachHang {
   // và GDV được phân công phụ trách khách này (null = chưa phân, mọi GDV thấy như cũ).
   phiMuaPctRieng Float? @map("phi_mua_pct_rieng")
   phiBhPctRieng  Float? @map("phi_bh_pct_rieng")
+  // Đợt 3B — bật/tắt bảo hiểm riêng cho khách (null = theo công ty · true = bật · false = tắt)
+  baoHiemRieng   Boolean? @map("bao_hiem_rieng")
   gdvPhuTrachId  Int?   @map("gdv_phu_trach_id")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
@@ -201,6 +203,8 @@ model DonHang {
   tongGiaHang Float        @default(0) @map("tong_gia_hang")
   phiMua      Float        @default(0) @map("phi_mua")
   phiBH       Float        @default(0) @map("phi_bh")
+  // Đợt 3B — đè bảo hiểm riêng cho đơn này (null = theo khách/công ty · true/false = ép riêng đơn)
+  coBaoHiem   Boolean?     @map("co_bao_hiem")
   phiPhatSinh Float        @default(0) @map("phi_phat_sinh")
   // Góp ý NV #9 — CSKH nhập phí phát sinh, chỉ khi Kế toán duyệt mới cộng vào tổng tiền.
   phiPhatSinhDuyet   Boolean   @default(false) @map("phi_phat_sinh_duyet")
@@ -224,6 +228,12 @@ model DonHang {
   nguoiNhan   String?      @map("nguoi_nhan")
   sdtNhan     String?      @map("sdt_nhan")
   diaChiNhan  String?      @map("dia_chi_nhan") @db.Text
+
+  // Đợt 3B — khóa cân: chốt khi Kho VN xác nhận nhận hàng (hoặc kho bấm "Chốt cân").
+  // Sau khi canDaChot = true, chỉ Admin được sửa cân (nhân viên kho bị chặn).
+  canDaChot   Boolean      @default(false) @map("can_da_chot")
+  canChotBy   String?      @map("can_chot_by")
+  canChotAt   DateTime?    @map("can_chot_at")
 
   // Đợt 4 — kho TQ: người phụ trách nhận (2 NV kho)
   // Góp ý NV #32 — tách "người trực tiếp làm" và "người phụ trách" (kho TQ có 2 nhân viên).

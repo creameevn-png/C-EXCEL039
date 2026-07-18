@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { FiUsers, FiSearch, FiEdit2, FiX, FiSave, FiInbox } from 'react-icons/fi';
+import { FiUsers, FiSearch, FiEdit2, FiX, FiSave, FiInbox, FiAlertTriangle } from 'react-icons/fi';
 import { callServer, reload } from '@/lib/client';
 import { showToast } from '@/components/Toast';
 import { formatCurrency } from '@/lib/format';
@@ -14,11 +14,15 @@ type KH = {
 };
 
 export default function KhachHangClient(
-  { list, canEdit, canSeeLienHe = true, gdvList = [] }:
-  { list: KH[]; canEdit: boolean; canSeeLienHe?: boolean; gdvList?: GDV[] }
+  { list, canEdit, canSeeLienHe = true, chiThayDonMinh = false, gdvList = [] }:
+  { list: KH[]; canEdit: boolean; canSeeLienHe?: boolean; chiThayDonMinh?: boolean; gdvList?: GDV[] }
 ) {
   const [q, setQ] = useState('');
   const [tuyenF, setTuyenF] = useState('');
+  const [chuaPhanOnly, setChuaPhanOnly] = useState(false);
+  // Tra tên GDV theo id để hiển thị cột "GDV phụ trách".
+  const gdvNameById = useMemo(() => new Map(gdvList.map((g) => [g.id, g.hoTen])), [gdvList]);
+  const soChuaPhan = useMemo(() => list.filter((c) => c.gdvPhuTrachId == null).length, [list]);
   const [editing, setEditing] = useState<KH | null>(null);
   const [edit, setEdit] = useState({
     tenKH: '', sdt: '', email: '', diaChi: '', tuyen: 'HaNoi', pctCoc: 70,
@@ -30,10 +34,11 @@ export default function KhachHangClient(
     const s = q.trim().toLowerCase();
     return list.filter((c) => {
       if (tuyenF && c.tuyen !== tuyenF) return false;
+      if (chuaPhanOnly && c.gdvPhuTrachId != null) return false;
       if (!s) return true;
       return [c.maKH, c.tenKH, c.sdt, c.email].some((v) => (v || '').toLowerCase().includes(s));
     });
-  }, [list, q, tuyenF]);
+  }, [list, q, tuyenF, chuaPhanOnly]);
 
   function openEdit(c: KH) {
     setEditing(c);
@@ -69,6 +74,29 @@ export default function KhachHangClient(
         <span className="icon-inline"><FiUsers /> Khách hàng ({filtered.length}/{list.length})</span>
       </div>
 
+      {soChuaPhan > 0 && (
+        <div style={{
+          marginBottom: 16, padding: '12px 14px', borderRadius: 8, fontSize: 14, lineHeight: 1.5,
+          background: chiThayDonMinh ? 'var(--danger-bg, #fef2f2)' : 'var(--warning-bg, #fffbeb)',
+          border: `1px solid ${chiThayDonMinh ? 'var(--danger, #ef4444)' : 'var(--warning, #f59e0b)'}`,
+          color: chiThayDonMinh ? 'var(--danger-dark, #b91c1c)' : 'var(--warning-dark, #b45309)'
+        }}>
+          <span className="icon-inline" style={{ fontWeight: 600 }}>
+            <FiAlertTriangle /> Còn {soChuaPhan} khách chưa phân công GDV.
+          </span>
+          {chiThayDonMinh && (
+            <div style={{ marginTop: 4 }}>
+              Cài đặt &ldquo;GDV chỉ thấy đơn của mình&rdquo; ĐANG BẬT → đơn của các khách này không ai xử lý.
+            </div>
+          )}
+          {!chuaPhanOnly && (
+            <div style={{ marginTop: 6 }}>
+              <button className="btn btn-sm btn-secondary" onClick={() => setChuaPhanOnly(true)}>Lọc khách chưa phân</button>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="form-grid" style={{ marginBottom: 16 }}>
         <div className="form-field">
           <div style={{ position: 'relative' }}>
@@ -83,6 +111,13 @@ export default function KhachHangClient(
             <option value="HCM">HCM</option>
           </select>
         </div>
+        <div className="form-field">
+          <label className="icon-inline" style={{ cursor: 'pointer', userSelect: 'none' }}>
+            <input type="checkbox" checked={chuaPhanOnly} onChange={(e) => setChuaPhanOnly(e.target.checked)}
+              style={{ width: 'auto', marginRight: 6 }} />
+            Chỉ khách chưa phân GDV
+          </label>
+        </div>
       </div>
 
       {filtered.length === 0 ? (
@@ -95,6 +130,7 @@ export default function KhachHangClient(
             <th>Tuyến</th>
             <th>% Cọc</th><th className="number">Số dư ví</th><th className="number">Công nợ</th>
             <th className="number">Tổng đơn</th><th className="number">Doanh thu</th>
+            <th>GDV phụ trách</th>
             {canEdit && <th>Thao tác</th>}
           </tr></thead>
           <tbody>
@@ -109,6 +145,11 @@ export default function KhachHangClient(
                 <td className="number" title="Xem đơn của khách" style={{ cursor: 'pointer', color: c.congNo > 0 ? 'var(--danger-dark)' : undefined, fontWeight: c.congNo > 0 ? 600 : 400 }} onClick={() => (window as any).openCustomerDetail?.(c.maKH)}>{formatCurrency(c.congNo)}</td>
                 <td className="number" title="Xem đơn của khách" style={{ cursor: 'pointer' }} onClick={() => (window as any).openCustomerDetail?.(c.maKH)}>{c.tongDon}</td>
                 <td className="number" title="Xem đơn của khách" style={{ cursor: 'pointer' }} onClick={() => (window as any).openCustomerDetail?.(c.maKH)}>{formatCurrency(c.doanhThu)}</td>
+                <td>
+                  {c.gdvPhuTrachId != null
+                    ? (gdvNameById.get(c.gdvPhuTrachId) || `#${c.gdvPhuTrachId}`)
+                    : <span className="status-badge" style={{ background: '#fef3c7', color: '#92400e' }}>Chưa phân</span>}
+                </td>
                 {canEdit && <td><button className="btn btn-primary btn-sm" onClick={() => openEdit(c)}><FiEdit2 /> Sửa</button></td>}
               </tr>
             ))}

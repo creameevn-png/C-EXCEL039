@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FiSettings, FiSave, FiInfo, FiClock } from 'react-icons/fi';
+import { FiSettings, FiSave, FiInfo, FiClock, FiAlertTriangle } from 'react-icons/fi';
 import { callServer } from '@/lib/client';
 import { showToast } from '@/components/Toast';
 
@@ -20,7 +20,10 @@ const KNOWN: Known[] = [
   { ten: 'gdv_chi_thay_don_minh', nhan: 'GDV chỉ thấy đơn của mình', ghiChu: 'Đặt 1 để mỗi giao dịch viên chỉ thấy đơn do mình phụ trách hoặc đơn của khách mình phụ trách; 0 = thấy mọi đơn.', macDinh: '0' }
 ];
 
-export default function CaiDatClient({ rows }: { rows: Row[] }) {
+export default function CaiDatClient(
+  { rows, soKhachChuaPhan = 0, soDonMoCoi = 0 }:
+  { rows: Row[]; soKhachChuaPhan?: number; soDonMoCoi?: number }
+) {
   const map = new Map(rows.map((r) => [r.ten, r]));
   const display = KNOWN.map((k) => ({
     ten: k.ten,
@@ -35,6 +38,13 @@ export default function CaiDatClient({ rows }: { rows: Row[] }) {
   const [busy, setBusy] = useState<Record<string, boolean>>({});
 
   async function save(ten: string, ghiChu: string) {
+    // Bật "GDV chỉ thấy đơn của mình" khi còn khách chưa phân công GDV → cảnh báo, không chặn cứng.
+    if (ten === 'gdv_chi_thay_don_minh' && values[ten] === '1' && soKhachChuaPhan > 0) {
+      const ok = confirm(
+        `Còn ${soKhachChuaPhan} khách chưa phân công GDV. Khi bật, ${soDonMoCoi} đơn của họ sẽ không giao dịch viên nào nhìn thấy.\n\nVẫn muốn bật?`
+      );
+      if (!ok) return;
+    }
     setBusy((p) => ({ ...p, [ten]: true }));
     const r = await callServer('setSetting', ten, values[ten], ghiChu);
     setBusy((p) => ({ ...p, [ten]: false }));
@@ -55,6 +65,20 @@ export default function CaiDatClient({ rows }: { rows: Row[] }) {
             <input type="text" value={values[r.ten] ?? ''}
               onChange={(e) => setValues({ ...values, [r.ten]: e.target.value })}
               disabled={busy[r.ten]} />
+            {r.ten === 'gdv_chi_thay_don_minh' && values[r.ten] === '1' && soKhachChuaPhan > 0 && (
+              <div style={{
+                marginTop: 8, padding: '10px 12px', borderRadius: 8,
+                background: 'var(--danger-bg, #fef2f2)', border: '1px solid var(--danger, #ef4444)',
+                color: 'var(--danger-dark, #b91c1c)', fontSize: 13, lineHeight: 1.5
+              }}>
+                <span className="icon-inline" style={{ fontWeight: 600 }}>
+                  <FiAlertTriangle /> Còn {soKhachChuaPhan} khách chưa phân công GDV — {soDonMoCoi} đơn của họ sẽ không giao dịch viên nào nhìn thấy khi bật.
+                </span>
+                <div style={{ marginTop: 4 }}>
+                  <a href="/admin/khach-hang" style={{ color: 'var(--primary)', fontWeight: 600 }}>Phân công ngay →</a>
+                </div>
+              </div>
+            )}
             <div className="hint"><code>{r.ten}</code> · {r.ghiChu}</div>
           </div>
           <div className="form-field">

@@ -19,3 +19,18 @@ export async function logActivity(
     // never throw from audit
   }
 }
+
+// So sánh bản ghi cũ (before) với các trường thay đổi (patch) trên danh sách field.
+// Chỉ trả về field thực sự đổi, dạng { truoc, sau } — dùng cho trang xem log dựng "trước → sau".
+export function diffFields(
+  before: Record<string, any>,
+  patch: Record<string, any>,
+  fields: string[]
+): Record<string, { truoc: any; sau: any }> {
+  const out: Record<string, { truoc: any; sau: any }> = {};
+  for (const k of fields) {
+    if (patch[k] === undefined) continue;
+    if (before[k] !== patch[k]) out[k] = { truoc: before[k] ?? null, sau: patch[k] ?? null };
+  }
+  return out;
+}

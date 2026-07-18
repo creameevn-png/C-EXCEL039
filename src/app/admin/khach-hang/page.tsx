@@ -1,5 +1,6 @@
 import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { getSetting } from '@/lib/settings';
 import AppShell from '@/components/AppShell';
 import KhachHangClient from './KhachHangClient';
 import OrderDetailModalHost from '@/components/OrderDetailModal';
@@ -27,12 +28,15 @@ export default async function AdminKhachHangPage() {
   // Góp ý NV #21: Kế toán không cần nhìn SĐT / email khách. Lớp /api/action đã ẩn
   // (canSeeLienHe), nhưng trang này query Prisma thẳng nên phải tự chặn ở đây.
   const canSeeLienHe = user.vaiTro !== 'KeToan';
+  // Cài đặt "GDV chỉ thấy đơn của mình" đang bật? Dùng để cảnh báo khách chưa phân công GDV.
+  const chiThayDonMinh = (await getSetting('gdv_chi_thay_don_minh')) === '1';
 
   return (
     <AppShell user={user} subtitle={`${customers.length} khách hàng`}>
       <KhachHangClient
         canEdit={canEdit}
         canSeeLienHe={canSeeLienHe}
+        chiThayDonMinh={chiThayDonMinh}
         gdvList={gdvList.map((g) => ({ id: g.id, hoTen: g.hoTen }))}
         list={customers.map((c) => ({
           maKH: c.maKH, tenKH: c.tenKH,

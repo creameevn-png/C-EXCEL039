@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db';
 import { getSession, getSessionFresh } from '@/lib/auth';
 import { computeOrderTotals, calcPhiMua, calcM3 } from '@/lib/shipping-fee';
 import { nextMaDH, nextMaKH, nextMaSP, nextMaKN, nextMaYC, nextMaNCC } from '@/lib/codes';
-import { logActivity } from '@/lib/audit';
+import { logActivity, diffFields } from '@/lib/audit';
 import { pushNotify } from '@/lib/notify';
 import { getNumber, getSetting } from '@/lib/settings';
 import { rateLimit, clientIp } from '@/lib/ratelimit';
@@ -415,7 +415,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       })
     ]);
     await recomputePhieuGiao(o.maPhieuGiao);
-    await logActivity(user.email, 'CONFIRM_DEPOSIT', maDH, { tienCoc: coc });
+    await logActivity(user.email, 'CONFIRM_DEPOSIT', maDH, { trangThai: { truoc: o.trangThai, sau: 'DatCoc' }, tienCoc: coc });
     await pushNotify({
       vaiTro: ['GDV', 'MuaHang'], loai: 'info', maDH,
       tieuDe: `Đơn ${maDH} đã đặt cọc`,
@@ -433,7 +433,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (!o) return err('Đơn không tồn tại');
     if (o.trangThai !== 'DatCoc') return err('Đơn không ở trạng thái Đặt cọc');
     await prisma.donHang.update({ where: { maDH }, data: { maGD, trangThai: 'DaMuaHang' } });
-    await logActivity(user.email, 'UPDATE_MA_GD', maDH, { maGD });
+    await logActivity(user.email, 'UPDATE_MA_GD', maDH, { trangThai: { truoc: o.trangThai, sau: 'DaMuaHang' }, maGD });
     return ok();
   },
 
@@ -453,7 +453,10 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     });
     // Mỗi mã vận đơn là một kiện — kho VN sẽ bắn từng mã để nhận và giao (#28, #37, #38).
     await syncKienTheoMaVD(maDH, maVD);
-    await logActivity(user.email, 'UPDATE_MA_VD', maDH, { maVD });
+    await logActivity(user.email, 'UPDATE_MA_VD', maDH, {
+      ...(o.trangThai === 'DaMuaHang' && { trangThai: { truoc: o.trangThai, sau: 'NccGiaoHang' } }),
+      maVD
+    });
     await pushNotify({
       vaiTro: 'KhoTQ', loai: 'info', maDH,
       tieuDe: `Đơn ${maDH} sắp về kho TQ`,
@@ -480,7 +483,11 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     // Góp ý NV #14: ghi chú riêng của GDV cho đơn hàng.
     const ghiChuGDV = patch?.ghiChuGDV !== undefined ? (String(patch.ghiChuGDV).trim() || null) : undefined;
     await prisma.donHang.update({ where: { maDH }, data: { vonNDT, shipNDTQ, loiNhuanNDT, ...(ghiChuGDV !== undefined && { ghiChuGDV }) } });
-    await logActivity(user.email, 'UPDATE_VON_GDV', maDH, { vonNDT, shipNDTQ, loiNhuanNDT });
+    await logActivity(user.email, 'UPDATE_VON_GDV', maDH, {
+      vonNDT: { truoc: o.vonNDT, sau: vonNDT },
+      shipNDTQ: { truoc: o.shipNDTQ, sau: shipNDTQ },
+      loiNhuanNDT
+    });
     return ok({ vonNDT, shipNDTQ, tongThuNDT, loiNhuanNDT });
   },
 
@@ -498,7 +505,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (!line) return err('Không tìm thấy dòng hàng');
     await prisma.chiTietDon.update({ where: { id: line.id }, data: { vonNDT: von } });
     await recomputeVonGDV(maDH);
-    await logActivity(user.email, 'SUA_VON_DONG', maDH, { stt, vonNDT: `${line.vonNDT}→${von}` });
+    await logActivity(user.email, 'SUA_VON_DONG', maDH, { stt, vonNDT: { truoc: line.vonNDT, sau: von } });
     const o = await prisma.donHang.findUnique({ where: { maDH } });
     return ok({ vonNDT: o?.vonNDT || 0, loiNhuanNDT: o?.loiNhuanNDT || 0 });
   },
@@ -545,7 +552,10 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     });
     await recomputeDonHang(maDH);
     await recomputePhieuGiao(o.maPhieuGiao);
-    await logActivity(user.email, accepted ? 'DUYET_PHI_PHAT_SINH' : 'TU_CHOI_PHI_PHAT_SINH', maDH, { soTien: o.phiPhatSinh, note });
+    await logActivity(user.email, accepted ? 'DUYET_PHI_PHAT_SINH' : 'TU_CHOI_PHI_PHAT_SINH', maDH, {
+      duyet: { truoc: o.phiPhatSinhDuyet, sau: !!accepted },
+      soTien: o.phiPhatSinh, note
+    });
     await pushNotify({
       vaiTro: ['CSKH'], loai: accepted ? 'success' : 'warning', maDH,
       tieuDe: `Phí phát sinh đơn ${maDH} ${accepted ? 'đã được duyệt' : 'bị từ chối'}`,
@@ -570,7 +580,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       data: { soLuong: sl, thanhTien: line.donGiaVND * sl }
     });
     await recomputeDonHang(maDH);
-    await logActivity(user.email, 'SUA_SO_LUONG', maDH, { stt, soLuong: `${line.soLuong}→${sl}` });
+    await logActivity(user.email, 'SUA_SO_LUONG', maDH, { stt, soLuong: { truoc: line.soLuong, sau: sl } });
     return ok();
   },
 
@@ -597,7 +607,12 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       })
     ]);
     await recomputePhieuGiao(o.maPhieuGiao);
-    await logActivity(user.email, 'CONFIRM_PAYMENT', maDH, { amount, newCon, newStatus });
+    await logActivity(user.email, 'CONFIRM_PAYMENT', maDH, {
+      amount,
+      daTra: { truoc: o.daTra, sau: newPaid },
+      conLai: { truoc: o.conLai, sau: newCon },
+      trangThai: { truoc: o.trangThai, sau: newStatus }
+    });
     if (newStatus === 'GiaoHang') {
       await pushNotify({
         vaiTro: ['KhoVN', 'CSKH'], loai: 'success', maDH,
@@ -619,7 +634,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       where: { maDH },
       data: { trangThai: 'KhoTqNhan', anhKhoTQ: imageBase64 || null, nguoiPhuTrachTQ: user.hoTen || user.email }
     });
-    await logActivity(user.email, 'KHO_TQ_NHAN', maDH);
+    await logActivity(user.email, 'KHO_TQ_NHAN', maDH, { trangThai: { truoc: o.trangThai, sau: 'KhoTqNhan' } });
     return ok();
   },
 
@@ -699,7 +714,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       where: { maDH },
       data: { trangThai: 'DangVanChuyen', anhRoiTQ: imageBase64 || null }
     });
-    await logActivity(user.email, 'ROI_TQ', maDH);
+    await logActivity(user.email, 'ROI_TQ', maDH, { trangThai: { truoc: o.trangThai, sau: 'DangVanChuyen' } });
     await pushNotify({
       vaiTro: 'KhoVN', loai: 'info', maDH,
       tieuDe: `Đơn ${maDH} đã rời kho TQ`,
@@ -731,7 +746,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       where: { maDH, trangThai: 'ChuaVe' },
       data: { trangThai: 'DaVeVN', ngayVeVN: new Date(), nguoiNhan: user.hoTen || user.email }
     });
-    await logActivity(user.email, 'KHO_VN_NHAN', maDH, { newStatus });
+    await logActivity(user.email, 'KHO_VN_NHAN', maDH, { trangThai: { truoc: o.trangThai, sau: newStatus } });
     if (newStatus === 'ChoThanhToan') {
       await pushNotify({
         vaiTro: ['KeToan', 'CSKH'], loai: 'warning', maDH,
@@ -770,7 +785,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       data: { tongDon: { increment: 1 }, doanhThu: { increment: o.tongTien } }
     });
     await recomputePhieuGiao(o.maPhieuGiao);
-    await logActivity(user.email, 'DELIVERED', maDH);
+    await logActivity(user.email, 'DELIVERED', maDH, { trangThai: { truoc: o.trangThai, sau: 'HoanThanh' } });
     await pushNotify({
       vaiTro: ['CSKH', 'KeToan'], loai: 'success', maDH,
       tieuDe: `Đơn ${maDH} đã hoàn thành`,
@@ -846,6 +861,10 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     // (phòng khi đơn được cân lại sau khi thêm vào bao).
     await recomputeBao(maBao);
     await logActivity(user.email, 'XUAT_BAO', maBao, { soDon: orders.length });
+    // Ghi log riêng theo TỪNG đơn để nhật ký đơn thấy được mốc đổi trạng thái khi xuất bao.
+    for (const o of orders) {
+      await logActivity(user.email, 'CHUYEN_TRANG_THAI', o.maDH, { trangThai: { truoc: 'KhoTqNhan', sau: 'DangVanChuyen' }, maBao });
+    }
     await pushNotify({
       vaiTro: ['KhoVN'], loai: 'info',
       tieuDe: `Bao ${maBao} đang về VN`,
@@ -882,6 +901,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       if (chuaVeTheoDon.get(o.maDH)) continue; // còn kiện chưa bắn mã → chưa nhận đơn này
       const next: TrangThaiDon = o.conLai <= 0.5 ? 'KhoVnNhan' : 'ChoThanhToan';
       await prisma.donHang.update({ where: { maDH: o.maDH }, data: { trangThai: next } });
+      await logActivity(user.email, 'CHUYEN_TRANG_THAI', o.maDH, { trangThai: { truoc: 'DangVanChuyen', sau: next }, maBao });
       received++;
     }
 
@@ -982,12 +1002,16 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (!o) return err('Đơn không tồn tại');
     if (donDaChot(o.trangThai)) return err('Đơn đã hoàn thành / đã hủy — không sửa được phí ship');
     const line = lineNoiDia !== undefined ? (String(lineNoiDia).trim() || null) : undefined;
+    const shipNDMoi = Math.max(0, Number(shipVN) || 0);
     await prisma.donHang.update({
       where: { maDH },
-      data: { shipND: Math.max(0, Number(shipVN) || 0), ...(line !== undefined && { lineNoiDia: line }) }
+      data: { shipND: shipNDMoi, ...(line !== undefined && { lineNoiDia: line }) }
     });
     await recomputeDonHang(maDH);
-    await logActivity(user.email, 'UPDATE_SHIP_VN', maDH, { shipVN, lineNoiDia: line });
+    await logActivity(user.email, 'UPDATE_SHIP_VN', maDH, {
+      shipND: { truoc: o.shipND, sau: shipNDMoi },
+      ...(line !== undefined && { lineNoiDia: { truoc: o.lineNoiDia, sau: line } })
+    });
     return ok();
   },
 
@@ -1066,7 +1090,10 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       }
     }
 
-    await logActivity(user.email, 'NHAN_KIEN_VN', kien.maDH, { maVD, conThieu });
+    await logActivity(user.email, 'NHAN_KIEN_VN', kien.maDH, {
+      maVD, conThieu,
+      ...(o && trangThaiDon !== o.trangThai && { trangThai: { truoc: o.trangThai, sau: trangThaiDon } })
+    });
     return ok({
       maDH: kien.maDH, maVD, conThieu, tongKien: cacKien.length,
       daVe: cacKien.length - conThieu, trangThaiDon,
@@ -1099,10 +1126,12 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
 
     const cacKien = await prisma.kienHang.findMany({ where: { maDH: kien.maDH } });
     const conLaiKien = cacKien.filter((k) => k.trangThai !== 'DaGiao').length;
+    let trangThaiMoi: TrangThaiDon = o.trangThai;
 
     if (conLaiKien === 0) {
       // Giao hết kiện → đơn hoàn thành (cùng hiệu lực với nút "Đã giao tới KH").
       if (o.trangThai !== 'HoanThanh') {
+        trangThaiMoi = 'HoanThanh';
         await prisma.donHang.update({
           where: { maDH: o.maDH },
           data: { trangThai: 'HoanThanh', anhGiaoKH: imageBase64 || o.anhGiaoKH || null }
@@ -1120,10 +1149,14 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       }
     } else if (o.trangThai === 'KhoVnNhan') {
       // Mới giao một phần → đánh dấu đơn đang giao hàng.
+      trangThaiMoi = 'GiaoHang';
       await prisma.donHang.update({ where: { maDH: o.maDH }, data: { trangThai: 'GiaoHang' } });
     }
 
-    await logActivity(user.email, 'GIAO_KIEN', kien.maDH, { maVD, conLaiKien });
+    await logActivity(user.email, 'GIAO_KIEN', kien.maDH, {
+      maVD, conLaiKien,
+      ...(trangThaiMoi !== o.trangThai && { trangThai: { truoc: o.trangThai, sau: trangThaiMoi } })
+    });
     return ok({ maDH: kien.maDH, maVD, conLaiKien, tongKien: cacKien.length });
   },
 
@@ -1456,6 +1489,9 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
             data: { phiKhieuNai: don.phiKhieuNai + kn.phiDoiTra }
           });
           await tx.khieuNai.update({ where: { maKN }, data: { daTinhPhiKH: true } });
+          await logActivity(user.email, 'CONG_PHI_KHIEU_NAI', kn.maDH, {
+            phiKhieuNai: { truoc: don.phiKhieuNai, sau: don.phiKhieuNai + kn.phiDoiTra }, maKN
+          });
           phiVeKhach = kn.phiDoiTra;
         }
       }
@@ -1592,8 +1628,11 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       const gid = patch.gdvPhuTrachId === null ? null : Math.trunc(Number(patch.gdvPhuTrachId));
       data.gdvPhuTrachId = gid && gid > 0 ? gid : null;
     }
+    // Nạp bản ghi cũ TRƯỚC khi cập nhật để log được "trước → sau" (không log mật khẩu).
+    const cur = await prisma.khachHang.findUnique({ where: { maKH } });
     await prisma.khachHang.update({ where: { maKH }, data });
-    await logActivity(user.email, 'UPDATE_CUSTOMER', maKH, patch);
+    await logActivity(user.email, 'UPDATE_CUSTOMER', maKH,
+      cur ? diffFields(cur, data, ['tenKH', 'sdt', 'email', 'diaChi', 'tuyen', 'pctCoc', 'phiMuaPctRieng', 'phiBhPctRieng', 'gdvPhuTrachId']) : {});
     return ok();
   },
 
@@ -1637,7 +1676,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       }
     });
     await recomputePhieuGiao(o.maPhieuGiao);
-    await logActivity(user.email, 'CANCEL_ORDER', maDH, { lyDo, hoanTien });
+    await logActivity(user.email, 'CANCEL_ORDER', maDH, { trangThai: { truoc: o.trangThai, sau: 'Huy' }, lyDo, hoanTien });
     await pushNotify({
       vaiTro: ['CSKH', 'KeToan', 'Admin'], loai: 'danger', maDH,
       tieuDe: `Đơn ${maDH} đã hủy`,
@@ -2080,23 +2119,23 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     const changes: any = {};
     const num = (v: any) => Number(v) || 0;
 
-    if (patch?.kg !== undefined) { const v = num(patch.kg); if (v !== line.kg) { changes.kg = `${line.kg}→${v}`; data.kg = v; } }
+    if (patch?.kg !== undefined) { const v = num(patch.kg); if (v !== line.kg) { changes.kg = { truoc: line.kg, sau: v }; data.kg = v; } }
     // Z2 — Kho TQ ghi chú sản phẩm lúc cân (chỉ lưu khi có gửi, không ghi đè rỗng).
     if (patch?.ghiChu !== undefined) {
       const v = String(patch.ghiChu || '').trim() || null;
-      if (v !== line.ghiChu) { changes.ghiChu = 'updated'; data.ghiChu = v; }
+      if (v !== line.ghiChu) { changes.ghiChu = { truoc: line.ghiChu, sau: v }; data.ghiChu = v; }
     }
     for (const k of ['dai', 'rong', 'cao'] as const) {
-      if (patch?.[k] !== undefined) { const v = num(patch[k]); if (v !== line[k]) { changes[k] = `${line[k]}→${v}`; data[k] = v; } }
+      if (patch?.[k] !== undefined) { const v = num(patch[k]); if (v !== line[k]) { changes[k] = { truoc: line[k], sau: v }; data[k] = v; } }
     }
 
     // Có đủ 3 chiều → m³ suy ra từ kích thước; không thì lấy m³ nhập tay.
     const dai = data.dai ?? line.dai, rong = data.rong ?? line.rong, cao = data.cao ?? line.cao;
     const m3TuKichThuoc = await calcM3(dai, rong, cao);
     if (m3TuKichThuoc > 0) {
-      if (m3TuKichThuoc !== line.m3) { changes.m3 = `${line.m3}→${m3TuKichThuoc} (từ ${dai}×${rong}×${cao})`; data.m3 = m3TuKichThuoc; }
+      if (m3TuKichThuoc !== line.m3) { changes.m3 = { truoc: line.m3, sau: m3TuKichThuoc }; data.m3 = m3TuKichThuoc; }
     } else if (patch?.m3 !== undefined) {
-      const v = num(patch.m3); if (v !== line.m3) { changes.m3 = `${line.m3}→${v}`; data.m3 = v; }
+      const v = num(patch.m3); if (v !== line.m3) { changes.m3 = { truoc: line.m3, sau: v }; data.m3 = v; }
     }
 
     if (Object.keys(data).length === 0) return ok();
@@ -2116,37 +2155,40 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     const o = await prisma.donHang.findUnique({ where: { maDH } });
     if (!o) return err('Đơn không tồn tại');
     const data: any = {};
-    const changes: any = {};
-    if (patch?.tuyen !== undefined) { data.tuyen = normTuyen(patch.tuyen); changes.tuyen = `${o.tuyen}→${data.tuyen}`; }
-    if (patch?.lineVC !== undefined) { data.lineVC = patch.lineVC as LineVC; changes.lineVC = `${o.lineVC}→${patch.lineVC}`; }
-    if (patch?.loaiHang !== undefined) { data.loaiHang = patch.loaiHang; changes.loaiHang = patch.loaiHang; }
-    if (patch?.pctCoc !== undefined) { data.pctCoc = Number(patch.pctCoc) || o.pctCoc; changes.pctCoc = data.pctCoc; }
-    if (patch?.shipND !== undefined) { data.shipND = Number(patch.shipND) || 0; changes.shipND = data.shipND; }
-    if (patch?.dongGo !== undefined) { data.dongGo = Number(patch.dongGo) || 0; changes.dongGo = data.dongGo; }
-    if (patch?.phuThu !== undefined) { data.phuThu = Number(patch.phuThu) || 0; changes.phuThu = data.phuThu; }
+    if (patch?.tuyen !== undefined) data.tuyen = normTuyen(patch.tuyen);
+    if (patch?.lineVC !== undefined) data.lineVC = patch.lineVC as LineVC;
+    if (patch?.loaiHang !== undefined) data.loaiHang = patch.loaiHang;
+    if (patch?.pctCoc !== undefined) data.pctCoc = Number(patch.pctCoc) || o.pctCoc;
+    if (patch?.shipND !== undefined) data.shipND = Number(patch.shipND) || 0;
+    if (patch?.dongGo !== undefined) data.dongGo = Number(patch.dongGo) || 0;
+    if (patch?.phuThu !== undefined) data.phuThu = Number(patch.phuThu) || 0;
     // Sửa lại phí phát sinh → quay về trạng thái chờ Kế toán duyệt (góp ý NV #9).
     if (patch?.phiPhatSinh !== undefined) {
       data.phiPhatSinh = Number(patch.phiPhatSinh) || 0;
-      changes.phiPhatSinh = data.phiPhatSinh;
       if (data.phiPhatSinh !== o.phiPhatSinh) {
         data.phiPhatSinhDuyet = false;
         data.phiPhatSinhDuyetBy = null;
         data.phiPhatSinhDuyetAt = null;
       }
     }
-    if (patch?.ngachHQ !== undefined) { data.ngachHQ = patch.ngachHQ || 'Tiểu ngạch'; changes.ngachHQ = data.ngachHQ; }
-    if (patch?.thueNK !== undefined) { data.thueNK = Number(patch.thueNK) || 0; changes.thueNK = data.thueNK; }
-    if (patch?.vat !== undefined) { data.vat = Number(patch.vat) || 0; changes.vat = data.vat; }
-    if (patch?.phiKiemHoa !== undefined) { data.phiKiemHoa = Number(patch.phiKiemHoa) || 0; changes.phiKiemHoa = data.phiKiemHoa; }
-    if (patch?.phiLuuKho !== undefined) { data.phiLuuKho = Number(patch.phiLuuKho) || 0; changes.phiLuuKho = data.phiLuuKho; }
-    if (patch?.kiemDem !== undefined) { data.kiemDem = !!patch.kiemDem; changes.kiemDem = data.kiemDem; }
-    if (patch?.nguoiNhan !== undefined) { data.nguoiNhan = patch.nguoiNhan || null; changes.nguoiNhan = 'updated'; }
-    if (patch?.sdtNhan !== undefined) { data.sdtNhan = patch.sdtNhan || null; changes.sdtNhan = 'updated'; }
-    if (patch?.diaChiNhan !== undefined) { data.diaChiNhan = patch.diaChiNhan || null; changes.diaChiNhan = 'updated'; }
-    if (patch?.ghiChu !== undefined) { data.ghiChu = patch.ghiChu || null; changes.ghiChu = 'updated'; }
+    if (patch?.ngachHQ !== undefined) data.ngachHQ = patch.ngachHQ || 'Tiểu ngạch';
+    if (patch?.thueNK !== undefined) data.thueNK = Number(patch.thueNK) || 0;
+    if (patch?.vat !== undefined) data.vat = Number(patch.vat) || 0;
+    if (patch?.phiKiemHoa !== undefined) data.phiKiemHoa = Number(patch.phiKiemHoa) || 0;
+    if (patch?.phiLuuKho !== undefined) data.phiLuuKho = Number(patch.phiLuuKho) || 0;
+    if (patch?.kiemDem !== undefined) data.kiemDem = !!patch.kiemDem;
+    if (patch?.nguoiNhan !== undefined) data.nguoiNhan = patch.nguoiNhan || null;
+    if (patch?.sdtNhan !== undefined) data.sdtNhan = patch.sdtNhan || null;
+    if (patch?.diaChiNhan !== undefined) data.diaChiNhan = patch.diaChiNhan || null;
+    if (patch?.ghiChu !== undefined) data.ghiChu = patch.ghiChu || null;
     if (Object.keys(data).length) await prisma.donHang.update({ where: { maDH }, data });
     await recomputeDonHang(maDH);
-    await logActivity(user.email, 'SUA_DON', maDH, changes);
+    // So sánh giá trị đã chuẩn hoá (data) với bản ghi cũ (o) → log "trước → sau" chuẩn.
+    await logActivity(user.email, 'SUA_DON', maDH, diffFields(o, data, [
+      'tuyen', 'lineVC', 'loaiHang', 'pctCoc', 'shipND', 'dongGo', 'phuThu',
+      'ngachHQ', 'thueNK', 'vat', 'phiKiemHoa', 'phiLuuKho', 'kiemDem',
+      'nguoiNhan', 'sdtNhan', 'diaChiNhan', 'ghiChu'
+    ]));
     return ok();
   },
 

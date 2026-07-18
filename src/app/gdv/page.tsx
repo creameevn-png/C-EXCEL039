@@ -1,14 +1,22 @@
 import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { getSetting } from '@/lib/settings';
 import GdvClient from './GdvClient';
 
 export const dynamic = 'force-dynamic';
 
 export default async function GdvPage() {
   const user = await requireRole(['GDV', 'MuaHang']);
+  // Lọc đơn theo người phụ trách: chỉ bật khi cài đặt = '1' và người xem là GDV/MuaHang
+  // (không áp cho Admin xem màn này). Mặc định '0' → scopeFilter rỗng → thấy mọi đơn như cũ.
+  const chiThayDonMinh = (await getSetting('gdv_chi_thay_don_minh')) === '1';
+  const locTheoNguoi = chiThayDonMinh && (user.vaiTro === 'GDV' || user.vaiTro === 'MuaHang');
+  const scopeFilter = locTheoNguoi
+    ? { OR: [{ gdvId: user.id }, { khachHang: { gdvPhuTrachId: user.id } }] }
+    : {};
   const [pending, khieuNai, allRaw] = await Promise.all([
     prisma.donHang.findMany({
-      where: { trangThai: { in: ['DatCoc', 'DaMuaHang'] } },
+      where: { trangThai: { in: ['DatCoc', 'DaMuaHang'] }, ...scopeFilter },
       include: { khachHang: true, gdv: true, chiTiet: { orderBy: { stt: 'asc' } } },
       orderBy: { ngayTao: 'desc' }
     }),
@@ -19,6 +27,7 @@ export default async function GdvPage() {
       take: 100
     }),
     prisma.donHang.findMany({
+      where: { ...scopeFilter },
       orderBy: { ngayTao: 'desc' },
       take: 300,
       select: {

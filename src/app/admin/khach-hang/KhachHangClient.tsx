@@ -6,19 +6,24 @@ import { callServer, reload } from '@/lib/client';
 import { showToast } from '@/components/Toast';
 import { formatCurrency } from '@/lib/format';
 
+type GDV = { id: number; hoTen: string };
 type KH = {
   maKH: string; tenKH: string; sdt: string; email: string; tuyen: string;
   pctCoc: number; soDuVi: number; congNo: number; tongDon: number; doanhThu: number;
+  phiMuaPctRieng: number | null; phiBhPctRieng: number | null; gdvPhuTrachId: number | null;
 };
 
 export default function KhachHangClient(
-  { list, canEdit, canSeeLienHe = true }:
-  { list: KH[]; canEdit: boolean; canSeeLienHe?: boolean }
+  { list, canEdit, canSeeLienHe = true, gdvList = [] }:
+  { list: KH[]; canEdit: boolean; canSeeLienHe?: boolean; gdvList?: GDV[] }
 ) {
   const [q, setQ] = useState('');
   const [tuyenF, setTuyenF] = useState('');
   const [editing, setEditing] = useState<KH | null>(null);
-  const [edit, setEdit] = useState({ tenKH: '', sdt: '', email: '', diaChi: '', tuyen: 'HaNoi', pctCoc: 70 });
+  const [edit, setEdit] = useState({
+    tenKH: '', sdt: '', email: '', diaChi: '', tuyen: 'HaNoi', pctCoc: 70,
+    phiMuaPctRieng: '', phiBhPctRieng: '', gdvPhuTrachId: ''
+  });
   const [busy, setBusy] = useState(false);
 
   const filtered = useMemo(() => {
@@ -32,7 +37,13 @@ export default function KhachHangClient(
 
   function openEdit(c: KH) {
     setEditing(c);
-    setEdit({ tenKH: c.tenKH, sdt: c.sdt, email: c.email, diaChi: '', tuyen: c.tuyen, pctCoc: c.pctCoc });
+    setEdit({
+      tenKH: c.tenKH, sdt: c.sdt, email: c.email, diaChi: '', tuyen: c.tuyen, pctCoc: c.pctCoc,
+      // Ô trống = dùng % chung hệ thống (cột null). Có số = % riêng của khách.
+      phiMuaPctRieng: c.phiMuaPctRieng == null ? '' : String(c.phiMuaPctRieng),
+      phiBhPctRieng: c.phiBhPctRieng == null ? '' : String(c.phiBhPctRieng),
+      gdvPhuTrachId: c.gdvPhuTrachId == null ? '' : String(c.gdvPhuTrachId)
+    });
   }
 
   async function save() {
@@ -41,6 +52,11 @@ export default function KhachHangClient(
     setBusy(true);
     const patch: any = { tenKH: edit.tenKH, sdt: edit.sdt, email: edit.email, tuyen: edit.tuyen, pctCoc: edit.pctCoc };
     if (edit.diaChi.trim()) patch.diaChi = edit.diaChi;
+    // % riêng: ô trống → null (dùng % chung hệ thống). Có số → parse thuần.
+    patch.phiMuaPctRieng = edit.phiMuaPctRieng.trim() === '' ? null : (parseFloat(edit.phiMuaPctRieng) || 0);
+    patch.phiBhPctRieng = edit.phiBhPctRieng.trim() === '' ? null : (parseFloat(edit.phiBhPctRieng) || 0);
+    // GDV phụ trách: '' → null (chưa phân).
+    patch.gdvPhuTrachId = edit.gdvPhuTrachId === '' ? null : (parseInt(edit.gdvPhuTrachId, 10) || null);
     const r = await callServer('updateKhachHang', editing.maKH, patch);
     setBusy(false);
     if (r?.success) { showToast('Đã cập nhật khách hàng', 'success'); setEditing(null); reload(); }
@@ -122,6 +138,23 @@ export default function KhachHangClient(
             </div>
             <div className="form-field" style={{ marginTop: 10 }}><label>Địa chỉ</label>
               <input value={edit.diaChi} onChange={(e) => setEdit({ ...edit, diaChi: e.target.value })} placeholder="(để trống nếu không đổi)" /></div>
+            <div className="form-grid" style={{ marginTop: 10 }}>
+              <div className="form-field"><label>% phí mua riêng</label>
+                <input type="number" min={0} max={100} step="any" value={edit.phiMuaPctRieng}
+                  onChange={(e) => setEdit({ ...edit, phiMuaPctRieng: e.target.value })}
+                  placeholder="Để trống = dùng chung hệ thống" />
+                <small style={{ color: 'var(--text-faint)' }}>Để trống = dùng % chung của hệ thống.</small></div>
+              <div className="form-field"><label>% phí bảo hiểm riêng</label>
+                <input type="number" min={0} max={100} step="any" value={edit.phiBhPctRieng}
+                  onChange={(e) => setEdit({ ...edit, phiBhPctRieng: e.target.value })}
+                  placeholder="Để trống = dùng chung hệ thống" />
+                <small style={{ color: 'var(--text-faint)' }}>Để trống = dùng % chung của hệ thống.</small></div>
+            </div>
+            <div className="form-field" style={{ marginTop: 10 }}><label>GDV phụ trách</label>
+              <select value={edit.gdvPhuTrachId} onChange={(e) => setEdit({ ...edit, gdvPhuTrachId: e.target.value })}>
+                <option value="">— Chưa phân —</option>
+                {gdvList.map((g) => (<option key={g.id} value={String(g.id)}>{g.hoTen}</option>))}
+              </select></div>
           </div>
           <div className="btn-row">
             <button className="btn btn-secondary" onClick={() => setEditing(null)}>Hủy</button>

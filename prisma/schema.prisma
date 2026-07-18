@@ -132,6 +132,11 @@ model KhachHang {
   congNo     Float    @default(0) @map("cong_no")
   tongDon    Int      @default(0) @map("tong_don")
   doanhThu   Float    @default(0) @map("doanh_thu")
+  // Đợt bổ sung (yêu cầu Zalo 18/07) — phí riêng theo từng khách (null = dùng % chung của hệ thống)
+  // và GDV được phân công phụ trách khách này (null = chưa phân, mọi GDV thấy như cũ).
+  phiMuaPctRieng Float? @map("phi_mua_pct_rieng")
+  phiBhPctRieng  Float? @map("phi_bh_pct_rieng")
+  gdvPhuTrachId  Int?   @map("gdv_phu_trach_id")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 

@@ -5,7 +5,8 @@ const DEFAULTS: Record<string, string> = {
   phi_mua_pct: '2',
   phi_bh_pct: '1',
   ten_cong_ty: 'Quản Lý Ship Trung Việt',
-  zalo_lien_he: ''
+  zalo_lien_he: '',
+  gdv_chi_thay_don_minh: '0'
 };
 
 let cache: Record<string, string> | null = null;

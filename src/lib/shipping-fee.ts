@@ -99,19 +99,26 @@ export async function computeOrderTotals(input: {
   phiKhieuNai?: number;
   /** Phí mua tính sẵn theo từng sàn (calcPhiMua). Có thì dùng, không thì tính theo % chung. */
   phiMuaOverride?: number;
+  /** Z6 — % phí mua RIÊNG của khách (KhachHang.phiMuaPctRieng). null/undefined → dùng % chung
+   *  (phi_mua_pct). Chỉ áp khi KHÔNG có phiMuaOverride (override theo sàn ưu tiên cao nhất). */
+  phiMuaPctKH?: number;
+  /** Z6 — % phí bảo hiểm RIÊNG của khách (KhachHang.phiBhPctRieng). null/undefined → % chung (phi_bh_pct). */
+  phiBhPctKH?: number;
   thueNK?: number;
   vat?: number;
   phiKiemHoa?: number;
   phiLuuKho?: number;
 }) {
   const giaHang = Number(input.giaHang) || 0;
-  const pctMua = await getNumber('phi_mua_pct', 2);
+  // Z6 — % phí mua: ưu tiên override theo sàn > % riêng của khách > % chung hệ thống.
+  // % riêng chỉ đổi CON SỐ %, vẫn tính THUẦN từ giaHang nên idempotent như cũ.
+  const pctMua = input.phiMuaPctKH != null ? input.phiMuaPctKH : await getNumber('phi_mua_pct', 2);
   const phiMua = input.phiMuaOverride != null
     ? Math.round(input.phiMuaOverride)
     : Math.round((giaHang * pctMua) / 100 / 1000) * 1000;
   // Bảo hiểm: % theo cài đặt (mặc định 1% giá hàng) — tính THUẦN từ giá hàng nên
-  // idempotent qua mọi lần recompute (không cộng dồn).
-  const pctBH = await getNumber('phi_bh_pct', 1);
+  // idempotent qua mọi lần recompute (không cộng dồn). Z6: khách có % riêng thì dùng % riêng.
+  const pctBH = input.phiBhPctKH != null ? input.phiBhPctKH : await getNumber('phi_bh_pct', 1);
   const phiBH = Math.round((giaHang * pctBH) / 100 / 1000) * 1000;
   // Phí phát sinh khác do CSKH nhập tay (lưu ở cột riêng phi_phat_sinh).
   const phiPhatSinh = Math.round(Number(input.phiPhatSinh) || 0);

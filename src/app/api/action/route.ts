@@ -65,6 +65,9 @@ async function recomputeDonHang(maDH: string) {
   const tongM3 = ct.reduce((s, c) => s + c.m3 * c.soLuong, 0);
   // Phí mua theo từng sàn (per-web); fallback % chung khi sàn chưa cấu hình.
   const phiMuaPerWeb = await calcPhiMua(ct.map((c) => ({ webNguon: c.webNguon, thanhTien: c.thanhTien })));
+  // Z6 — phí RIÊNG theo khách: đọc khách của đơn để lấy % mua/bảo hiểm riêng (nếu có).
+  // Đơn lỗi không thấy khách → để undefined, hàm tính dùng % chung như cũ (không vỡ).
+  const khDon = o.maKH ? await prisma.khachHang.findUnique({ where: { maKH: o.maKH } }) : null;
 
   const totals = await computeOrderTotals({
     giaHang: tongGiaHang,
@@ -75,6 +78,9 @@ async function recomputeDonHang(maDH: string) {
     phiPhatSinh: o.phiPhatSinhDuyet ? o.phiPhatSinh : 0,
     phiKhieuNai: o.phiKhieuNai,
     phiMuaOverride: phiMuaPerWeb,
+    // Z6 — % riêng của khách; null → hàm tính tự dùng % chung.
+    phiMuaPctKH: khDon?.phiMuaPctRieng ?? undefined,
+    phiBhPctKH: khDon?.phiBhPctRieng ?? undefined,
     thueNK: o.thueNK, vat: o.vat, phiKiemHoa: o.phiKiemHoa, phiLuuKho: o.phiLuuKho,
     pctCoc: o.pctCoc,
     lineVC: o.lineVC, loaiHang: o.loaiHang
@@ -1575,6 +1581,17 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (patch.diaChi !== undefined) data.diaChi = patch.diaChi;
     if (patch.tuyen) data.tuyen = normTuyen(patch.tuyen);
     if (patch.pctCoc !== undefined) data.pctCoc = Number(patch.pctCoc) || 70;
+    // Đợt bổ sung — % phí riêng của khách (null = dùng % chung hệ thống). Kẹp trong [0,100].
+    const clampPct = (v: any) => Math.min(100, Math.max(0, Number(v) || 0));
+    if (patch.phiMuaPctRieng !== undefined)
+      data.phiMuaPctRieng = patch.phiMuaPctRieng === null ? null : clampPct(patch.phiMuaPctRieng);
+    if (patch.phiBhPctRieng !== undefined)
+      data.phiBhPctRieng = patch.phiBhPctRieng === null ? null : clampPct(patch.phiBhPctRieng);
+    // GDV phụ trách (null = chưa phân). Ép về số nguyên hợp lệ, không thì để null.
+    if (patch.gdvPhuTrachId !== undefined) {
+      const gid = patch.gdvPhuTrachId === null ? null : Math.trunc(Number(patch.gdvPhuTrachId));
+      data.gdvPhuTrachId = gid && gid > 0 ? gid : null;
+    }
     await prisma.khachHang.update({ where: { maKH }, data });
     await logActivity(user.email, 'UPDATE_CUSTOMER', maKH, patch);
     return ok();

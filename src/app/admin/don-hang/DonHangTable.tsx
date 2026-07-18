@@ -25,11 +25,14 @@ type Row = {
   maDH: string; ngayTao: string; tenKH: string; maKH: string;
   tongTien: number; conLai: number; trangThai: string;
   nvTao: string; maGD: string; maVD: string;
+  gdvId: number | null;
   tuyen: string; lineVC: string; loaiHang: string; pctCoc: number;
   shipND: number; dongGo: number; phuThu: number; ghiChu: string;
 };
 
-export default function DonHangTable({ orders }: { orders: Row[] }) {
+type Gdv = { id: number; hoTen: string };
+
+export default function DonHangTable({ orders, gdvs = [] }: { orders: Row[]; gdvs?: Gdv[] }) {
   const [q, setQ] = useState('');
   const [fStatus, setFStatus] = useState('');
   const [fLine, setFLine] = useState('');
@@ -44,6 +47,16 @@ export default function DonHangTable({ orders }: { orders: Row[] }) {
   const [cancelReason, setCancelReason] = useState('');
   const [cancelHoanVi, setCancelHoanVi] = useState(true);
   const [busyC, setBusyC] = useState(false);
+  // Z7: gán GDV xử lý ngay trên bảng — bản ghi đè cục bộ để đổi tức thì trước khi reload.
+  const [gdvOf, setGdvOf] = useState<Record<string, number | null>>({});
+
+  async function assignGDVToOrder(maDH: string, val: string) {
+    const gid = val ? Number(val) : null;
+    setGdvOf((m) => ({ ...m, [maDH]: gid }));
+    const r = await callServer('assignGDV', maDH, gid);
+    if (r?.success) { showToast(gid ? 'Đã gán GDV xử lý' : 'Đã bỏ gán GDV', 'success'); reload(); }
+    else showToast(r?.message || 'Có lỗi khi gán GDV', 'error');
+  }
 
   async function doCancel() {
     if (!cancelT) return;
@@ -156,7 +169,7 @@ export default function DonHangTable({ orders }: { orders: Row[] }) {
           <thead><tr>
             <th>Mã đơn</th><th>Ngày</th><th>Khách hàng</th>
             <th className="number">Tổng tiền</th><th className="number">Còn lại</th>
-            <th>Trạng thái</th><th>NV</th><th>Mã GD/VĐ</th><th></th>
+            <th>Trạng thái</th><th>NV</th><th>GDV xử lý</th><th>Mã GD/VĐ</th><th></th>
           </tr></thead>
           <tbody>
             {filtered.map((o) => (
@@ -172,6 +185,12 @@ export default function DonHangTable({ orders }: { orders: Row[] }) {
                 </td>
                 <td><span className={`status-badge ${statusToClass(o.trangThai)}`}>{statusToLabel(o.trangThai, o.ngayTao)}</span></td>
                 <td style={{ fontSize: 11 }}>{o.nvTao || '-'}</td>
+                <td style={{ minWidth: 150 }}>
+                  <select className="erp-cell" value={gdvOf[o.maDH] ?? o.gdvId ?? ''} onChange={(e) => assignGDVToOrder(o.maDH, e.target.value)}>
+                    <option value="">— Chưa gán —</option>
+                    {gdvs.map((g) => <option key={g.id} value={g.id}>{g.hoTen}</option>)}
+                  </select>
+                </td>
                 <td style={{ fontSize: 11 }}>
                   {o.maGD && <div>GD: {o.maGD}</div>}
                   {o.maVD && <div>VĐ: {o.maVD}</div>}

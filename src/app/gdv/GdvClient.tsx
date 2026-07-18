@@ -203,6 +203,9 @@ export default function GdvClient({ user, pendingOrders, allOrders, khieuNai }: 
             placeholder="VD: shop hết màu đỏ, đã đổi sang xanh; hẹn phát hàng 12/07…" disabled={busy[o.maDH]} />
         </div>
         <div className="ac-meta" style={{ marginTop: 8 }}>
+          Tổng tiền tệ mua (tệ mua thực tế + ship nội địa TQ): <b>{fmtNDT(von + shipTq)}</b>
+        </div>
+        <div className="ac-meta" style={{ marginTop: 8 }}>
           Lợi nhuận GDV (ước tính): <b style={{ color: ln >= 0 ? '#059669' : '#DC2626' }}>{fmtNDT(ln)}</b>
           <button className="btn btn-secondary btn-sm" style={{ marginLeft: 10 }} onClick={() => submitVonGDV(o.maDH)} disabled={busy[o.maDH]}>
             <FiSave /> Lưu giá vốn + ghi chú

@@ -22,7 +22,8 @@ export default function BangGiaWebClient({ rows }: { rows: Row[] }) {
     setBusy(true);
     const r = await callServer('upsertBangGiaWeb', form);
     setBusy(false);
-    if (r?.success) { showToast('Đã lưu bảng giá ' + form.web, 'success'); reload(); }
+    // Tên web hạ về chữ thường làm khoá → gõ "Taobao" khi đã có "taobao" là đè dòng cũ.
+    if (r?.success) { showToast(r.capNhat ? `Đã cập nhật bảng giá ${r.web} (đè lên dòng đã có)` : `Đã thêm bảng giá ${r.web}`, 'success'); reload(); }
     else showToast(r?.message || 'Lỗi', 'error');
   }
 

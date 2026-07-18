@@ -18,6 +18,12 @@ export default async function AdminDonHangPage({ searchParams }: { searchParams:
     orderBy: { ngayTao: 'desc' }, take: 500
   });
 
+  // Danh sách nhân viên vai GDV/Mua hàng để gán xử lý cho đơn (giống màn CSKH).
+  const gdvs = await prisma.nhanVien.findMany({
+    where: { vaiTro: { in: ['GDV', 'MuaHang'] }, trangThai: 'HoatDong' },
+    select: { id: true, hoTen: true }
+  });
+
   const STATUSES = ['DonMoiTao', 'DatCoc', 'DaMuaHang', 'NccGiaoHang', 'KhoTqNhan', 'DangVanChuyen', 'KhoVnNhan', 'ChoThanhToan', 'GiaoHang', 'HoanThanh', 'Huy'];
 
   return (
@@ -34,11 +40,12 @@ export default async function AdminDonHangPage({ searchParams }: { searchParams:
           ))}
         </div>
 
-        <DonHangTable orders={orders.map((o) => ({
+        <DonHangTable gdvs={gdvs} orders={orders.map((o) => ({
           maDH: o.maDH, ngayTao: o.ngayTao.toISOString(),
           tenKH: o.khachHang?.tenKH || '', maKH: o.maKH,
           tongTien: o.tongTien, conLai: o.conLai, trangThai: o.trangThai,
           nvTao: o.nvTao || '', maGD: o.maGD || '', maVD: o.maVD || '',
+          gdvId: o.gdvId,
           tuyen: o.tuyen, lineVC: o.lineVC, loaiHang: o.loaiHang, pctCoc: o.pctCoc,
           shipND: o.shipND, dongGo: o.dongGo, phuThu: o.phuThu, ghiChu: o.ghiChu || ''
         }))} />

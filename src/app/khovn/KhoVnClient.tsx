@@ -18,7 +18,7 @@ type WeighLine = { stt: number; tenSP: string; soLuong: number; kg: string; dai:
 
 type Row = {
   maDH: string; maVD: string; maBao: string; tenKH: string;
-  tenHang: string; tuyen: string; conLai: number; shipND: number;
+  tenHang: string; tuyen: string; conLai: number; shipND: number; soDuVi: number;
   diaChiNhan: string; nguoiNhan: string; sdtNhan: string; lineNoiDia: string;
 };
 type Bao = {
@@ -130,9 +130,12 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
     } else showToast(r?.message || 'Lỗi', 'error');
   }
 
-  async function saveShipVN(maDH: string) {
-    const v = parseFloat(shipInputs[maDH] || '0') || 0;
-    const r = await callServer('updateShipVN', maDH, v, lineInputs[maDH] ?? '');
+  async function saveShipVN(o: Row) {
+    // Chỉ sửa ô nào NV thật sự nhập; ô để trống thì giữ nguyên giá trị cũ của đơn.
+    // (Trước đây ô bỏ trống bị gửi 0 / rỗng → xoá mất phí ship hoặc line đã lưu.)
+    const v = shipInputs[o.maDH] !== undefined ? (parseFloat(shipInputs[o.maDH]) || 0) : o.shipND;
+    const line = lineInputs[o.maDH] !== undefined ? lineInputs[o.maDH] : (o.lineNoiDia ?? '');
+    const r = await callServer('updateShipVN', o.maDH, v, line);
     if (r?.success) { showToast('Đã cập nhật ship nội địa VN', 'success'); reload(); }
     else showToast(r?.message || 'Lỗi', 'error');
   }
@@ -250,7 +253,7 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
           <div style={{ display: 'flex', gap: 6 }}>
             <input type="number" defaultValue={o.shipND || ''} placeholder="phí giao VN"
               onChange={(e) => setShipInputs((p) => ({ ...p, [o.maDH]: e.target.value }))} />
-            <button className="btn btn-secondary btn-sm" onClick={() => saveShipVN(o.maDH)}><FiSave /></button>
+            <button className="btn btn-secondary btn-sm" onClick={() => saveShipVN(o)}><FiSave /></button>
           </div>
         </div>
       </div>
@@ -364,6 +367,10 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
               <FiAlertCircle /> Còn nợ {fmtVND(o.conLai)}đ — không thể giao đến khi thanh toán đủ
             </div>
           )}
+          {/* Z5: cho kho VN thấy số dư ví khách khi giao — phân biệt với "còn lại của đơn". */}
+          <div className="icon-inline" style={{ background: '#EFF6FF', padding: 8, borderRadius: 6, marginTop: 8, fontSize: 12, color: '#1E40AF' }}>
+            <FiDollarSign /> Số dư ví khách: <b>{fmtVND(o.soDuVi)}đ</b>
+          </div>
           {shipVN(o)}
           <div className="ac-actions">
             <button className="btn btn-success" onClick={() => confirmDelivered(o.maDH)} disabled={o.conLai > 0.5}>

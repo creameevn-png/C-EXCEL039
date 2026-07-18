@@ -16,7 +16,7 @@ type SP = {
 
 const EMPTY = { tenSP: '', danhMuc: '', webNguon: '', kg: 0, m3: 0, gia: 0, linkTaobao: '', ghiChu: '' };
 
-export default function SanPhamClient({ list, canDelete }: { list: SP[]; canDelete: boolean }) {
+export default function SanPhamClient({ list, canAdd, canDelete }: { list: SP[]; canAdd: boolean; canDelete: boolean }) {
   const [q, setQ] = useState('');
   const [webF, setWebF] = useState('');
   const [busy, setBusy] = useState(false);
@@ -65,7 +65,7 @@ export default function SanPhamClient({ list, canDelete }: { list: SP[]; canDele
     <div className="form-section">
       <div className="section-title" style={{ justifyContent: 'space-between' }}>
         <span className="icon-inline"><FiBox /> Sản phẩm ({filtered.length}/{list.length})</span>
-        <button className="btn btn-success btn-sm" onClick={openCreate}><FiPlus /> Thêm SP</button>
+        {canAdd && <button className="btn btn-success btn-sm" onClick={openCreate}><FiPlus /> Thêm SP</button>}
       </div>
 
       <div className="form-grid" style={{ marginBottom: 16 }}>

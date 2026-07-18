@@ -12,7 +12,7 @@ import Combobox from '@/components/Combobox';
 
 type Nguon = {
   id: number; tenSP: string; danhMuc: string; tenNCC: string; linkTaobao: string;
-  giaNDT: number | null; moq: number; thoiGianGiao: string; chatLuong: number; createdAt: string;
+  giaNDT: number | null; moq: number; thoiGianGiao: string; chatLuong: number; ghiChu: string; createdAt: string;
 };
 type Ncc = { id: number; maNCC: string; tenNCC: string; wechat: string; ghiChu: string };
 
@@ -68,7 +68,7 @@ export default function MuaHangClient({ nguonHang, ncc }: { nguonHang: Nguon[]; 
     setNForm({
       tenSP: n.tenSP, danhMuc: n.danhMuc, tenNCC: n.tenNCC, linkTaobao: n.linkTaobao,
       giaNDT: n.giaNDT ?? '', moq: String(n.moq), thoiGianGiao: n.thoiGianGiao,
-      chatLuong: n.chatLuong ? String(n.chatLuong) : '', ghiChu: ''
+      chatLuong: n.chatLuong ? String(n.chatLuong) : '', ghiChu: n.ghiChu
     });
     setNOpen(true);
   }

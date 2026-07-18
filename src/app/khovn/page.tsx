@@ -60,6 +60,7 @@ export default async function KhoVnPage() {
     tenHang: o.chiTiet.map((c: any) => `${c.tenSP} (x${c.soLuong})`).join(' · '),
     tuyen: o.tuyen,
     conLai: o.conLai, shipND: o.shipND,
+    soDuVi: o.khachHang?.soDuVi ?? 0,
     diaChiNhan: o.diaChiNhan || '', nguoiNhan: o.nguoiNhan || '', sdtNhan: o.sdtNhan || '',
     lineNoiDia: o.lineNoiDia || ''
   });

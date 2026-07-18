@@ -1,4 +1,4 @@
-import { requireUser } from '@/lib/auth';
+import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getNumber } from '@/lib/settings';
 import AppShell from '@/components/AppShell';
@@ -8,7 +8,9 @@ import { FiInbox } from 'react-icons/fi';
 export const dynamic = 'force-dynamic';
 
 export default async function DatHangPage({ searchParams }: { searchParams: Promise<{ ma?: string }> }) {
-  const user = await requireUser();
+  // Chỉ CSKH (+ Admin) và khách tự đặt đơn của mình. Vai kho/kế toán không được
+  // xem hồ sơ KH qua ?ma=. Trùng với quyền tạo đơn ở /api/action.
+  const user = await requireRole(['CSKH', 'Customer']);
   const sp = await searchParams;
   let kh = null;
   if (user.vaiTro === 'Customer') {

@@ -20,7 +20,7 @@ export default async function MuaHangPage() {
     const rows: any[] = await prisma.$queryRaw`
       SELECT id, ten_sp AS tenSP, ten_ncc AS tenNCC, link_taobao AS linkTaobao,
              gia_ndt AS giaNDT, moq, thoi_gian_giao AS thoiGianGiao,
-             chat_luong AS chatLuong, created_at AS createdAt
+             chat_luong AS chatLuong, ghi_chu AS ghiChu, created_at AS createdAt
       FROM nguon_hang ORDER BY created_at DESC LIMIT 200`;
     nguonHang = rows.map((n) => ({ ...n, danhMuc: null }));
   }
@@ -45,7 +45,7 @@ export default async function MuaHangPage() {
         nguonHang={nguonHang.map((n) => ({
           id: n.id, tenSP: n.tenSP, danhMuc: n.danhMuc || '', tenNCC: n.tenNCC || '', linkTaobao: n.linkTaobao || '',
           giaNDT: n.giaNDT, moq: n.moq, thoiGianGiao: n.thoiGianGiao || '',
-          chatLuong: n.chatLuong || 0, createdAt: n.createdAt.toISOString()
+          chatLuong: n.chatLuong || 0, ghiChu: n.ghiChu || '', createdAt: n.createdAt.toISOString()
         }))}
         ncc={ncc.map((n) => ({
           id: n.id, maNCC: n.maNCC || '', tenNCC: n.tenNCC, wechat: n.wechat || '', ghiChu: n.ghiChu || ''

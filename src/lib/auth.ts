@@ -51,6 +51,21 @@ export async function getSession(): Promise<SessionUser | null> {
   }
 }
 
+/** Như getSession() nhưng đọc lại vai trò + trạng thái từ bảng nhân viên (thẻ phiên sống 7
+ *  ngày → khoá tài khoản / đổi vai trò phải có hiệu lực ngay). Tài khoản đã khoá → 'blocked'. */
+export async function getSessionFresh(): Promise<SessionUser | 'blocked' | null> {
+  const u = await getSession();
+  if (!u) return null;
+  const fresh = await prisma.nhanVien.findUnique({
+    where: { id: u.id },
+    select: { vaiTro: true, trangThai: true }
+  });
+  // Không có trong bảng nhân viên → giữ nguyên phiên như cũ (không chặn nhầm).
+  if (!fresh) return u;
+  if (fresh.trangThai !== 'HoatDong') return 'blocked';
+  return { ...u, vaiTro: fresh.vaiTro };
+}
+
 export async function requireUser(): Promise<SessionUser> {
   const u = await getSession();
   if (!u) redirect('/login');

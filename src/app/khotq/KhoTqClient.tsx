@@ -36,7 +36,7 @@ type Quy = {
   danhMuc: string; noiDung: string; maDH: string; nguoiTao: string;
 };
 // Góp ý NV #25/#33: kho TQ tự nhập cân & kích thước từng dòng hàng.
-type WeighLine = { stt: number; tenSP: string; soLuong: number; kg: string; dai: string; rong: string; cao: string; m3: string };
+type WeighLine = { stt: number; tenSP: string; soLuong: number; kg: string; dai: string; rong: string; cao: string; m3: string; ghiChu: string };
 const QUY_DANH_MUC = ['Thu hộ khách', 'Chi ship nội địa TQ', 'Chi đóng gói', 'Chi khác'];
 const LINE_LABEL: Record<string, string> = { LineNhanh: 'Nhanh', LineThuong: 'Thường', LineRe: 'Tiết kiệm' };
 
@@ -100,7 +100,8 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
         stt: c.stt, tenSP: c.tenSP, soLuong: c.soLuong,
         kg: String(c.kg ?? ''),
         dai: soHoacRong(c.dai), rong: soHoacRong(c.rong), cao: soHoacRong(c.cao),
-        m3: String(c.m3 ?? '')
+        m3: String(c.m3 ?? ''),
+        ghiChu: c.ghiChu ?? ''
       })));
     } else { showToast(r?.message || 'Lỗi tải đơn', 'error'); setWeighMaDH(null); }
   }
@@ -112,7 +113,7 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
     const kg = parseFloat(l.kg) || 0;
     const dai = parseFloat(l.dai) || 0, rong = parseFloat(l.rong) || 0, cao = parseFloat(l.cao) || 0;
     const hasKT = dai > 0 && rong > 0 && cao > 0;
-    const payload = hasKT ? { kg, dai, rong, cao } : { kg, m3: parseFloat(l.m3) || 0 };
+    const payload = { ...(hasKT ? { kg, dai, rong, cao } : { kg, m3: parseFloat(l.m3) || 0 }), ghiChu: l.ghiChu };
     setWeighBusy((p) => ({ ...p, [l.stt]: true }));
     const r = await callServer('updateChiTietKg', weighMaDH, l.stt, payload);
     setWeighBusy((p) => ({ ...p, [l.stt]: false }));
@@ -229,6 +230,41 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
     else showToast(r?.message || 'Lỗi', 'error');
   }
 
+  // ===== Xuất Excel tách bill < 5kg =====
+  // Gom mỗi đơn ở kho TQ thành 1 kiện (kg = tổng kg đơn), xếp vào các bill sao cho tổng kg mỗi bill < 5kg.
+  function exportBills5kg() {
+    const LIMIT = 5;
+    const items = atWarehouse
+      .map((o) => ({ maDH: o.maDH, maVD: o.maVD, tenHang: o.tenHang, kg: o.kg || 0 }))
+      .filter((it) => it.kg > 0);
+    if (items.length === 0) { showToast('Không có kiện nào có cân nặng để tách bill', 'error'); return; }
+    // Kiện ≥ 5kg đứng riêng 1 bill; kiện nhẹ nhét dần (giảm dần) cho tới gần 5kg thì sang bill mới.
+    const nang = items.filter((it) => it.kg >= LIMIT);
+    const nhe = items.filter((it) => it.kg < LIMIT).sort((a, b) => b.kg - a.kg);
+    const bills: { items: typeof items; kg: number }[] = [];
+    for (const it of nang) bills.push({ items: [it], kg: it.kg });
+    let cur: { items: typeof items; kg: number } | null = null;
+    for (const it of nhe) {
+      if (!cur || cur.kg + it.kg >= LIMIT) { cur = { items: [], kg: 0 }; bills.push(cur); }
+      cur.items.push(it); cur.kg += it.kg;
+    }
+    // CSV (BOM UTF-8 để Excel đọc đúng tiếng Việt)
+    const esc = (v: any) => {
+      const s = String(v ?? '');
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const rows: (string | number)[][] = [['Số bill', 'Mã đơn', 'Mã VĐ', 'Tên hàng', 'Kg']];
+    bills.forEach((b, i) => b.items.forEach((it) => rows.push([i + 1, it.maDH, it.maVD, it.tenHang, it.kg])));
+    const csv = '﻿' + rows.map((r) => r.map(esc).join(',')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `tach-bill-5kg-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(`Đã xuất ${bills.length} bill từ ${items.length} kiện`, 'success');
+  }
+
   function serviceBadges(o: Row) {
     if (!o.kiemDem && !o.dongGo) return null;
     return (
@@ -322,6 +358,11 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
   const tabShip = (
     <div className="form-section">
       <div className="section-title"><FiTruck /> Hàng tại kho TQ — chuẩn bị chuyển về VN</div>
+      <div className="ac-actions" style={{ marginBottom: 10 }}>
+        <button className="btn btn-secondary" onClick={exportBills5kg}>
+          <FiDownload /> Xuất Excel kiện (tách bill &lt;5kg)
+        </button>
+      </div>
       {scanBox}
       {atWarehouseFiltered.length === 0 ? (
         <div className="empty-state"><FiPackage /><p>{scan.trim() ? 'Không có đơn khớp mã đã bắn.' : 'Không có hàng tại kho.'}</p></div>
@@ -594,7 +635,7 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
                 <thead><tr>
                   <th>Sản phẩm</th><th className="number">SL</th><th className="number">Kg</th>
                   <th className="number">Dài</th><th className="number">Rộng</th><th className="number">Cao (cm)</th>
-                  <th className="number">M³</th><th></th>
+                  <th className="number">M³</th><th>Ghi chú</th><th></th>
                 </tr></thead>
                 <tbody>
                   {weighLines.map((l) => {
@@ -615,6 +656,7 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
                             onChange={(e) => patchWeigh(l.stt, { m3: e.target.value })} />
                           {hasKT && <div className="hint" style={{ fontSize: 10 }}>tự tính từ KT</div>}
                         </td>
+                        <td><input value={l.ghiChu} style={{ width: 140 }} placeholder="ghi chú kiện…" onChange={(e) => patchWeigh(l.stt, { ghiChu: e.target.value })} /></td>
                         <td><button className="btn btn-success btn-sm" disabled={weighBusy[l.stt]} onClick={() => saveWeighLine(l)}><FiSave /></button></td>
                       </tr>
                     );

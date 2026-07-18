@@ -433,9 +433,14 @@ export default function CskhClient({ initial }: Props) {
     else showToast(r?.message || 'Có lỗi khi cập nhật phí ship', 'error');
   }
 
+  // Đơn đã Hoàn thành / đã Huỷ thì khoá mọi ô sửa tiền — sửa được là tổng tiền
+  // của đơn đã chốt sổ tự đổi. Máy chủ cũng chặn; ẩn ô ở đây để khỏi gõ rồi mới báo lỗi.
+  const donDaChot = (o: MyOrder) => o.trangThai === 'HoanThanh' || o.trangThai === 'Huy';
+
   function shipCell(o: MyOrder) {
     const draft = shipDraft[o.maDH] ?? o.shipND;
     const line = lineDraft[o.maDH] ?? o.lineNoiDia;
+    if (donDaChot(o)) return <span className="hint">{o.shipND.toLocaleString('vi-VN')}đ{o.lineNoiDia ? ` · ${o.lineNoiDia}` : ''}</span>;
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
         <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>

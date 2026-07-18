@@ -12,6 +12,7 @@ export default async function AdminSanPhamPage() {
   return (
     <AppShell user={user} subtitle={`${products.length} sản phẩm`}>
       <SanPhamClient
+        canAdd={user.vaiTro === 'CSKH' || user.vaiTro === 'Admin'}
         canDelete={user.vaiTro === 'Admin'}
         list={products.map((p) => ({
           maSP: p.maSP, tenSP: p.tenSP, danhMuc: p.danhMuc || '', webNguon: p.webNguon || '',

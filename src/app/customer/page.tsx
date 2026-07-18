@@ -6,6 +6,7 @@ import OrderLink from '@/components/OrderLink';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { statusToClass, statusToLabel } from '@/lib/status';
 import { FiInbox, FiShoppingCart, FiAlertTriangle, FiPackage, FiUser } from 'react-icons/fi';
+import RutTienButton from './RutTienButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,13 +67,14 @@ export default async function CustomerPage() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16 }}>
         <a href={`/yeu-cau?ma=${kh.maKH}`} className="btn btn-success" style={{ padding: 18, fontSize: 14 }}>
           <FiShoppingCart /> Yêu cầu mua hàng mới
         </a>
         <a href={`/khieu-nai?ma=${kh.maKH}`} className="btn btn-danger" style={{ padding: 18, fontSize: 14 }}>
           <FiAlertTriangle /> Gửi khiếu nại
         </a>
+        <RutTienButton maKH={kh.maKH} soDuVi={kh.soDuVi} />
       </div>
 
       <div className="form-section">

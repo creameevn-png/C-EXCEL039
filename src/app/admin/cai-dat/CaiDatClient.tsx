@@ -14,7 +14,9 @@ const KNOWN: Known[] = [
   { ten: 'phi_bh_pct', nhan: 'Phí bảo hiểm (%)', ghiChu: 'Đặt 0 để bỏ thu phí bảo hiểm.' },
   { ten: 'm3_chia', nhan: 'Hệ số quy đổi m³', ghiChu: 'm³ = dài × rộng × cao (cm) ÷ hệ số. Mặc định 1.000.000 (đơn vị cm).', macDinh: '1000000' },
   { ten: 'ten_cong_ty', nhan: 'Tên doanh nghiệp', ghiChu: 'Tên doanh nghiệp' },
-  { ten: 'zalo_lien_he', nhan: 'Zalo liên hệ', ghiChu: 'Zalo liên hệ' }
+  { ten: 'zalo_lien_he', nhan: 'Zalo liên hệ', ghiChu: 'Zalo liên hệ' },
+  { ten: 'vi_bat_buoc', nhan: 'Bắt buộc ví khi khách tự đặt', ghiChu: 'Đặt 1 để bắt buộc khách có đủ số dư ví mới đặt được đơn; 0 = tắt.', macDinh: '0' },
+  { ten: 'vi_coc_toi_thieu', nhan: 'Ví tối thiểu khi đặt (đ)', ghiChu: 'Mức ví tối thiểu khách phải có để đặt đơn (lấy số lớn hơn giữa mức này và tiền cọc). Chỉ áp dụng khi bật "Bắt buộc ví".', macDinh: '0' }
 ];
 
 export default function CaiDatClient({ rows }: { rows: Row[] }) {

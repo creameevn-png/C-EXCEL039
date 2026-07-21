@@ -9,6 +9,8 @@ import type { SessionUser } from '@/lib/auth';
 import AppShell from '@/components/AppShell';
 import Tabs from '@/components/Tabs';
 import OrderDetailModalHost from '@/components/OrderDetailModal';
+import VanDonDetailModalHost from '@/components/VanDonDetailModal';
+import KhieuNaiDetailModalHost from '@/components/KhieuNaiDetailModal';
 import { showToast } from '@/components/Toast';
 import { callServer, reload } from '@/lib/client';
 import { fmtVND, fmtDateDDMM } from '@/lib/format';
@@ -388,7 +390,7 @@ export default function GdvClient({ user, pendingOrders, allOrders, khieuNai }: 
                 </td>
                 <td>{o.maKH ? <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(o.maKH)}>{o.maKH}</span> : '-'}</td>
                 <td>{o.maKH ? <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(o.maKH)}>{o.tenKH}</span> : o.tenKH}</td>
-                <td>{o.maVD || '-'}</td>
+                <td>{o.maVD ? <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openVanDonDetail?.(o.maVD)}>{o.maVD}</span> : '-'}</td>
                 <td><span className={`status-badge ${statusToClass(o.trangThai)}`}>{statusToLabel(o.trangThai)}</span></td>
                 <td className="number">{fmtVND(o.tongTien)}đ</td>
                 <td>{fmtDateDDMM(o.ngayTao)}</td>
@@ -408,7 +410,8 @@ export default function GdvClient({ user, pendingOrders, allOrders, khieuNai }: 
       ) : khieuNai.map((k) => (
         <div key={k.maKN} className="action-card" style={{ opacity: busy[k.maKN] ? 0.5 : 1 }}>
           <div className="ac-header">
-            <div className="ac-title">{k.maKN}</div>
+            <div className="ac-title" style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                 onClick={() => (window as any).openKhieuNaiDetail?.(k.maKN)}>{k.maKN}</div>
             <span className={`status-badge ${k.trangThai === 'TuChoi' ? 's-cancel' : 's-deposit'}`}>
               {(KN_LABEL as Record<string, string>)[k.trangThai] || k.trangThai}
             </span>
@@ -492,6 +495,10 @@ export default function GdvClient({ user, pendingOrders, allOrders, khieuNai }: 
       </div>
 
       <OrderDetailModalHost canSeeMoney={false} canSeeProfit={true} />
+      {/* Khiếu nại + vận đơn bấm từ trong màn; đặt sau OrderDetailModalHost để nổi lên
+          trên; VĐ đặt sau KN vì KN có thể mở tiếp mã VĐ khách gửi trả. */}
+      <KhieuNaiDetailModalHost />
+      <VanDonDetailModalHost />
     </AppShell>
   );
 }

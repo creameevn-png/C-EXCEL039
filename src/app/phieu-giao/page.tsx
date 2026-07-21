@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import PhieuGiaoClient from './PhieuGiaoClient';
 import OrderDetailModalHost from '@/components/OrderDetailModal';
 import CustomerDetailModalHost from '@/components/CustomerDetailModal';
+import PhieuGiaoDetailModalHost from '@/components/PhieuGiaoDetailModal';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +38,8 @@ export default async function PhieuGiaoPage() {
       nguoiTao: p.nguoiTao || '', createdAt: p.createdAt.toISOString()
     }))}
   />
+    {/* PhieuGiao host TRƯỚC; Customer/Order host SAU để khi bấm mã KH/đơn trong modal phiếu thì nổi lên trên. */}
+    <PhieuGiaoDetailModalHost />
     <CustomerDetailModalHost canSeeMoney={['Admin', 'CSKH', 'KeToan'].includes(user.vaiTro)} />
     <OrderDetailModalHost canSeeMoney={['Admin', 'CSKH', 'KeToan'].includes(user.vaiTro)} canSeeProfit={['Admin', 'KeToan', 'GDV', 'MuaHang'].includes(user.vaiTro)} />
     </>

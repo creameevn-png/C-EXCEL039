@@ -2,6 +2,8 @@ import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import AppShell from '@/components/AppShell';
 import MuaHangClient from './MuaHangClient';
+import NccDetailModalHost from '@/components/NccDetailModal';
+import ProductDetailModalHost from '@/components/ProductDetailModal';
 import { FiInfo, FiPackage, FiHome, FiStar, FiCalendar } from 'react-icons/fi';
 
 export const dynamic = 'force-dynamic';
@@ -51,6 +53,10 @@ export default async function MuaHangPage() {
           id: n.id, maNCC: n.maNCC || '', tenNCC: n.tenNCC, wechat: n.wechat || '', ghiChu: n.ghiChu || ''
         }))}
       />
+      {/* Nối chéo NCC ⇄ Sản phẩm. canSeeMoney (công nợ NCC): chỉ Mua hàng/Kế toán/Admin;
+          GDV bị server tự tắt qua data.canSeeMoney. Product host đặt SAU để nổi lên trên khi mở từ NCC. */}
+      <NccDetailModalHost canSeeMoney={['Admin', 'MuaHang', 'KeToan'].includes(user.vaiTro)} />
+      <ProductDetailModalHost />
     </AppShell>
   );
 }

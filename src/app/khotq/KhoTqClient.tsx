@@ -10,6 +10,8 @@ import type { SessionUser } from '@/lib/auth';
 import AppShell from '@/components/AppShell';
 import Tabs from '@/components/Tabs';
 import OrderDetailModalHost from '@/components/OrderDetailModal';
+import BaoDetailModalHost from '@/components/BaoDetailModal';
+import VanDonDetailModalHost from '@/components/VanDonDetailModal';
 import ImageUploadModalHost from '@/components/ImageUploadModal';
 import { showToast } from '@/components/Toast';
 import { callServer, reload } from '@/lib/client';
@@ -345,7 +347,10 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
       ) : pendingFiltered.map((o) => (
         <div key={o.maDH} className="action-card">
           <div className="ac-header">
-            <div className="ac-title">Mã VĐ: {o.maVD || '(chưa có)'}</div>
+            <div className="ac-title">Mã VĐ: {o.maVD
+              ? <span style={{ cursor: 'pointer', textDecoration: 'underline', color: '#1E3A8A' }}
+                  onClick={() => (window as any).openVanDonDetail?.(o.maVD)}>{o.maVD}</span>
+              : '(chưa có)'}</div>
             <span className="status-badge s-tq">NCC đã giao</span>
           </div>
           {serviceBadges(o)}
@@ -388,7 +393,10 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
           <tbody>
             {atWarehouseFiltered.map((o) => (
               <tr key={o.maDH}>
-                <td className="ma-don">{o.maVD}</td>
+                <td className="ma-don">{o.maVD
+                  ? <span style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                      onClick={() => (window as any).openVanDonDetail?.(o.maVD)}>{o.maVD}</span>
+                  : ''}</td>
                 <td><span className="ma-don" style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => (window as any).openOrderDetail?.(o.maDH)}>{o.maDH}</span></td>
                 <td>{o.tenHang}</td>
                 <td>{o.kg} / {o.m3}</td>
@@ -452,7 +460,10 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
           <tbody>
             {voChu.map((h) => (
               <tr key={h.id}>
-                <td className="ma-don">{h.maVD}</td>
+                <td className="ma-don">{h.maVD
+                  ? <span style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                      onClick={() => (window as any).openVanDonDetail?.(h.maVD)}>{h.maVD}</span>
+                  : ''}</td>
                 <td>{h.kg}</td>
                 <td>{h.dai}×{h.rong}×{h.cao}</td>
                 <td>{h.m3}</td>
@@ -498,7 +509,8 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
         openBaos.map((b) => (
           <div key={b.maBao} className="action-card">
             <div className="ac-header">
-              <div className="ac-title"><FiBox /> {b.maBao} · Line {LINE_LABEL[b.line] || b.line}</div>
+              <div className="ac-title"><FiBox /> <span style={{ cursor: 'pointer', textDecoration: 'underline', color: '#1E3A8A' }}
+                onClick={() => (window as any).openBaoDetail?.(b.maBao)}>{b.maBao}</span> · Line {LINE_LABEL[b.line] || b.line}</div>
               <span className="status-badge s-tq">Đang đóng</span>
             </div>
             <div className="ac-meta">{b.soKien} đơn · {b.tongKg}kg · {b.tongM3}m³ · Đơn: <b>{b.orders.length ? b.orders.map((m, i) => <span key={m}>{i > 0 ? ', ' : ''}<span style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => (window as any).openOrderDetail?.(m)}>{m}</span></span>) : '(trống)'}</b></div>
@@ -516,7 +528,7 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
       {exportedBaos.length > 0 && <>
         <div className="section-title" style={{ marginTop: 16 }}><FiTruck /> Bao đã xuất (đang về VN)</div>
         <table className="data-table"><thead><tr><th>Mã bao</th><th>Line</th><th>Số đơn</th><th>Kg/M³</th></tr></thead>
-          <tbody>{exportedBaos.map((b) => (<tr key={b.maBao}><td className="ma-don">{b.maBao}</td><td>{LINE_LABEL[b.line] || b.line}</td><td>{b.soKien}</td><td>{b.tongKg}/{b.tongM3}</td></tr>))}</tbody></table>
+          <tbody>{exportedBaos.map((b) => (<tr key={b.maBao}><td className="ma-don"><span style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => (window as any).openBaoDetail?.(b.maBao)}>{b.maBao}</span></td><td>{LINE_LABEL[b.line] || b.line}</td><td>{b.soKien}</td><td>{b.tongKg}/{b.tongM3}</td></tr>))}</tbody></table>
       </>}
     </div>
   );
@@ -698,6 +710,9 @@ export default function KhoTqClient({ user, pendingArrivals, atWarehouse, voChu,
       </div>
 
       <OrderDetailModalHost canSeeMoney={false} />
+      {/* Bấm mã bao / mã vận đơn ở các bảng kho TQ để mở chi tiết (đặt sau host đơn để nổi trên). */}
+      <BaoDetailModalHost />
+      <VanDonDetailModalHost />
       <ImageUploadModalHost />
     </AppShell>
   );

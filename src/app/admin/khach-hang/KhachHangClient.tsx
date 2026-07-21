@@ -153,7 +153,7 @@ export default function KhachHangClient(
                 <td className="number" title="Xem đơn của khách" style={{ cursor: 'pointer' }} onClick={() => (window as any).openCustomerDetail?.(c.maKH)}>{formatCurrency(c.doanhThu)}</td>
                 <td>
                   {c.gdvPhuTrachId != null
-                    ? (gdvNameById.get(c.gdvPhuTrachId) || `#${c.gdvPhuTrachId}`)
+                    ? <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openNhanVienDetail?.(String(c.gdvPhuTrachId))}>{gdvNameById.get(c.gdvPhuTrachId) || `#${c.gdvPhuTrachId}`}</span>
                     : <span className="status-badge" style={{ background: '#fef3c7', color: '#92400e' }}>Chưa phân</span>}
                 </td>
                 {canEdit && <td><button className="btn btn-primary btn-sm" onClick={() => openEdit(c)}><FiEdit2 /> Sửa</button></td>}

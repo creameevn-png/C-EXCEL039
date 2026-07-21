@@ -618,7 +618,7 @@ export default function BaoCaoClient({ rows, knRows, cashRows, tonKhoRows, nvLis
           <tbody>
             {hhData.map((d) => (
               <tr key={d.id}>
-                <td>{d.hoTen}<br /><span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{VAITRO_LABEL[d.vaiTro] || d.vaiTro}</span></td>
+                <td><span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openNhanVienDetail?.(d.id)}>{d.hoTen}</span><br /><span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{VAITRO_LABEL[d.vaiTro] || d.vaiTro}</span></td>
                 <td className="number">{d.soDon}</td>
                 <td className="number">{fmtVND(d.doanhSo)}đ</td>
                 <td className="number">{d.pctHoaHong}%{d.pctHoaHong === 0 && chuaDatTiLe}</td>
@@ -643,7 +643,7 @@ export default function BaoCaoClient({ rows, knRows, cashRows, tonKhoRows, nvLis
           <tbody>
             {thData.map((d) => (
               <tr key={d.id}>
-                <td>{d.hoTen}</td>
+                <td><span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openNhanVienDetail?.(d.id)}>{d.hoTen}</span></td>
                 <td className="number">{d.soDon}</td>
                 <td className="number">{fmtVND(d.doanhSo)}đ</td>
                 <td className="number">{fmtVND(d.tongPhi)}đ</td>

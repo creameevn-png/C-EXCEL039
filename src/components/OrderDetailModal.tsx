@@ -213,7 +213,7 @@ export default function OrderDetailModalHost({ canSeeMoney, canSeeProfit = false
 
               <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12 }}>
                 <div><b>Mã GD:</b> {data.maGD || '(chưa có)'}</div>
-                <div><b>Mã VĐ:</b> {data.maVD || '(chưa có)'}</div>
+                <div><b>Mã VĐ:</b> {data.maVD ? <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openVanDonDetail?.(data.maVD)}>{data.maVD}</span> : '(chưa có)'}</div>
                 <div><b>NV tạo:</b> {data.nvName || '-'}</div>
                 {data.gdvTen && <div><b>GDV phụ trách:</b> {data.gdvTen}</div>}
               </div>

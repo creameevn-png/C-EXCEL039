@@ -5,6 +5,7 @@ import AppShell from '@/components/AppShell';
 import KhachHangClient from './KhachHangClient';
 import OrderDetailModalHost from '@/components/OrderDetailModal';
 import CustomerDetailModalHost from '@/components/CustomerDetailModal';
+import NhanVienDetailModalHost from '@/components/NhanVienDetailModal';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,8 +51,10 @@ export default async function AdminKhachHangPage() {
           gdvPhuTrachId: c.gdvPhuTrachId ?? null
         }))}
       />
-      {/* Customer host TRƯỚC, Order host SAU: bấm đơn trong modal KH thì modal đơn nổi lên trên. */}
+      {/* Customer host TRƯỚC, Order host SAU: bấm đơn trong modal KH thì modal đơn nổi lên trên.
+          NhanVien host cho cột "GDV phụ trách"; đặt trước Order host vì modal NV có thể mở tiếp đơn. */}
       <CustomerDetailModalHost canSeeMoney />
+      <NhanVienDetailModalHost />
       <OrderDetailModalHost
         canSeeMoney={['Admin', 'CSKH', 'KeToan'].includes(user.vaiTro)}
         canSeeProfit={['Admin', 'KeToan', 'GDV', 'MuaHang'].includes(user.vaiTro)}

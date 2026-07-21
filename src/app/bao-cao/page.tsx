@@ -4,6 +4,7 @@ import AppShell from '@/components/AppShell';
 import BaoCaoClient from './BaoCaoClient';
 import OrderDetailModalHost from '@/components/OrderDetailModal';
 import CustomerDetailModalHost from '@/components/CustomerDetailModal';
+import NhanVienDetailModalHost from '@/components/NhanVienDetailModal';
 
 export const dynamic = 'force-dynamic';
 
@@ -96,6 +97,8 @@ export default async function BaoCaoPage() {
       <BaoCaoClient rows={rows} knRows={knRows} cashRows={cashRows} tonKhoRows={tonKhoRows} nvList={nvList} soQuyRows={soQuyRows} />
       <CustomerDetailModalHost canSeeMoney />
       <OrderDetailModalHost canSeeMoney={['Admin', 'CSKH', 'KeToan'].includes(user.vaiTro)} canSeeProfit={['Admin', 'KeToan', 'GDV', 'MuaHang'].includes(user.vaiTro)} />
+      {/* NV bấm từ báo cáo hoa hồng/thưởng; đặt sau OrderDetailModalHost để đơn nổi lên trên. */}
+      <NhanVienDetailModalHost />
     </AppShell>
   );
 }

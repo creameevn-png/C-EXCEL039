@@ -199,7 +199,7 @@ export default function DonHangTable({ orders, gdvs = [] }: { orders: Row[]; gdv
                 </td>
                 <td style={{ fontSize: 11 }}>
                   {o.maGD && <div>GD: {o.maGD}</div>}
-                  {o.maVD && <div>VĐ: {o.maVD}</div>}
+                  {o.maVD && <div>VĐ: <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openVanDonDetail?.(o.maVD)}>{o.maVD}</span></div>}
                 </td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <button className="erp-iconbtn" title="Sửa đơn (Admin)" onClick={() => openEdit(o)}><FiEdit2 /></button>

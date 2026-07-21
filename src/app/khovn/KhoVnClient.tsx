@@ -9,6 +9,8 @@ import type { SessionUser } from '@/lib/auth';
 import AppShell from '@/components/AppShell';
 import Tabs from '@/components/Tabs';
 import OrderDetailModalHost from '@/components/OrderDetailModal';
+import BaoDetailModalHost from '@/components/BaoDetailModal';
+import VanDonDetailModalHost from '@/components/VanDonDetailModal';
 import ImageUploadModalHost from '@/components/ImageUploadModal';
 import { showToast } from '@/components/Toast';
 import { callServer, reload } from '@/lib/client';
@@ -306,14 +308,18 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
       ) : incomingFiltered.map((o) => (
         <div key={o.maDH} className="action-card">
           <div className="ac-header">
-            <div className="ac-title">Mã VĐ: {o.maVD || '(chưa có)'}</div>
+            <div className="ac-title">Mã VĐ: {o.maVD
+              ? <span style={{ cursor: 'pointer', textDecoration: 'underline', color: '#1E3A8A' }}
+                  onClick={() => (window as any).openVanDonDetail?.(o.maVD)}>{o.maVD}</span>
+              : '(chưa có)'}</div>
             <span className="status-badge s-shipping">Đang vận chuyển</span>
           </div>
           <div className="ac-meta">
             Đơn: <b style={{ cursor: 'pointer', textDecoration: 'underline', color: '#1E3A8A' }}
                     onClick={() => (window as any).openOrderDetail?.(o.maDH)}>{o.maDH}</b> ·
             KH: {o.tenKH} · {o.tenHang} · Tuyến: <b>{o.tuyen === 'HCM' ? 'HCM' : 'Hà Nội'}</b>
-            {o.maBao && <> · Bao: <b>{o.maBao}</b></>}
+            {o.maBao && <> · Bao: <b><span style={{ cursor: 'pointer', textDecoration: 'underline', color: '#1E3A8A' }}
+              onClick={() => (window as any).openBaoDetail?.(o.maBao)}>{o.maBao}</span></b></>}
           </div>
           {diaChi(o)}
           {shipVN(o)}
@@ -417,7 +423,8 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
           return (
             <div key={b.maBao} className="action-card">
               <div className="ac-header">
-                <div className="ac-title"><FiBox /> {b.maBao} · Line {LINE_LABEL[b.line] || b.line}</div>
+                <div className="ac-title"><FiBox /> <span style={{ cursor: 'pointer', textDecoration: 'underline', color: '#1E3A8A' }}
+                  onClick={() => (window as any).openBaoDetail?.(b.maBao)}>{b.maBao}</span> · Line {LINE_LABEL[b.line] || b.line}</div>
                 <span className={`status-badge ${thieu > 0 ? 's-waiting' : 's-vn'}`}>{b.trangThai === 'DaVeVN' ? 'Đang nhận' : 'Đã xuất'}</span>
               </div>
               <div className="ac-meta">{b.soKien} đơn · {b.tongKg}kg · {b.tongM3}m³ · Đã nhận: <b>{b.daNhan}/{b.tong}</b></div>
@@ -447,7 +454,10 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
         <div className="ac-meta">
           {k.maDH && <>Đơn: <b style={{ cursor: 'pointer', textDecoration: 'underline', color: '#1E3A8A' }}
             onClick={() => (window as any).openOrderDetail?.(k.maDH)}>{k.maDH}</b> · </>}
-          KH: <b>{k.tenKH || k.maKH || '—'}</b> · Mã VĐ trả: <b>{k.maVDTraHang || '(chưa có)'}</b>
+          KH: <b>{k.tenKH || k.maKH || '—'}</b> · Mã VĐ trả: <b>{k.maVDTraHang
+            ? <span style={{ cursor: 'pointer', textDecoration: 'underline', color: '#1E3A8A' }}
+                onClick={() => (window as any).openVanDonDetail?.(k.maVDTraHang)}>{k.maVDTraHang}</span>
+            : '(chưa có)'}</b>
         </div>
         {k.daNhanHangKN && k.ngayNhanKN && (
           <div className="ac-meta" style={{ fontSize: 12 }}>
@@ -498,7 +508,8 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
         {baoOpen && (
           <>
             <div className="ac-meta" style={{ marginTop: 10 }}>
-              Bao <b>{baoOpen.maBao}</b> · Line {LINE_LABEL[baoOpen.line] || baoOpen.line} · Đã về: <b>{baoOpen.daVe}/{baoOpen.soKien}</b> kiện
+              Bao <b><span style={{ cursor: 'pointer', textDecoration: 'underline', color: '#1E3A8A' }}
+                onClick={() => (window as any).openBaoDetail?.(baoOpen.maBao)}>{baoOpen.maBao}</span></b> · Line {LINE_LABEL[baoOpen.line] || baoOpen.line} · Đã về: <b>{baoOpen.daVe}/{baoOpen.soKien}</b> kiện
             </div>
             <div className="form-field" style={{ marginTop: 8 }}>
               <label>Bắn mã vận đơn (nhận từng kiện)</label>
@@ -518,7 +529,8 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
               <tbody>
                 {baoOpen.kien.map((k) => (
                   <tr key={k.maVD}>
-                    <td><b>{k.maVD}</b></td>
+                    <td><b><span style={{ cursor: 'pointer', textDecoration: 'underline', color: '#1E3A8A' }}
+                      onClick={() => (window as any).openVanDonDetail?.(k.maVD)}>{k.maVD}</span></b></td>
                     <td style={{ cursor: 'pointer', textDecoration: 'underline', color: '#1E3A8A' }}
                       onClick={() => (window as any).openOrderDetail?.(k.maDH)}>{k.maDH}</td>
                     <td><span className={`status-badge ${KIEN_CLASS[k.trangThai] || 's-waiting'}`}>{KIEN_LABEL[k.trangThai] || k.trangThai}</span></td>
@@ -553,10 +565,14 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
           <tbody>
             {kienList.map((k) => (
               <tr key={`${k.maDH}-${k.maVD}`}>
-                <td><b>{k.maVD}</b></td>
+                <td><b><span style={{ cursor: 'pointer', textDecoration: 'underline', color: '#1E3A8A' }}
+                  onClick={() => (window as any).openVanDonDetail?.(k.maVD)}>{k.maVD}</span></b></td>
                 <td style={{ cursor: 'pointer', textDecoration: 'underline', color: '#1E3A8A' }}
                   onClick={() => (window as any).openOrderDetail?.(k.maDH)}>{k.maDH}</td>
-                <td>{k.maBao || '—'}</td>
+                <td>{k.maBao
+                  ? <span style={{ cursor: 'pointer', textDecoration: 'underline', color: '#1E3A8A' }}
+                      onClick={() => (window as any).openBaoDetail?.(k.maBao)}>{k.maBao}</span>
+                  : '—'}</td>
                 <td><span className={`status-badge ${KIEN_CLASS[k.trangThai] || 's-waiting'}`}>{KIEN_LABEL[k.trangThai] || k.trangThai}</span></td>
                 <td>{k.ngayVeVN ? formatDate(k.ngayVeVN) : '—'}</td>
                 <td>{k.ngayGiao ? formatDate(k.ngayGiao) : '—'}</td>
@@ -770,6 +786,9 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
       </div>
 
       <OrderDetailModalHost canSeeMoney={false} />
+      {/* Bấm mã bao / mã vận đơn (kể cả mã VĐ hàng khiếu nại trả) để mở chi tiết. */}
+      <BaoDetailModalHost />
+      <VanDonDetailModalHost />
       <ImageUploadModalHost />
     </AppShell>
   );

@@ -3,6 +3,8 @@ import { prisma } from '@/lib/db';
 import { getNumber } from '@/lib/settings';
 import AppShell from '@/components/AppShell';
 import GioMuaHoClient from './GioMuaHoClient';
+import NhanVienDetailModalHost from '@/components/NhanVienDetailModal';
+import OrderDetailModalHost from '@/components/OrderDetailModal';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,12 +41,19 @@ export default async function GioMuaHoPage() {
     note: r.note || '',
     ghiChuRiengTu: r.ghiChuRiengTu || '',
     nguoiThem: r.nhanVien?.hoTen || '',
+    nvId: r.nvId ?? null,
     createdAt: r.createdAt.toISOString(),
   }));
 
   return (
     <AppShell user={user} title={`Giỏ mua hộ (${items.length})`}>
       <GioMuaHoClient items={items} tyGia={tyGia} isAdmin={user.vaiTro === 'Admin'} />
+      {/* Cột "Người thêm" (chỉ Admin) bấm mở chi tiết NV; modal NV có thể mở tiếp đơn → cần Order host, đặt SAU. */}
+      <NhanVienDetailModalHost />
+      <OrderDetailModalHost
+        canSeeMoney={['Admin', 'CSKH', 'KeToan'].includes(user.vaiTro)}
+        canSeeProfit={['Admin', 'KeToan', 'GDV', 'MuaHang'].includes(user.vaiTro)}
+      />
     </AppShell>
   );
 }

@@ -13,7 +13,7 @@ type Item = {
   id: number; source: string; productId: string; productUrl: string; title: string; titleVi?: string; danhMuc?: string; ghiChuRiengTu?: string;
   image: string; priceText: string; priceValue: number | null; currency: string;
   quantity: number; minQuantity: number; skuText: string; note: string;
-  nguoiThem: string; createdAt: string;
+  nguoiThem: string; nvId: number | null; createdAt: string;
 };
 
 const SOURCE_BADGE: Record<string, { label: string; bg: string; color: string }> = {
@@ -138,7 +138,9 @@ export default function GioMuaHoClient({ items, tyGia, isAdmin }: { items: Item[
                     <td className="number">{it.quantity}{it.minQuantity > 1 && <span style={{ color: 'var(--text-faint)', fontSize: 11 }}> /MOQ{it.minQuantity}</span>}</td>
                     <td className="number">{it.priceText || (it.priceValue != null ? it.priceValue : '-')}</td>
                     <td className="number">{it.priceValue != null ? vnd(estVnd) : '-'}</td>
-                    {isAdmin && <td>{it.nguoiThem || '-'}</td>}
+                    {isAdmin && <td>{it.nvId != null && it.nguoiThem
+                      ? <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openNhanVienDetail?.(String(it.nvId))}>{it.nguoiThem}</span>
+                      : (it.nguoiThem || '-')}</td>}
                     <td>{formatDate(it.createdAt)}</td>
                     <td>
                       <button className="erp-iconbtn rm" title="Xoá khỏi giỏ" onClick={() => del(it)}><FiTrash2 /></button>

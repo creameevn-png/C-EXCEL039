@@ -139,9 +139,9 @@ export default function MuaHangClient({ nguonHang, ncc }: { nguonHang: Nguon[]; 
             <tbody>
               {filteredNguon.map((n) => (
                 <tr key={n.id}>
-                  <td>{n.tenSP} {n.linkTaobao && <a href={n.linkTaobao} target="_blank" className="icon-inline" style={{ color: 'var(--primary)' }}><FiExternalLink /></a>}</td>
+                  <td><span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openProductDetail?.(String(n.id))}>{n.tenSP}</span> {n.linkTaobao && <a href={n.linkTaobao} target="_blank" className="icon-inline" style={{ color: 'var(--primary)' }}><FiExternalLink /></a>}</td>
                   <td>{n.danhMuc || '-'}</td>
-                  <td>{n.tenNCC || '-'}</td>
+                  <td>{n.tenNCC ? <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openNccDetail?.(n.tenNCC)}>{n.tenNCC}</span> : '-'}</td>
                   <td className="number">{n.giaNDT ? formatNDT(n.giaNDT) : '-'}</td>
                   <td className="number">{n.moq}</td>
                   <td>{n.thoiGianGiao || '-'}</td>
@@ -173,8 +173,10 @@ export default function MuaHangClient({ nguonHang, ncc }: { nguonHang: Nguon[]; 
             <tbody>
               {filteredNcc.map((n) => (
                 <tr key={n.id}>
-                  <td className="ma-don">{n.maNCC || '-'}</td>
-                  <td>{n.tenNCC}</td>
+                  <td className="ma-don">{n.maNCC
+                    ? <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openNccDetail?.(n.maNCC)}>{n.maNCC}</span>
+                    : '-'}</td>
+                  <td><span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openNccDetail?.(n.tenNCC)}>{n.tenNCC}</span></td>
                   <td>{n.wechat || '-'}</td>
                   <td>{n.ghiChu || '-'}</td>
                   <td>

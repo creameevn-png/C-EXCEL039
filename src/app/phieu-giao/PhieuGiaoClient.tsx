@@ -164,7 +164,7 @@ export default function PhieuGiaoClient({ user, candidates, phieus }:
           <tbody>
             {phieus.map((p) => (
               <tr key={p.maPhieu}>
-                <td className="ma-don">{p.maPhieu}</td>
+                <td className="ma-don"><span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openPhieuGiaoDetail?.(p.maPhieu)}>{p.maPhieu}</span></td>
                 <td>{formatDate(p.createdAt)}</td>
                 <td>{p.maKH ? (
                   <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(p.maKH)}>{p.maKH} - {p.tenKH}</span>

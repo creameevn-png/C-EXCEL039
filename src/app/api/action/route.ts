@@ -1876,6 +1876,239 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     });
   },
 
+  // ============== BAO TỔNG (drill-down mã bao) ==============
+  // Kho TQ/VN, CSKH, Kế toán tra 1 bao: gồm đơn nào, kiện nào, tổng cân. Không tiền nhạy cảm.
+  async getBaoDetail(args, user) {
+    if (!allow(user.vaiTro, ['KhoTQ', 'KhoVN', 'CSKH', 'KeToan'])) return err('Không có quyền');
+    const maBao = String(args[0] || '').trim();
+    if (!maBao) return err('Thiếu mã bao');
+    const bao = await prisma.baoTong.findUnique({ where: { maBao } });
+    if (!bao) return err('Không tìm thấy bao: ' + maBao);
+    const orders = await prisma.donHang.findMany({
+      where: { maBao },
+      orderBy: { ngayTao: 'asc' },
+      select: { maDH: true, trangThai: true, tongKg: true, tongM3: true }
+    });
+    const kien = await prisma.kienHang.findMany({
+      where: { maBao },
+      orderBy: [{ maDH: 'asc' }, { maVD: 'asc' }],
+      select: { maDH: true, maVD: true, kg: true, m3: true, trangThai: true }
+    });
+    return ok({
+      data: {
+        maBao: bao.maBao,
+        line: bao.line,
+        trangThai: bao.trangThai,
+        tongKg: bao.tongKg,
+        tongM3: bao.tongM3,
+        soKien: bao.soKien,
+        ghiChu: bao.ghiChu || '',
+        nguoiTao: bao.nguoiTao || '',
+        nguoiNhanVN: bao.nguoiNhanVN || '',
+        createdAt: bao.createdAt.toISOString(),
+        xuatAt: bao.xuatAt ? bao.xuatAt.toISOString() : null,
+        veVNAt: bao.veVNAt ? bao.veVNAt.toISOString() : null,
+        orders: orders.map((o) => ({ maDH: o.maDH, trangThai: o.trangThai, tongKg: o.tongKg, tongM3: o.tongM3 })),
+        kien: kien.map((k) => ({ maDH: k.maDH, maVD: k.maVD, kg: k.kg, m3: k.m3, trangThai: k.trangThai }))
+      }
+    });
+  },
+
+  // ============== VẬN ĐƠN / KIỆN (drill-down mã VĐ) ==============
+  // Một mã VĐ có thể gắn nhiều kiện (mỗi đơn 1 kiện). Kho TQ giấu danh tính khách.
+  async getVanDonDetail(args, user) {
+    if (!allow(user.vaiTro, ['KhoTQ', 'KhoVN', 'GDV', 'MuaHang', 'CSKH', 'KeToan'])) return err('Không có quyền');
+    const maVD = String(args[0] || '').trim();
+    if (!maVD) return err('Thiếu mã vận đơn');
+    const canSeeTenKH = user.vaiTro !== 'KhoTQ';
+    const kien = await prisma.kienHang.findMany({
+      where: { maVD },
+      orderBy: { maDH: 'asc' },
+      select: { maDH: true, maVD: true, kg: true, m3: true, trangThai: true, maBao: true, ngayVeVN: true, ngayGiao: true }
+    });
+    // Hàng "vô chủ": mã VĐ về kho TQ nhưng chưa khớp đơn nào.
+    const voChu = await prisma.hangVoChu.findMany({
+      where: { maVD, daGan: false },
+      select: { id: true, kg: true, m3: true, maDH: true, ghiChu: true }
+    });
+    if (kien.length === 0 && voChu.length === 0) return err('Không tìm thấy kiện theo mã VĐ: ' + maVD);
+    // Lấy tên khách của các đơn liên quan (ẩn với Kho TQ).
+    const maDHs = Array.from(new Set(kien.map((k) => k.maDH)));
+    const donMap = new Map<string, { maKH: string; tenKH: string }>();
+    if (canSeeTenKH && maDHs.length) {
+      const dons = await prisma.donHang.findMany({
+        where: { maDH: { in: maDHs } },
+        select: { maDH: true, maKH: true, khachHang: { select: { tenKH: true } } }
+      });
+      for (const d of dons) donMap.set(d.maDH, { maKH: d.maKH, tenKH: d.khachHang?.tenKH || '' });
+    }
+    return ok({
+      data: {
+        maVD,
+        kien: kien.map((k) => ({
+          maDH: k.maDH,
+          maKH: canSeeTenKH ? (donMap.get(k.maDH)?.maKH || '') : '',
+          tenKH: canSeeTenKH ? (donMap.get(k.maDH)?.tenKH || '') : '',
+          kg: k.kg, m3: k.m3, trangThai: k.trangThai, maBao: k.maBao || '',
+          ngayVeVN: k.ngayVeVN ? k.ngayVeVN.toISOString() : null,
+          ngayGiao: k.ngayGiao ? k.ngayGiao.toISOString() : null
+        })),
+        voChu: voChu.map((v) => ({ id: v.id, kg: v.kg, m3: v.m3, maDH: v.maDH || '', ghiChu: v.ghiChu || '' }))
+      }
+    });
+  },
+
+  // ============== KHIẾU NẠI (drill-down mã KN) ==============
+  // CSKH xử lý KN nên xem được; không có giá vốn ở đây.
+  async getKhieuNaiDetail(args, user) {
+    if (!allow(user.vaiTro, ['CSKH', 'KeToan', 'GDV', 'MuaHang'])) return err('Không có quyền');
+    const maKN = String(args[0] || '').trim();
+    if (!maKN) return err('Thiếu mã khiếu nại');
+    const kn = await prisma.khieuNai.findUnique({ where: { maKN } });
+    if (!kn) return err('Không tìm thấy khiếu nại: ' + maKN);
+    return ok({
+      data: {
+        maKN: kn.maKN,
+        ngayTao: kn.ngayTao.toISOString(),
+        maDH: kn.maDH || '',
+        maKH: kn.maKH || '',
+        nguoiTao: kn.nguoiTao || '',
+        loai: kn.loai,
+        trangThai: kn.trangThai,
+        moTa: kn.moTa || '',
+        phuongAn: kn.phuongAn || '',
+        soTienHoan: kn.soTienHoan,
+        phiDoiTra: kn.phiDoiTra,
+        hoanVi: kn.hoanVi,
+        daHoanVi: kn.daHoanVi,
+        quyChiuPhi: kn.quyChiuPhi || '',
+        doiTacNCC: kn.doiTacNCC || '',
+        maVDTraHang: kn.maVDTraHang || '',
+        chuyenKhoVN: kn.chuyenKhoVN,
+        daNhanHangKN: kn.daNhanHangKN,
+        ngayNhanKN: kn.ngayNhanKN ? kn.ngayNhanKN.toISOString() : null,
+        ghiChuXuLy: kn.ghiChuXuLy || '',
+        anhBangChung: kn.anhBangChung || '',
+        duyetCap1By: kn.duyetCap1By || '',
+        duyetCap1At: kn.duyetCap1At ? kn.duyetCap1At.toISOString() : null,
+        duyetCap2By: kn.duyetCap2By || '',
+        duyetCap2At: kn.duyetCap2At ? kn.duyetCap2At.toISOString() : null
+      }
+    });
+  },
+
+  // ============== NHÀ CUNG CẤP / NCC (drill-down) ==============
+  // NCC nối bằng TÊN (chưa FK). Khóa nhận cả tên NCC lẫn mã NCC.
+  // Công nợ NCC chỉ MuaHang/KeToan/Admin xem; GDV thấy NCC nhưng ẩn tiền.
+  async getNccDetail(args, user) {
+    if (!allow(user.vaiTro, ['MuaHang', 'GDV', 'KeToan'])) return err('Không có quyền');
+    const khoa = String(args[0] || '').trim();
+    if (!khoa) return err('Thiếu khóa NCC');
+    const canSeeMoney = allow(user.vaiTro, ['MuaHang', 'KeToan']);
+    // Tìm theo mã NCC trước, không có thì theo tên (nối fuzzy bằng tên).
+    let ncc = await prisma.nCC.findFirst({ where: { maNCC: khoa } });
+    if (!ncc) ncc = await prisma.nCC.findFirst({ where: { tenNCC: khoa } });
+    // Có thể NCC chỉ tồn tại dưới dạng tên trong nguồn hàng (chưa lập hồ sơ NCC).
+    const ten = ncc?.tenNCC || khoa;
+    const nguon = await prisma.nguonHang.findMany({
+      where: { tenNCC: ten },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      select: { id: true, tenSP: true, danhMuc: true, linkTaobao: true, giaNDT: true, moq: true, chatLuong: true }
+    });
+    if (!ncc && nguon.length === 0) return err('Không tìm thấy nhà cung cấp: ' + khoa);
+    // Công nợ NCC = Σ PhatSinh − Σ ThanhToan (theo doiTac = tên NCC).
+    let congNo = 0;
+    let soCongNoDong = 0;
+    if (canSeeMoney) {
+      const rows = await prisma.congNoNCC.findMany({
+        where: { doiTac: ten },
+        select: { loai: true, soTien: true }
+      });
+      soCongNoDong = rows.length;
+      congNo = rows.reduce((s, r) => s + (r.loai === 'ThanhToan' ? -r.soTien : r.soTien), 0);
+    }
+    return ok({
+      data: {
+        tenNCC: ten,
+        maNCC: ncc?.maNCC || '',
+        wechat: ncc?.wechat || '',
+        ghiChu: ncc?.ghiChu || '',
+        coHoSo: !!ncc,
+        congNo: canSeeMoney ? Math.round(congNo) : 0,
+        soCongNoDong,
+        canSeeMoney,
+        nguonHang: nguon.map((n) => ({
+          id: n.id, tenSP: n.tenSP, danhMuc: n.danhMuc || '',
+          linkTaobao: n.linkTaobao || '', giaNDT: n.giaNDT ?? null,
+          moq: n.moq, chatLuong: n.chatLuong ?? null
+        }))
+      }
+    });
+  },
+
+  // ============== SẢN PHẨM / NGUỒN HÀNG (drill-down) ==============
+  // SanPham có mã (maSP); NguonHang chỉ có id số. Không có giá vốn ở đây nên an toàn.
+  async getProductDetail(args, user) {
+    if (!allow(user.vaiTro, ['CSKH', 'GDV', 'MuaHang', 'KeToan'])) return err('Không có quyền');
+    const khoa = String(args[0] || '').trim();
+    if (!khoa) return err('Thiếu khóa sản phẩm');
+    // Ưu tiên tra theo mã SP (SanPham); nếu khóa là số thì thử nguồn hàng theo id.
+    const sp = await prisma.sanPham.findUnique({ where: { maSP: khoa } });
+    if (sp) {
+      return ok({
+        data: {
+          loai: 'SanPham',
+          maSP: sp.maSP, tenSP: sp.tenSP, danhMuc: sp.danhMuc || '',
+          webNguon: sp.webNguon || '', kgGoiY: sp.kgGoiY, m3GoiY: sp.m3GoiY,
+          giaThamKhao: sp.giaThamKhao, linkTaobao: sp.linkTaobao || '', ghiChu: sp.ghiChu || ''
+        }
+      });
+    }
+    if (/^\d+$/.test(khoa)) {
+      const n = await prisma.nguonHang.findUnique({ where: { id: Number(khoa) } });
+      if (n) {
+        return ok({
+          data: {
+            loai: 'NguonHang',
+            id: n.id, tenSP: n.tenSP, danhMuc: n.danhMuc || '', tenNCC: n.tenNCC || '',
+            linkTaobao: n.linkTaobao || '', giaNDT: n.giaNDT ?? null, moq: n.moq,
+            thoiGianGiao: n.thoiGianGiao || '', chatLuong: n.chatLuong ?? null, ghiChu: n.ghiChu || ''
+          }
+        });
+      }
+    }
+    return err('Không tìm thấy sản phẩm: ' + khoa);
+  },
+
+  // ============== NHÂN VIÊN / GDV (drill-down hiệu suất) ==============
+  // CSKH/Kế toán xem hiệu suất NV: số đơn phụ trách + danh sách đơn (maDH bấm được).
+  // MASK: KHÔNG trả tiền khách; chỉ maDH + trạng thái.
+  async getNhanVienDetail(args, user) {
+    if (!allow(user.vaiTro, ['CSKH', 'KeToan'])) return err('Không có quyền');
+    const id = Math.trunc(Number(args[0]));
+    if (!id || id <= 0) return err('Thiếu id nhân viên');
+    const nv = await prisma.nhanVien.findUnique({ where: { id } });
+    if (!nv) return err('Không tìm thấy nhân viên');
+    const orders = await prisma.donHang.findMany({
+      where: { gdvId: id },
+      orderBy: { ngayTao: 'desc' },
+      take: 100,
+      select: { maDH: true, trangThai: true, ngayTao: true }
+    });
+    const tongDon = await prisma.donHang.count({ where: { gdvId: id } });
+    return ok({
+      data: {
+        id: nv.id,
+        hoTen: nv.hoTen,
+        vaiTro: nv.vaiTro,
+        trangThai: nv.trangThai,
+        tongDon,
+        orders: orders.map((o) => ({ maDH: o.maDH, trangThai: o.trangThai, ngayTao: o.ngayTao.toISOString() }))
+      }
+    });
+  },
+
   // Chi tiết đơn PHÍA KHÁCH (trang tra-cuu công khai). Xác thực lại bằng
   // maKH + 4 số cuối SĐT (KHÔNG dùng session) và đơn phải thuộc chính KH đó.
   // Chỉ trả thông tin khách được xem: KHÔNG có giá vốn (¥)/lợi nhuận/đơn giá NDT.

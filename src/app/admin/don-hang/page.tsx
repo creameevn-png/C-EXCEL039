@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import AppShell from '@/components/AppShell';
 import OrderDetailModalHost from '@/components/OrderDetailModal';
 import CustomerDetailModalHost from '@/components/CustomerDetailModal';
+import VanDonDetailModalHost from '@/components/VanDonDetailModal';
 import DonHangTable from './DonHangTable';
 import { statusToClass, statusToLabel } from '@/lib/status';
 
@@ -53,6 +54,7 @@ export default async function AdminDonHangPage({ searchParams }: { searchParams:
       </div>
       <CustomerDetailModalHost canSeeMoney />
       <OrderDetailModalHost canSeeMoney={true} />
+      <VanDonDetailModalHost />
     </AppShell>
   );
 }

@@ -28,6 +28,7 @@ type OrderDetail = {
   maGD: string | null;
   maVD: string | null;
   nvName: string;
+  gdvTen?: string;
   tongKg: number;
   tongM3: number;
   pctCoc: number;
@@ -214,6 +215,7 @@ export default function OrderDetailModalHost({ canSeeMoney, canSeeProfit = false
                 <div><b>Mã GD:</b> {data.maGD || '(chưa có)'}</div>
                 <div><b>Mã VĐ:</b> {data.maVD || '(chưa có)'}</div>
                 <div><b>NV tạo:</b> {data.nvName || '-'}</div>
+                {data.gdvTen && <div><b>GDV phụ trách:</b> {data.gdvTen}</div>}
               </div>
 
               {data.ghiChu && (

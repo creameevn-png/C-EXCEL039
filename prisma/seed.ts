@@ -9,9 +9,9 @@ async function main() {
   const users: Array<{ email: string; hoTen: string; vaiTro: VaiTro }> = [
     { email: 'admin@demo.vn', hoTen: 'Quản trị viên', vaiTro: 'Admin' },
     { email: 'cskh@demo.vn', hoTen: 'Nhân viên CSKH', vaiTro: 'CSKH' },
-    { email: 'gdv@demo.vn', hoTen: 'Giao dịch viên', vaiTro: 'GDV' },
+    { email: 'gdv@demo.vn', hoTen: 'GDV 1', vaiTro: 'GDV' },
     { email: 'ketoan@demo.vn', hoTen: 'Kế toán', vaiTro: 'KeToan' },
-    { email: 'muahang@demo.vn', hoTen: 'Nhân viên Mua hàng', vaiTro: 'MuaHang' },
+    { email: 'muahang@demo.vn', hoTen: 'GDV 2', vaiTro: 'MuaHang' },
     { email: 'khotq@demo.vn', hoTen: 'Nhân viên Kho TQ', vaiTro: 'KhoTQ' },
     { email: 'khovn@demo.vn', hoTen: 'Nhân viên Kho VN', vaiTro: 'KhoVN' },
     { email: 'kh001@gmail.com', hoTen: 'Anh Tuấn', vaiTro: 'Customer' }

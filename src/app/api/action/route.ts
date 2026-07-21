@@ -1726,6 +1726,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       where: { maDH },
       include: {
         nv: true,
+        gdv: true,
         khachHang: true,
         chiTiet: { orderBy: { stt: 'asc' } },
         payments: { orderBy: { ngay: 'asc' } }
@@ -1758,6 +1759,8 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         trangThai: o.trangThai,
         maGD: o.maGD, maVD: o.maVD,
         nvName: o.nv?.hoTen || o.nvTao || '',
+        // GDV phụ trách hiện theo TÊN NGƯỜI (tài khoản), không phải tên vai. Khách (Customer) không xem nhân sự nội bộ.
+        gdvTen: user?.vaiTro !== 'Customer' ? (o.gdv?.hoTen || '') : '',
         tongKg: o.tongKg, tongM3: o.tongM3,
         pctCoc: o.pctCoc,
         chiTiet: o.chiTiet.map((c) => ({

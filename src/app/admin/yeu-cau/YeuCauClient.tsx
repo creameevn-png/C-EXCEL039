@@ -90,7 +90,7 @@ export default function YeuCauClient({ list }: { list: YC[] }) {
             <div className="ac-title">{y.maYC}</div>
             <span className={`status-badge ${YC_CLASS[y.trangThai] || 's-new'}`}>{YC_LABEL[y.trangThai] || y.trangThai}</span>
           </div>
-          <div className="ac-meta icon-inline"><FiUser /> {y.hoTen} · <FiPhone /> {y.sdt}{y.maKH && <> · KH: <b>{y.maKH}</b></>} · {y.tuyen === 'HCM' ? 'HCM' : 'Hà Nội'}</div>
+          <div className="ac-meta icon-inline"><FiUser /> {y.hoTen} · <FiPhone /> {y.sdt}{y.maKH && <> · KH: <b style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={(e) => { e.stopPropagation(); (window as any).openCustomerDetail?.(y.maKH); }}>{y.maKH}</b></>} · {y.tuyen === 'HCM' ? 'HCM' : 'Hà Nội'}</div>
           <div className="ac-meta" style={{ marginTop: 6 }}>{formatDateTime(y.ngayTao)} · <b>{y.sanPham.length} sản phẩm</b>{y.maDH && <> · Đơn: <b style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={(e) => { e.stopPropagation(); (window as any).openOrderDetail?.(y.maDH); }}>{y.maDH}</b></>}</div>
           {y.ghiChu && <div className="ac-meta icon-inline" style={{ marginTop: 4, color: '#334155' }}><FiFileText /> {y.ghiChu.slice(0, 160)}</div>}
           <div className="ac-actions">
@@ -113,7 +113,7 @@ export default function YeuCauClient({ list }: { list: YC[] }) {
                 <div style={{ background: 'var(--surface-2)', padding: 12, borderRadius: 8, marginBottom: 12, fontSize: 13 }}>
                   <div className="icon-inline"><FiUser /> <b>{editing.hoTen}</b> · <FiPhone /> <a href={`tel:${editing.sdt}`} style={{ color: 'var(--primary)', fontWeight: 600 }}>{editing.sdt}</a>{editing.email && <> · {editing.email}</>}</div>
                   <div style={{ marginTop: 4, color: 'var(--text-muted)' }}>
-                    {editing.maKH && <>Mã KH: <b>{editing.maKH}</b> · </>}
+                    {editing.maKH && <>Mã KH: <b style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(editing.maKH)}>{editing.maKH}</b> · </>}
                     Tuyến: <b>{editing.tuyen === 'HCM' ? 'HCM' : 'Hà Nội'}</b> · {formatDateTime(editing.ngayTao)}
                   </div>
                 </div>

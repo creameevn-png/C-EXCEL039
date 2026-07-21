@@ -11,13 +11,14 @@ import AppShell from '@/components/AppShell';
 import Tabs from '@/components/Tabs';
 import Combobox from '@/components/Combobox';
 import OrderDetailModalHost from '@/components/OrderDetailModal';
+import CustomerDetailModalHost from '@/components/CustomerDetailModal';
 import { showToast } from '@/components/Toast';
 import { callServer, reload } from '@/lib/client';
 import { fmtVND, shortMoney, formatDateTime } from '@/lib/format';
 import { statusToClass, statusToLabel } from '@/lib/status';
 
 type Pending = {
-  maDH: string; tenKH: string; maGD: string; nv: string;
+  maDH: string; maKH: string; tenKH: string; maGD: string; nv: string;
   tongTien: number; daTra: number; conLai: number; phiKhieuNai: number; trangThai: string;
 };
 type Cust = { maKH: string; tenKH: string; soDuVi: number };
@@ -174,7 +175,9 @@ export default function KeToanClient({ user, pendingPayments, customers, walletT
               onClick={() => (window as any).openOrderDetail?.(o.maDH)}>{o.maDH}</div>
             <span className={`status-badge ${statusToClass(o.trangThai)}`}>{statusToLabel(o.trangThai)}</span>
           </div>
-          <div className="ac-meta">KH: <b>{o.tenKH}</b> · Mã GD: <b>{o.maGD || '(chưa có)'}</b> · NV: {o.nv}</div>
+          <div className="ac-meta">KH: <b>{o.maKH
+            ? <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(o.maKH)}>{o.tenKH}</span>
+            : o.tenKH}</b> · Mã GD: <b>{o.maGD || '(chưa có)'}</b> · NV: {o.nv}</div>
           <div className="ac-amount">
             <div>Tổng tiền: <b>{fmtVND(o.tongTien)}đ</b></div>
             <div>Đã trả: <b className="text-success">{fmtVND(o.daTra)}đ</b></div>
@@ -279,7 +282,9 @@ export default function KeToanClient({ user, pendingPayments, customers, walletT
               {walletTxns.map((t) => (
                 <tr key={t.id}>
                   <td>{formatDateTime(t.ngay)}</td>
-                  <td>{t.tenKH}<br /><span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{t.maKH}</span></td>
+                  <td>{t.maKH
+                    ? <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(t.maKH)}>{t.tenKH}</span>
+                    : t.tenKH}<br /><span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{t.maKH}</span></td>
                   <td>
                     <span className={`status-badge ${t.loai === 'Nap' ? 's-paid' : 's-cancel'}`}>{t.loai === 'Nap' ? 'Nạp +' : 'Trừ −'}</span>
                   </td>
@@ -315,7 +320,9 @@ export default function KeToanClient({ user, pendingPayments, customers, walletT
               onClick={() => (window as any).openOrderDetail?.(o.maDH)}>{o.maDH}</div>
             <span className="status-badge s-waiting">Chờ duyệt</span>
           </div>
-          <div className="ac-meta">KH: <b>{o.tenKH}</b> · Mã KH: <b>{o.maKH}</b> · Người tạo đơn: {o.nguoiTao || '-'} · {formatDateTime(o.ngayTao)}</div>
+          <div className="ac-meta">KH: <b>{o.tenKH}</b> · Mã KH: <b>{o.maKH
+            ? <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(o.maKH)}>{o.maKH}</span>
+            : '-'}</b> · Người tạo đơn: {o.nguoiTao || '-'} · {formatDateTime(o.ngayTao)}</div>
           <div className="icon-inline" style={{ background: '#FEF3C7', color: '#92400e', padding: 10, borderRadius: 6, margin: '10px 0', fontSize: 14 }}>
             <FiDollarSign /> <b>Phí phát sinh chờ duyệt: {fmtVND(o.phiPhatSinh)}đ</b>
           </div>
@@ -421,7 +428,9 @@ export default function KeToanClient({ user, pendingPayments, customers, walletT
                     {r.noiDung || '-'}
                     {(r.maDH || r.maKH) && <span style={{ fontSize: 10, color: 'var(--text-faint)' }}><br />
                       {r.maDH && <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openOrderDetail?.(r.maDH)}>{r.maDH}</span>}
-                      {r.maDH && r.maKH ? ' · ' : ''}{r.maKH || ''}</span>}
+                      {r.maDH && r.maKH ? ' · ' : ''}{r.maKH
+                        ? <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(r.maKH)}>{r.maKH}</span>
+                        : ''}</span>}
                   </td>
                   <td style={{ fontSize: 11 }}>{r.nguoiTao || '-'}</td>
                   <td>
@@ -470,7 +479,9 @@ export default function KeToanClient({ user, pendingPayments, customers, walletT
                     {r.noiDung || '-'}
                     {(r.maDH || r.maKH) && <span style={{ fontSize: 10, color: 'var(--text-faint)' }}><br />
                       {r.maDH && <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openOrderDetail?.(r.maDH)}>{r.maDH}</span>}
-                      {r.maDH && r.maKH ? ' · ' : ''}{r.maKH || ''}</span>}
+                      {r.maDH && r.maKH ? ' · ' : ''}{r.maKH
+                        ? <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(r.maKH)}>{r.maKH}</span>
+                        : ''}</span>}
                   </td>
                   <td style={{ fontSize: 11 }}>{r.nguoiTao || '-'}</td>
                 </tr>
@@ -518,6 +529,7 @@ export default function KeToanClient({ user, pendingPayments, customers, walletT
         { id: 'wallet', label: <><FiDollarSign /> Ví khách hàng</>, content: tabWallet }
       ]} />
 
+      <CustomerDetailModalHost canSeeMoney={true} />
       <OrderDetailModalHost canSeeMoney={true} />
     </AppShell>
   );

@@ -16,7 +16,7 @@ import { KN_LABEL, TRANG_THAI_LABEL, statusToLabel, statusToClass } from '@/lib/
 
 type ChiTiet = { stt: number; tenSP: string; soLuong: number; donGiaNDT: number; vonNDT: number; linkTaobao: string };
 type Pending = {
-  maDH: string; tenKH: string; web: string; tongKg: number; tuyen: string;
+  maDH: string; maKH: string; tenKH: string; web: string; tongKg: number; tuyen: string;
   tongTien: number; daTra: number; tenHang: string;
   maGD: string; maVD: string; trangThai: string;
   gdvId: number | null; gdvTen: string;
@@ -267,7 +267,7 @@ export default function GdvClient({ user, pendingOrders, allOrders, khieuNai }: 
         </div>
         {isDeposit ? (
           <>
-            <div className="ac-meta">KH: <b>{o.tenKH}</b> · Web: <b>{o.web}</b> · {o.tongKg}kg · {o.tuyen === 'HCM' ? 'HCM' : 'Hà Nội'}</div>
+            <div className="ac-meta">KH: <b>{o.maKH ? <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(o.maKH)}>{o.tenKH}</span> : o.tenKH}</b> · Web: <b>{o.web}</b> · {o.tongKg}kg · {o.tuyen === 'HCM' ? 'HCM' : 'Hà Nội'}</div>
             <div className="ac-amount">
               <div>Tổng tiền: <b>{fmtVND(o.tongTien)}đ</b></div>
               <div>Đã cọc: <b style={{ color: '#059669' }}>{fmtVND(o.daTra)}đ</b></div>
@@ -275,7 +275,7 @@ export default function GdvClient({ user, pendingOrders, allOrders, khieuNai }: 
             <div className="ac-meta icon-inline" style={{ marginTop: 8 }}><FiFileText /><b>Hàng:</b> {o.tenHang}</div>
           </>
         ) : (
-          <div className="ac-meta">KH: <b>{o.tenKH}</b> · Web: <b>{o.web}</b> · Mã GD: <b>{o.maGD || '(chưa có)'}</b></div>
+          <div className="ac-meta">KH: <b>{o.maKH ? <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(o.maKH)}>{o.tenKH}</span> : o.tenKH}</b> · Web: <b>{o.web}</b> · Mã GD: <b>{o.maGD || '(chưa có)'}</b></div>
         )}
         {gdvPhuTrach(o)}
         {isDeposit ? (
@@ -386,8 +386,8 @@ export default function GdvClient({ user, pendingOrders, allOrders, khieuNai }: 
                   <span style={{ cursor: 'pointer', color: 'var(--primary)', textDecoration: 'underline' }}
                     onClick={() => (window as any).openOrderDetail?.(o.maDH)}>{o.maDH}</span>
                 </td>
-                <td>{o.maKH}</td>
-                <td>{o.tenKH}</td>
+                <td>{o.maKH ? <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(o.maKH)}>{o.maKH}</span> : '-'}</td>
+                <td>{o.maKH ? <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(o.maKH)}>{o.tenKH}</span> : o.tenKH}</td>
                 <td>{o.maVD || '-'}</td>
                 <td><span className={`status-badge ${statusToClass(o.trangThai)}`}>{statusToLabel(o.trangThai)}</span></td>
                 <td className="number">{fmtVND(o.tongTien)}đ</td>
@@ -414,7 +414,7 @@ export default function GdvClient({ user, pendingOrders, allOrders, khieuNai }: 
             </span>
           </div>
           <div className="ac-meta">
-            Loại: <b>{KN_LOAI[k.loai] || k.loai}</b> · Đơn: <b>{k.maDH ? <span style={{ cursor: 'pointer', color: 'var(--primary)', textDecoration: 'underline' }} onClick={() => (window as any).openOrderDetail?.(k.maDH)}>{k.maDH}</span> : '-'}</b> · KH: <b>{k.tenKH || k.maKH || '-'}</b> · {fmtDateDDMM(k.ngayTao)}
+            Loại: <b>{KN_LOAI[k.loai] || k.loai}</b> · Đơn: <b>{k.maDH ? <span style={{ cursor: 'pointer', color: 'var(--primary)', textDecoration: 'underline' }} onClick={() => (window as any).openOrderDetail?.(k.maDH)}>{k.maDH}</span> : '-'}</b> · KH: <b>{k.maKH ? <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(k.maKH)}>{k.tenKH || k.maKH}</span> : (k.tenKH || '-')}</b> · {fmtDateDDMM(k.ngayTao)}
           </div>
           <div style={{ background: 'var(--surface-2)', padding: 10, borderRadius: 8, margin: '10px 0', fontSize: 13 }}>
             <b>Khách phản ánh:</b> {k.moTa}

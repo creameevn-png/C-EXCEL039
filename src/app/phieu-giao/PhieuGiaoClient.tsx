@@ -166,7 +166,9 @@ export default function PhieuGiaoClient({ user, candidates, phieus }:
               <tr key={p.maPhieu}>
                 <td className="ma-don">{p.maPhieu}</td>
                 <td>{formatDate(p.createdAt)}</td>
-                <td>{p.maKH} - {p.tenKH}</td>
+                <td>{p.maKH ? (
+                  <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(p.maKH)}>{p.maKH} - {p.tenKH}</span>
+                ) : `${p.maKH} - ${p.tenKH}`}</td>
                 <td className="number">{p.soDon}</td>
                 <td className="number">{fmtVND(p.tongTien)}</td>
                 <td className="number" style={{ color: '#059669' }}>{fmtVND(p.daThu)}</td>

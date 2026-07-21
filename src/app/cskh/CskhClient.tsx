@@ -828,7 +828,9 @@ export default function CskhClient({ initial }: Props) {
                     onClick={() => (window as any).openOrderDetail?.(o.maDH)}>{o.maDH}</td>
                 <td>{fmtDateDDMM(o.ngayTao)}</td>
                 <td>
-                  {o.tenKH}
+                  {o.maKH ? (
+                    <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(o.maKH)}>{o.tenKH}</span>
+                  ) : o.tenKH}
                   {o.khachTuDat && (
                     <div><span className="status-badge" style={{ background: '#fef3c7', color: '#92400e', fontSize: 10 }}>
                       Khách tự đặt

@@ -110,7 +110,7 @@ export default function OrderDetailModalHost({ canSeeMoney, canSeeProfit = false
 
               <div style={{ background: '#F8FAFC', padding: 12, borderRadius: 8, marginBottom: 12 }}>
                 <div style={{ fontSize: 12, color: '#64748B', marginBottom: 4 }}>Khách hàng</div>
-                <div style={{ fontWeight: 700 }}>{data.maKH} - {data.tenKH}</div>
+                <div style={{ fontWeight: 700 }}>{data.maKH ? <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openCustomerDetail?.(data.maKH)}>{data.maKH}</span> : ''}{' - '}{data.tenKH}</div>
                 <div style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
                   {data.sdt && <>SĐT: {data.sdt} · </>}
                   Tuyến: <b>{data.tuyen === 'HCM' ? 'HCM' : 'Hà Nội'}</b> ·

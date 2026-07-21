@@ -1,6 +1,7 @@
 import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getSetting } from '@/lib/settings';
+import CustomerDetailModalHost from '@/components/CustomerDetailModal';
 import GdvClient from './GdvClient';
 
 export const dynamic = 'force-dynamic';
@@ -37,10 +38,14 @@ export default async function GdvPage() {
       }
     })
   ]);
-  return <GdvClient
+  return <>
+    {/* GDV/Mua hàng KHÔNG được xem tiền khách → canSeeMoney=false. Đặt trước GdvClient
+        (chứa OrderDetailModalHost) để modal đơn nổi lên trên modal khách. */}
+    <CustomerDetailModalHost canSeeMoney={false} />
+    <GdvClient
     user={user}
     pendingOrders={pending.map((o) => ({
-      maDH: o.maDH, tenKH: o.khachHang?.tenKH || '',
+      maDH: o.maDH, maKH: o.maKH, tenKH: o.khachHang?.tenKH || '',
       web: o.chiTiet[0]?.webNguon || '',
       tongKg: o.tongKg, tuyen: o.tuyen,
       tongTien: o.tongTien, daTra: o.daTra,
@@ -66,5 +71,6 @@ export default async function GdvPage() {
       trangThai: k.trangThai, phuongAn: k.phuongAn || '', ghiChuXuLy: k.ghiChuXuLy || '',
       anhBangChung: k.anhBangChung || ''
     }))}
-  />;
+  />
+  </>;
 }

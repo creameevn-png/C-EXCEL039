@@ -1827,7 +1827,11 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
   // Chi tiết 1 khách hàng + danh sách đơn (drill-down từ báo cáo/danh sách KH).
   // Staff-only (thấy tiền/công nợ). Không cho Customer/kho gọi.
   async getCustomerDetail(args, user) {
-    if (!allow(user.vaiTro, ['CSKH', 'KeToan'])) return err('Không có quyền');
+    // Interconnect: GDV/Mua hàng/Kho VN cũng mở được chi tiết khách để tra cứu nhanh
+    // (họ vốn đã thấy tên khách trong đơn), NHƯNG bị ẩn MỌI số tiền (ví/công nợ/doanh thu/
+    // tổng tiền đơn). Admin/CSKH/Kế toán xem đầy đủ. Kho TQ (giấu danh tính khách) & Customer bị chặn.
+    if (!allow(user.vaiTro, ['CSKH', 'KeToan', 'GDV', 'MuaHang', 'KhoVN'])) return err('Không có quyền');
+    const canSeeMoney = allow(user.vaiTro, ['CSKH', 'KeToan']);
     const ma = String(args[0] || '').trim().toUpperCase();
     if (!ma) return err('Thiếu mã KH');
     const kh = await prisma.khachHang.findUnique({ where: { maKH: ma } });
@@ -1856,17 +1860,17 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         sdt: canSeeLienHe ? (kh.sdt || '') : '',
         diaChi: canSeeLienHe ? (kh.diaChi || '') : '',
         tuyen: kh.tuyen,
-        soDuVi: kh.soDuVi,
-        congNo: Math.round(noAgg._sum.conLai || 0),
-        doanhThu: Math.round(dtAgg._sum.tongTien || 0),
+        soDuVi: canSeeMoney ? kh.soDuVi : 0,
+        congNo: canSeeMoney ? Math.round(noAgg._sum.conLai || 0) : 0,
+        doanhThu: canSeeMoney ? Math.round(dtAgg._sum.tongTien || 0) : 0,
         tongDon: dons.length,
         orders: dons.map((o) => ({
           maDH: o.maDH,
           ngayTao: o.ngayTao.toISOString(),
           trangThai: o.trangThai,
-          tongTien: o.tongTien,
-          daTra: o.daTra,
-          conLai: o.conLai
+          tongTien: canSeeMoney ? o.tongTien : 0,
+          daTra: canSeeMoney ? o.daTra : 0,
+          conLai: canSeeMoney ? o.conLai : 0
         }))
       }
     });

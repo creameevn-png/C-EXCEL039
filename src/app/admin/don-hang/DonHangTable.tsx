@@ -178,7 +178,13 @@ export default function DonHangTable({ orders, gdvs = [] }: { orders: Row[]; gdv
                   <span onClick={() => (window as any).openOrderDetail?.(o.maDH)}>{o.maDH}</span>
                 </td>
                 <td>{formatDate(o.ngayTao)}</td>
-                <td>{o.tenKH}<br /><span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{o.maKH}</span></td>
+                <td>
+                  {o.maKH ? (
+                    <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }}
+                      onClick={() => (window as any).openCustomerDetail?.(o.maKH)}>{o.tenKH}</span>
+                  ) : o.tenKH}
+                  <br /><span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{o.maKH}</span>
+                </td>
                 <td className="number">{formatCurrency(o.tongTien)}</td>
                 <td className="number" style={{ color: o.conLai > 0 ? 'var(--danger-dark)' : 'var(--success-dark)', fontWeight: o.conLai > 0 ? 600 : 400 }}>
                   {formatCurrency(o.conLai)}

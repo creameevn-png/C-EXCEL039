@@ -2,6 +2,7 @@ import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import PhieuGiaoClient from './PhieuGiaoClient';
 import OrderDetailModalHost from '@/components/OrderDetailModal';
+import CustomerDetailModalHost from '@/components/CustomerDetailModal';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +37,7 @@ export default async function PhieuGiaoPage() {
       nguoiTao: p.nguoiTao || '', createdAt: p.createdAt.toISOString()
     }))}
   />
+    <CustomerDetailModalHost canSeeMoney={['Admin', 'CSKH', 'KeToan'].includes(user.vaiTro)} />
     <OrderDetailModalHost canSeeMoney={['Admin', 'CSKH', 'KeToan'].includes(user.vaiTro)} canSeeProfit={['Admin', 'KeToan', 'GDV', 'MuaHang'].includes(user.vaiTro)} />
     </>
   );

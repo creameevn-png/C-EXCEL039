@@ -147,7 +147,7 @@ export default function KhachHangClient(
                 {canSeeLienHe && <><td>{c.sdt || '-'}</td><td>{c.email || '-'}</td></>}
                 <td>{c.tuyen === 'HCM' ? 'HCM' : 'Hà Nội'}</td>
                 <td>{Math.round(c.pctCoc)}%</td>
-                <td className="number text-success" style={{ fontWeight: 600 }}>{formatCurrency(c.soDuVi)}</td>
+                <td className="number text-success" title="Xem đơn của khách" style={{ fontWeight: 600, cursor: 'pointer' }} onClick={() => (window as any).openCustomerDetail?.(c.maKH)}>{formatCurrency(c.soDuVi)}</td>
                 <td className="number" title="Xem đơn của khách" style={{ cursor: 'pointer', color: c.congNo > 0 ? 'var(--danger-dark)' : undefined, fontWeight: c.congNo > 0 ? 600 : 400 }} onClick={() => (window as any).openCustomerDetail?.(c.maKH)}>{formatCurrency(c.congNo)}</td>
                 <td className="number" title="Xem đơn của khách" style={{ cursor: 'pointer' }} onClick={() => (window as any).openCustomerDetail?.(c.maKH)}>{c.tongDon}</td>
                 <td className="number" title="Xem đơn của khách" style={{ cursor: 'pointer' }} onClick={() => (window as any).openCustomerDetail?.(c.maKH)}>{formatCurrency(c.doanhThu)}</td>

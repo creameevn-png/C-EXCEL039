@@ -62,6 +62,7 @@ export default async function KeToanPage() {
   const pending = orders
     .map((o) => ({
       maDH: o.maDH,
+      maKH: o.maKH || '',
       tenKH: o.khachHang?.tenKH || '',
       maGD: o.maGD || '',
       nv: o.nv?.hoTen || o.nvTao || '',

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import AppShell from '@/components/AppShell';
 import YeuCauClient from './YeuCauClient';
 import OrderDetailModalHost from '@/components/OrderDetailModal';
+import CustomerDetailModalHost from '@/components/CustomerDetailModal';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +33,7 @@ export default async function AdminYeuCauPage() {
         trangThai: y.trangThai, nvXuLy: y.nvXuLy || '',
         ghiChuXuLy: y.ghiChuXuLy || '', maDH: y.maDH || ''
       }))} />
+      <CustomerDetailModalHost canSeeMoney={['Admin', 'CSKH', 'KeToan'].includes(user.vaiTro)} />
       <OrderDetailModalHost canSeeMoney={['Admin', 'CSKH', 'KeToan'].includes(user.vaiTro)} canSeeProfit={['Admin', 'KeToan', 'GDV', 'MuaHang'].includes(user.vaiTro)} />
     </AppShell>
   );

@@ -2,6 +2,7 @@ import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import AppShell from '@/components/AppShell';
 import OrderDetailModalHost from '@/components/OrderDetailModal';
+import CustomerDetailModalHost from '@/components/CustomerDetailModal';
 import DonHangTable from './DonHangTable';
 import { statusToClass, statusToLabel } from '@/lib/status';
 
@@ -50,6 +51,7 @@ export default async function AdminDonHangPage({ searchParams }: { searchParams:
           shipND: o.shipND, dongGo: o.dongGo, phuThu: o.phuThu, ghiChu: o.ghiChu || ''
         }))} />
       </div>
+      <CustomerDetailModalHost canSeeMoney />
       <OrderDetailModalHost canSeeMoney={true} />
     </AppShell>
   );

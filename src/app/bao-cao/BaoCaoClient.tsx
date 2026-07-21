@@ -143,7 +143,7 @@ function ReportTools({ name, headers, rows }: { name: string; headers: string[];
   );
 }
 
-export default function BaoCaoClient({ rows, knRows, cashRows, tonKhoRows, nvList, soQuyRows }: { rows: Row[]; knRows: KnRow[]; cashRows: CashRow[]; tonKhoRows: TonKhoRow[]; nvList: NvRow[]; soQuyRows: SoQuyRow[] }) {
+export default function BaoCaoClient({ rows, knRows, cashRows, tonKhoRows, nvList, soQuyRows, hoaHongPct = 8, tyGia = 3650 }: { rows: Row[]; knRows: KnRow[]; cashRows: CashRow[]; tonKhoRows: TonKhoRow[]; nvList: NvRow[]; soQuyRows: SoQuyRow[]; hoaHongPct?: number; tyGia?: number }) {
   const [month, setMonth] = useState('');
 
   useEffect(() => {
@@ -585,16 +585,20 @@ export default function BaoCaoClient({ rows, knRows, cashRows, tonKhoRows, nvLis
   );
 
   // ===== 11. Hoa hồng & thưởng (#52/#53) — theo tháng chọn =====
-  // Hoa hồng GDV = doanh số (Σ tongTien) các đơn được giao phụ trách (gdvId) × pctHoaHong%.
+  // Hoa hồng GDV (khách chốt 21/07): = hoaHongPct% × lợi nhuận (¥) của các đơn ĐÃ GIAO (HoanThanh)
+  //   và KHÔNG phát sinh vấn đề (không có khiếu nại). Đơn chưa giao / có khiếu nại KHÔNG tính.
   // Thưởng CSKH = Σ các loại phí (phiMua+phiVC+phiBH+phiPhatSinh+phuThu+dongGo+shipND) của
   // các đơn do người đó tạo (nvId) × pctThuong%.
+  const donCoVanDe = new Set(knRows.map((k) => k.maDH).filter(Boolean)); // đơn từng có khiếu nại
   const hhData = nvList.filter((n) => n.vaiTro === 'GDV' || n.vaiTro === 'MuaHang').map((n) => {
     const os = cur.filter((r) => r.gdvId === n.id);
-    const doanhSo = os.reduce((s, r) => s + r.tongTien, 0);
-    const loiNhuan = os.reduce((s, r) => s + r.loiNhuanNDT, 0);
-    return { ...n, soDon: os.length, doanhSo, loiNhuan, hoaHong: doanhSo * n.pctHoaHong / 100 };
+    const osTinh = os.filter((r) => r.trangThai === 'HoanThanh' && !donCoVanDe.has(r.maDH)); // đơn đủ điều kiện
+    const loiNhuan = os.reduce((s, r) => s + r.loiNhuanNDT, 0);          // LN tất cả đơn phụ trách (tham khảo)
+    const loiNhuanTinh = osTinh.reduce((s, r) => s + r.loiNhuanNDT, 0);  // LN các đơn đủ điều kiện tính HH
+    const hoaHong = Math.max(0, loiNhuanTinh) * hoaHongPct / 100;        // hoa hồng (¥)
+    return { ...n, soDon: os.length, soDonTinh: osTinh.length, loiNhuan, loiNhuanTinh, hoaHong };
   }).sort((a, b) => b.hoaHong - a.hoaHong);
-  const hhTong = hhData.reduce((s, d) => ({ soDon: s.soDon + d.soDon, doanhSo: s.doanhSo + d.doanhSo, hoaHong: s.hoaHong + d.hoaHong, loiNhuan: s.loiNhuan + d.loiNhuan }), { soDon: 0, doanhSo: 0, hoaHong: 0, loiNhuan: 0 });
+  const hhTong = hhData.reduce((s, d) => ({ soDon: s.soDon + d.soDon, soDonTinh: s.soDonTinh + d.soDonTinh, hoaHong: s.hoaHong + d.hoaHong, loiNhuanTinh: s.loiNhuanTinh + d.loiNhuanTinh }), { soDon: 0, soDonTinh: 0, hoaHong: 0, loiNhuanTinh: 0 });
 
   const thData = nvList.filter((n) => n.vaiTro === 'CSKH').map((n) => {
     const os = cur.filter((r) => r.nvId === n.id);
@@ -610,25 +614,30 @@ export default function BaoCaoClient({ rows, knRows, cashRows, tonKhoRows, nvLis
   const tabHoaHong = (
     <div className="form-section">
       <div className="section-title"><FiAward /> Hoa hồng GDV — tháng {ml}</div>
-      <ReportTools name={`Hoa_hong_GDV_${ml}`} headers={['Nhân viên', 'Vai trò', 'Số đơn phụ trách', 'Doanh số', '% hoa hồng', 'Hoa hồng', 'Lợi nhuận (¥)']}
-        rows={hhData.map((d) => [d.hoTen, VAITRO_LABEL[d.vaiTro] || d.vaiTro, d.soDon, d.doanhSo, d.pctHoaHong + '%', Math.round(d.hoaHong), d.loiNhuan.toFixed(1)])} />
+      <div style={{ fontSize: 11, color: 'var(--text-faint)', marginBottom: 8 }}>
+        Hoa hồng = <b>{hoaHongPct}%</b> × lợi nhuận các đơn <b>đã giao (Hoàn thành)</b> và <b>không phát sinh khiếu nại</b>. Tỉ giá quy đổi ≈ {fmtVND(tyGia)}đ/¥ (đổi ở Quản trị › Cài đặt).
+      </div>
+      <ReportTools name={`Hoa_hong_GDV_${ml}`} headers={['Nhân viên', 'Vai trò', 'Đơn phụ trách', 'Đơn tính HH', 'LN đơn đủ ĐK (¥)', '% HH', 'Hoa hồng (¥)', '≈ VND']}
+        rows={hhData.map((d) => [d.hoTen, VAITRO_LABEL[d.vaiTro] || d.vaiTro, d.soDon, d.soDonTinh, d.loiNhuanTinh.toFixed(1), hoaHongPct + '%', d.hoaHong.toFixed(1), Math.round(d.hoaHong * tyGia)])} />
       {hhData.length === 0 ? <div className="empty-state"><FiInbox /><p>Chưa có nhân viên GDV / Mua hàng.</p></div> : (
         <table className="data-table">
-          <thead><tr><th>Nhân viên</th><th className="number">Số đơn phụ trách</th><th className="number">Doanh số</th><th className="number">% hoa hồng</th><th className="number">Hoa hồng</th><th className="number">Lợi nhuận (¥)</th></tr></thead>
+          <thead><tr><th>Nhân viên</th><th className="number">Đơn phụ trách</th><th className="number">Đơn tính HH</th><th className="number">LN đơn đủ ĐK (¥)</th><th className="number">% HH</th><th className="number">Hoa hồng (¥)</th><th className="number">≈ VND</th></tr></thead>
           <tbody>
             {hhData.map((d) => (
               <tr key={d.id}>
                 <td><span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--primary)' }} onClick={() => (window as any).openNhanVienDetail?.(d.id)}>{d.hoTen}</span><br /><span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{VAITRO_LABEL[d.vaiTro] || d.vaiTro}</span></td>
                 <td className="number">{d.soDon}</td>
-                <td className="number">{fmtVND(d.doanhSo)}đ</td>
-                <td className="number">{d.pctHoaHong}%{d.pctHoaHong === 0 && chuaDatTiLe}</td>
-                <td className="number" style={{ fontWeight: 700, color: 'var(--success-dark)' }}>{fmtVND(Math.round(d.hoaHong))}đ</td>
-                <td className="number" style={{ color: d.loiNhuan >= 0 ? 'var(--success-dark)' : 'var(--danger-dark)' }}>{d.loiNhuan.toLocaleString()} ¥</td>
+                <td className="number">{d.soDonTinh}</td>
+                <td className="number" style={{ color: d.loiNhuanTinh >= 0 ? 'var(--success-dark)' : 'var(--danger-dark)' }}>{d.loiNhuanTinh.toLocaleString()} ¥</td>
+                <td className="number">{hoaHongPct}%</td>
+                <td className="number" style={{ fontWeight: 700, color: 'var(--success-dark)' }}>{d.hoaHong.toLocaleString()} ¥</td>
+                <td className="number">{fmtVND(Math.round(d.hoaHong * tyGia))}đ</td>
               </tr>
             ))}
             <tr style={{ fontWeight: 700, background: 'var(--surface-2)' }}>
-              <td>Σ Tổng</td><td className="number">{hhTong.soDon}</td><td className="number">{fmtVND(hhTong.doanhSo)}đ</td><td></td>
-              <td className="number">{fmtVND(Math.round(hhTong.hoaHong))}đ</td><td className="number">{hhTong.loiNhuan.toLocaleString()} ¥</td>
+              <td>Σ Tổng</td><td className="number">{hhTong.soDon}</td><td className="number">{hhTong.soDonTinh}</td>
+              <td className="number">{hhTong.loiNhuanTinh.toLocaleString()} ¥</td><td></td>
+              <td className="number">{hhTong.hoaHong.toLocaleString()} ¥</td><td className="number">{fmtVND(Math.round(hhTong.hoaHong * tyGia))}đ</td>
             </tr>
           </tbody>
         </table>
@@ -659,7 +668,7 @@ export default function BaoCaoClient({ rows, knRows, cashRows, tonKhoRows, nvLis
         </table>
       )}
 
-      <div className="alert alert-info" style={{ marginTop: 12 }}><FiAward /><span><b>Hoa hồng</b> tính trên doanh số (Σ giá trị đơn) các đơn được <b>giao phụ trách</b> (gdvId) × % hoa hồng. <b>Thưởng CSKH</b> tính trên tổng các loại phí (phí mua + vận chuyển + bảo hiểm + phát sinh + phụ thu + đóng gỗ + ship nội địa) của đơn <b>do người đó tạo</b> × % thưởng. Tỉ lệ % đặt ở Quản trị › Nhân viên.</span></div>
+      <div className="alert alert-info" style={{ marginTop: 12 }}><FiAward /><span><b>Hoa hồng GDV</b> = <b>{hoaHongPct}% × lợi nhuận (¥)</b> của các đơn <b>giao phụ trách</b> (gdvId) đã <b>giao xong (Hoàn thành)</b> và <b>không phát sinh khiếu nại</b>; lấy theo <b>tháng tạo đơn</b>. Đổi % ở Quản trị › Cài đặt (hoa_hong_pct). <b>Thưởng CSKH</b> tính trên tổng các loại phí (phí mua + vận chuyển + bảo hiểm + phát sinh + phụ thu + đóng gỗ + ship nội địa) của đơn <b>do người đó tạo</b> × % thưởng (đặt ở Quản trị › Nhân viên).</span></div>
     </div>
   );
 

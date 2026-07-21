@@ -5,6 +5,7 @@ const DEFAULTS: Record<string, string> = {
   phi_mua_pct: '2',
   phi_bh_pct: '1',
   bh_mac_dinh: '1',
+  hoa_hong_pct: '8',
   ten_cong_ty: 'Quản Lý Ship Trung Việt',
   zalo_lien_he: '',
   gdv_chi_thay_don_minh: '0'

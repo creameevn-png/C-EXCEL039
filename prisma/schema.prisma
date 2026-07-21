@@ -193,9 +193,15 @@ model DonHang {
   maGD        String?      @map("ma_gd") @db.Text
   maVD        String?      @map("ma_vd") @db.Text
 
-  // Đợt 2 — giá vốn GDV (đơn vị: tệ NDT). lợi nhuận = tệ khách trả − (vốn mua + ship nội địa TQ)
+  // Đợt 2 — giá vốn GDV (đơn vị: tệ NDT). vonNDT = tiền hàng thực trả NCC, shipNDTQ = phí ship nội địa TQ THỰC (chi phí).
   vonNDT      Float        @default(0) @map("von_ndt")
   shipNDTQ    Float        @default(0) @map("ship_nd_tq")
+  // Đợt 4 — chốt công thức lợi nhuận GDV (khách chốt 21/07):
+  //   lợi nhuận = tiền hàng khách + ship nội địa TQ KHÁCH trả − (tiền hàng thực NCC + phí ship thực)
+  // teKhachNDT: GDV nhập tay tiền hàng khách trả (¥); null = tự tính Σ đơn giá NDT × SL (giữ hành vi cũ).
+  teKhachNDT   Float?      @map("te_khach_ndt")
+  // shipKhachNDT: ship nội địa TQ KHÁCH trả (¥) — khoản doanh thu bị thiếu khiến LN luôn âm.
+  shipKhachNDT Float       @default(0) @map("ship_khach_ndt")
   loiNhuanNDT Float        @default(0) @map("loi_nhuan_ndt")
 
   tongKg      Float        @default(0) @map("tong_kg")

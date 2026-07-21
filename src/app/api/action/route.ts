@@ -89,6 +89,10 @@ async function recomputeDonHang(maDH: string) {
     lineVC: o.lineVC, loaiHang: o.loaiHang
   });
 
+  // Đợt 4 — SL / giá đổi thì tiền hàng khách (auto = Σ đơn giá NDT × SL) đổi theo,
+  // nên cập nhật luôn lợi nhuận lưu để báo cáo hoa hồng không dùng số cũ.
+  const teKhach = teKhachDon(o.teKhachNDT, ct);
+
   await prisma.donHang.update({
     where: { maDH },
     data: {
@@ -98,9 +102,20 @@ async function recomputeDonHang(maDH: string) {
       phiMua: totals.phiMua, phiBH: totals.phiBH, phiVC: totals.phiVC,
       tongTien: totals.tongTien,
       tienCoc: totals.coc,
-      conLai: totals.tongTien - o.daTra
+      conLai: totals.tongTien - o.daTra,
+      loiNhuanNDT: lnNDT(teKhach, o.shipKhachNDT, o.vonNDT, o.shipNDTQ)
     }
   });
+}
+
+/** Đợt 4 — tiền hàng khách trả (¥) của đơn: GDV nhập tay (teKhachNDT) ưu tiên, else Σ đơn giá NDT × SL. */
+function teKhachDon(teKhachNDT: number | null | undefined, chiTiet: { donGiaNDT: number; soLuong: number }[]): number {
+  return teKhachNDT != null ? teKhachNDT : chiTiet.reduce((s, c) => s + c.donGiaNDT * c.soLuong, 0);
+}
+/** Đợt 4 — công thức lợi nhuận GDV (¥), khách chốt 21/07:
+ *  lợi nhuận = tiền hàng khách + ship nội địa TQ khách − (tiền hàng thực NCC + phí ship thực). */
+function lnNDT(teKhach: number, shipKhach: number, von: number, shipTQ: number): number {
+  return teKhach + shipKhach - (von + shipTQ);
 }
 
 /** Góp ý NV #13 — giá vốn đơn = Σ tiền tệ mua thực tế của từng dòng hàng (nếu GDV đã nhập theo dòng). */
@@ -109,10 +124,10 @@ async function recomputeVonGDV(maDH: string) {
   if (!o) return;
   const vonTheoDong = o.chiTiet.reduce((s, c) => s + (c.vonNDT || 0), 0);
   if (vonTheoDong <= 0) return; // GDV chưa nhập theo dòng → giữ số tổng nhập tay.
-  const tongThuNDT = o.chiTiet.reduce((s, c) => s + c.donGiaNDT * c.soLuong, 0);
+  const teKhach = teKhachDon(o.teKhachNDT, o.chiTiet);
   await prisma.donHang.update({
     where: { maDH },
-    data: { vonNDT: vonTheoDong, loiNhuanNDT: tongThuNDT - (vonTheoDong + o.shipNDTQ) }
+    data: { vonNDT: vonTheoDong, loiNhuanNDT: lnNDT(teKhach, o.shipKhachNDT, vonTheoDong, o.shipNDTQ) }
   });
 }
 
@@ -483,18 +498,27 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     // trước lúc mua hàng thì không được xoá mất số đã nhập.
     const vonNDT = patch?.vonNDT !== undefined ? Math.max(0, Number(patch.vonNDT) || 0) : o.vonNDT;
     const shipNDTQ = patch?.shipNDTQ !== undefined ? Math.max(0, Number(patch.shipNDTQ) || 0) : o.shipNDTQ;
-    // Tệ khách trả trên đơn = Σ(đơn giá NDT × số lượng) của các dòng hàng.
-    const tongThuNDT = o.chiTiet.reduce((s, c) => s + c.donGiaNDT * c.soLuong, 0);
-    const loiNhuanNDT = tongThuNDT - (vonNDT + shipNDTQ);
+    // Đợt 4 — ship nội địa TQ KHÁCH trả (doanh thu). Không gửi → giữ số cũ.
+    const shipKhachNDT = patch?.shipKhachNDT !== undefined ? Math.max(0, Number(patch.shipKhachNDT) || 0) : o.shipKhachNDT;
+    // Đợt 4 — GDV nhập tay tiền hàng khách trả (¥). Gửi '' hoặc null → về tự tính theo dòng (null).
+    let teKhachNDT: number | null = o.teKhachNDT;
+    if (patch?.teKhachNDT !== undefined) {
+      teKhachNDT = (patch.teKhachNDT === '' || patch.teKhachNDT === null) ? null : Math.max(0, Number(patch.teKhachNDT) || 0);
+    }
+    // Tệ khách trả trên đơn = số GDV nhập tay, else Σ(đơn giá NDT × số lượng) các dòng.
+    const tongThuNDT = teKhachDon(teKhachNDT, o.chiTiet);
+    const loiNhuanNDT = lnNDT(tongThuNDT, shipKhachNDT, vonNDT, shipNDTQ);
     // Góp ý NV #14: ghi chú riêng của GDV cho đơn hàng.
     const ghiChuGDV = patch?.ghiChuGDV !== undefined ? (String(patch.ghiChuGDV).trim() || null) : undefined;
-    await prisma.donHang.update({ where: { maDH }, data: { vonNDT, shipNDTQ, loiNhuanNDT, ...(ghiChuGDV !== undefined && { ghiChuGDV }) } });
+    await prisma.donHang.update({ where: { maDH }, data: { vonNDT, shipNDTQ, shipKhachNDT, teKhachNDT, loiNhuanNDT, ...(ghiChuGDV !== undefined && { ghiChuGDV }) } });
     await logActivity(user.email, 'UPDATE_VON_GDV', maDH, {
       vonNDT: { truoc: o.vonNDT, sau: vonNDT },
       shipNDTQ: { truoc: o.shipNDTQ, sau: shipNDTQ },
+      shipKhachNDT: { truoc: o.shipKhachNDT, sau: shipKhachNDT },
+      teKhachNDT: { truoc: o.teKhachNDT, sau: teKhachNDT },
       loiNhuanNDT
     });
-    return ok({ vonNDT, shipNDTQ, tongThuNDT, loiNhuanNDT });
+    return ok({ vonNDT, shipNDTQ, shipKhachNDT, teKhachNDT, tongThuNDT, loiNhuanNDT });
   },
 
   // Góp ý NV #13: GDV nhập tiền tệ (¥) mua thực tế của TỪNG sản phẩm.
@@ -1745,7 +1769,8 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     const canSeeTenKH = user?.vaiTro !== 'KhoTQ';
     // Giá vốn & lợi nhuận: CHỈ Admin / Kế toán / GDV được xem (CSKH không thấy).
     const canSeeProfit = ['Admin', 'KeToan', 'GDV', 'MuaHang'].includes(user?.vaiTro || '');
-    const tongThuNDT = o.chiTiet.reduce((s, c) => s + c.donGiaNDT * c.soLuong, 0);
+    // Đợt 4 — tiền hàng khách trả (¥): GDV nhập tay ưu tiên, else Σ đơn giá NDT × SL.
+    const tongThuNDT = teKhachDon(o.teKhachNDT, o.chiTiet);
     return ok({
       data: {
         maDH: o.maDH,
@@ -1808,8 +1833,11 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         canSeeProfit,
         vonNDT: canSeeProfit ? o.vonNDT : 0,
         shipNDTQ: canSeeProfit ? o.shipNDTQ : 0,
+        shipKhachNDT: canSeeProfit ? o.shipKhachNDT : 0,
         tongThuNDT: canSeeProfit ? tongThuNDT : 0,
-        loiNhuanNDT: canSeeProfit ? o.loiNhuanNDT : 0,
+        // Tính LIVE từ đúng các thành phần đang hiển thị (tránh lệch với số lưu khi SL vừa đổi
+        // mà GDV chưa lưu lại giá vốn) — breakdown 4 dòng luôn khớp dòng tổng.
+        loiNhuanNDT: canSeeProfit ? lnNDT(tongThuNDT, o.shipKhachNDT, o.vonNDT, o.shipNDTQ) : 0,
         anh: {
           khoTQ: o.anhKhoTQ || undefined,
           roiTQ: o.anhRoiTQ || undefined,

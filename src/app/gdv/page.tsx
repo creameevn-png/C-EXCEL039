@@ -53,8 +53,10 @@ export default async function GdvPage() {
       maGD: o.maGD || '', maVD: o.maVD || '', trangThai: o.trangThai,
       gdvId: o.gdvId, gdvTen: o.gdv?.hoTen || '',
       vonNDT: o.vonNDT, shipNDTQ: o.shipNDTQ, loiNhuanNDT: o.loiNhuanNDT,
+      teKhachNDT: o.teKhachNDT, shipKhachNDT: o.shipKhachNDT,
       ghiChuGDV: o.ghiChuGDV || '',
-      tongThuNDT: o.chiTiet.reduce((s, c) => s + c.donGiaNDT * c.soLuong, 0),
+      // Tiền hàng khách trả: GDV nhập tay (teKhachNDT) ưu tiên, else Σ đơn giá NDT × SL.
+      tongThuNDT: o.teKhachNDT != null ? o.teKhachNDT : o.chiTiet.reduce((s, c) => s + c.donGiaNDT * c.soLuong, 0),
       chiTiet: o.chiTiet.map((c) => ({
         stt: c.stt, tenSP: c.tenSP, soLuong: c.soLuong,
         donGiaNDT: c.donGiaNDT, vonNDT: c.vonNDT, linkTaobao: c.linkTaobao || ''

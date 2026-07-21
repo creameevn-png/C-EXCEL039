@@ -23,6 +23,7 @@ type Pending = {
   maGD: string; maVD: string; trangThai: string;
   gdvId: number | null; gdvTen: string;
   vonNDT: number; shipNDTQ: number; loiNhuanNDT: number; tongThuNDT: number;
+  teKhachNDT: number | null; shipKhachNDT: number;
   ghiChuGDV: string; chiTiet: ChiTiet[];
 };
 type AllOrder = {
@@ -53,6 +54,11 @@ export default function GdvClient({ user, pendingOrders, allOrders, khieuNai }: 
     Object.fromEntries(pendingOrders.map((o) => [o.maDH, o.vonNDT ? String(o.vonNDT) : ''])));
   const [shipTqInputs, setShipTqInputs] = useState<Record<string, string>>(() =>
     Object.fromEntries(pendingOrders.map((o) => [o.maDH, o.shipNDTQ ? String(o.shipNDTQ) : ''])));
+  // Đợt 4 — doanh thu khách trả bên TQ (¥): tiền hàng khách (nhập tay, để trống = tự tính) + ship khách.
+  const [teKhachInputs, setTeKhachInputs] = useState<Record<string, string>>(() =>
+    Object.fromEntries(pendingOrders.map((o) => [o.maDH, o.teKhachNDT != null ? String(o.teKhachNDT) : ''])));
+  const [shipKhachInputs, setShipKhachInputs] = useState<Record<string, string>>(() =>
+    Object.fromEntries(pendingOrders.map((o) => [o.maDH, o.shipKhachNDT ? String(o.shipKhachNDT) : ''])));
   // Góp ý NV #14: ghi chú riêng của GDV cho từng đơn.
   const [noteInputs, setNoteInputs] = useState<Record<string, string>>(() =>
     Object.fromEntries(pendingOrders.map((o) => [o.maDH, o.ghiChuGDV || ''])));
@@ -74,13 +80,21 @@ export default function GdvClient({ user, pendingOrders, allOrders, khieuNai }: 
     const o = pendingOrders.find((x) => x.maDH === maDH);
     const tongVonDong = o ? o.chiTiet.reduce((s, c) => s + (c.vonNDT || 0), 0) : 0;
     const vonNDT = tongVonDong > 0 ? tongVonDong : (parseFloat(vonInputs[maDH] || '0') || 0);
+    // Chỉ gửi vốn khi GDV thực sự có nhập (ô tổng có số — kể cả "0" — hoặc đã nhập theo dòng);
+    // ô trống = lưu ghi chú trước lúc mua → KHÔNG gửi để giữ vốn cũ. Cho phép đưa vốn về 0.
+    const vonTouched = (vonInputs[maDH] ?? '').trim() !== '' || tongVonDong > 0;
     const shipNDTQ = parseFloat(shipTqInputs[maDH] || '0') || 0;
+    const shipKhachNDT = parseFloat(shipKhachInputs[maDH] || '0') || 0;
+    // Tiền hàng khách trả (¥): để trống → gửi '' để server về tự tính theo dòng; có số → override.
+    const teRaw = (teKhachInputs[maDH] ?? '').trim();
     // Chưa mua hàng thì GDV vẫn phải ghi chú được (#14) — không chặn ở đây; server giữ
     // nguyên giá vốn cũ khi client không gửi lên.
     setBusy((p) => ({ ...p, [maDH]: true }));
     const r = await callServer('updateVonGDV', maDH, {
-      ...(vonNDT > 0 && { vonNDT }),
+      ...(vonTouched && { vonNDT }),
       shipNDTQ,
+      shipKhachNDT,
+      teKhachNDT: teRaw === '' ? '' : (parseFloat(teRaw) || 0),
       ghiChuGDV: noteInputs[maDH] ?? ''
     });
     setBusy((p) => ({ ...p, [maDH]: false }));
@@ -176,15 +190,36 @@ export default function GdvClient({ user, pendingOrders, allOrders, khieuNai }: 
     const theoDong = tongVonDong > 0;
     const von = theoDong ? tongVonDong : (parseFloat(vonInputs[o.maDH] || '0') || 0);
     const shipTq = parseFloat(shipTqInputs[o.maDH] || '0') || 0;
-    const ln = o.tongThuNDT - (von + shipTq);
+    // Doanh thu khách trả (¥): tiền hàng khách (nhập tay ưu tiên, để trống = tự tính theo dòng) + ship khách.
+    const teRaw = (teKhachInputs[o.maDH] ?? '').trim();
+    const teKhach = teRaw === '' ? o.tongThuNDT : (parseFloat(teRaw) || 0);
+    const shipKhach = parseFloat(shipKhachInputs[o.maDH] || '0') || 0;
+    // Lợi nhuận = (tiền hàng khách + ship khách) − (vốn NCC + phí ship thực).
+    const ln = teKhach + shipKhach - (von + shipTq);
     return (
       <div style={{ marginTop: 10, padding: 10, background: 'var(--surface-2)', borderRadius: 8 }}>
         <div className="ac-meta" style={{ marginBottom: 8 }}>
-          <b>Giá vốn (¥) — phục vụ lãi/lỗ.</b> Tệ khách trả trên đơn: <b>{fmtNDT(o.tongThuNDT)}</b>
+          <b>Lãi/lỗ đơn (¥).</b> Tiền hàng khách theo giá đơn: <b>{fmtNDT(o.tongThuNDT)}</b> <span style={{ color: 'var(--text-faint)' }}>(để trống ô dưới = dùng số này)</span>
         </div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#059669', margin: '4px 0 2px' }}>① Khách trả (doanh thu)</div>
         <div className="form-grid">
           <div className="form-field">
-            <label>Tổng tệ MUA thực tế (¥)</label>
+            <label>Tiền hàng khách trả (¥)</label>
+            <input type="number" step="0.01" value={teKhachInputs[o.maDH] ?? ''}
+              onChange={(e) => setTeKhachInputs((p) => ({ ...p, [o.maDH]: e.target.value }))}
+              placeholder={`Tự tính: ${o.tongThuNDT}`} disabled={busy[o.maDH]} />
+          </div>
+          <div className="form-field">
+            <label>Ship nội địa TQ khách trả (¥)</label>
+            <input type="number" step="0.01" value={shipKhachInputs[o.maDH] ?? ''}
+              onChange={(e) => setShipKhachInputs((p) => ({ ...p, [o.maDH]: e.target.value }))}
+              placeholder="VD: 40" disabled={busy[o.maDH]} />
+          </div>
+        </div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#DC2626', margin: '8px 0 2px' }}>② Mình trả NCC (chi phí)</div>
+        <div className="form-grid">
+          <div className="form-field">
+            <label>Tiền hàng thực trả NCC (¥)</label>
             <input type="number" step="0.01"
               value={theoDong ? String(tongVonDong) : (vonInputs[o.maDH] ?? '')}
               onChange={(e) => setVonInputs((p) => ({ ...p, [o.maDH]: e.target.value }))}
@@ -192,7 +227,7 @@ export default function GdvClient({ user, pendingOrders, allOrders, khieuNai }: 
             {theoDong && <div className="hint">Đang tính theo giá vốn từng sản phẩm</div>}
           </div>
           <div className="form-field">
-            <label>Ship nội địa TQ (¥)</label>
+            <label>Phí ship nội địa TQ thực (¥)</label>
             <input type="number" step="0.01" value={shipTqInputs[o.maDH] ?? ''}
               onChange={(e) => setShipTqInputs((p) => ({ ...p, [o.maDH]: e.target.value }))}
               placeholder="VD: 30" disabled={busy[o.maDH]} />
@@ -204,13 +239,13 @@ export default function GdvClient({ user, pendingOrders, allOrders, khieuNai }: 
             onChange={(e) => setNoteInputs((p) => ({ ...p, [o.maDH]: e.target.value }))}
             placeholder="VD: shop hết màu đỏ, đã đổi sang xanh; hẹn phát hàng 12/07…" disabled={busy[o.maDH]} />
         </div>
-        <div className="ac-meta" style={{ marginTop: 8 }}>
-          Tổng tiền tệ mua (tệ mua thực tế + ship nội địa TQ): <b>{fmtNDT(von + shipTq)}</b>
+        <div className="ac-meta" style={{ marginTop: 8, fontSize: 11 }}>
+          ({fmtNDT(teKhach)} + {fmtNDT(shipKhach)}) − ({fmtNDT(von)} + {fmtNDT(shipTq)})
         </div>
-        <div className="ac-meta" style={{ marginTop: 8 }}>
-          Lợi nhuận GDV (ước tính): <b style={{ color: ln >= 0 ? '#059669' : '#DC2626' }}>{fmtNDT(ln)}</b>
+        <div className="ac-meta" style={{ marginTop: 4 }}>
+          Lợi nhuận GDV: <b style={{ color: ln >= 0 ? '#059669' : '#DC2626' }}>{fmtNDT(ln)}</b>
           <button className="btn btn-secondary btn-sm" style={{ marginLeft: 10 }} onClick={() => submitVonGDV(o.maDH)} disabled={busy[o.maDH]}>
-            <FiSave /> Lưu giá vốn + ghi chú
+            <FiSave /> Lưu lãi/lỗ + ghi chú
           </button>
         </div>
       </div>

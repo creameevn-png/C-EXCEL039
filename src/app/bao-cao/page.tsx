@@ -1,5 +1,6 @@
 import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { getNumber } from '@/lib/settings';
 import AppShell from '@/components/AppShell';
 import BaoCaoClient from './BaoCaoClient';
 import OrderDetailModalHost from '@/components/OrderDetailModal';
@@ -44,6 +45,10 @@ export default async function BaoCaoPage() {
     // Sổ quỹ (#22/#42): bút toán thu-chi không gắn đơn hàng, tách theo quỹ.
     prisma.soQuy.findMany({ take: 500, orderBy: { ngay: 'desc' } })
   ]);
+
+  // Đợt 4 — hoa hồng GDV: % (khách chốt 8%) + tỉ giá quy đổi ¥→đ để tham khảo.
+  const hoaHongPct = await getNumber('hoa_hong_pct', 8);
+  const tyGia = await getNumber('ty_gia_ndt_vnd', 3650);
 
   const rows = orders.map((o) => ({
     maDH: o.maDH,
@@ -94,7 +99,7 @@ export default async function BaoCaoPage() {
 
   return (
     <AppShell user={user}>
-      <BaoCaoClient rows={rows} knRows={knRows} cashRows={cashRows} tonKhoRows={tonKhoRows} nvList={nvList} soQuyRows={soQuyRows} />
+      <BaoCaoClient rows={rows} knRows={knRows} cashRows={cashRows} tonKhoRows={tonKhoRows} nvList={nvList} soQuyRows={soQuyRows} hoaHongPct={hoaHongPct} tyGia={tyGia} />
       <CustomerDetailModalHost canSeeMoney />
       <OrderDetailModalHost canSeeMoney={['Admin', 'CSKH', 'KeToan'].includes(user.vaiTro)} canSeeProfit={['Admin', 'KeToan', 'GDV', 'MuaHang'].includes(user.vaiTro)} />
       {/* NV bấm từ báo cáo hoa hồng/thưởng; đặt sau OrderDetailModalHost để đơn nổi lên trên. */}

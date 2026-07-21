@@ -61,6 +61,7 @@ type OrderDetail = {
   canSeeProfit?: boolean;
   vonNDT?: number;
   shipNDTQ?: number;
+  shipKhachNDT?: number;
   tongThuNDT?: number;
   loiNhuanNDT?: number;
   anh: { khoTQ?: string; roiTQ?: string; khoVN?: string; giaoKH?: string };
@@ -201,9 +202,10 @@ export default function OrderDetailModalHost({ canSeeMoney, canSeeProfit = false
 
               {canSeeProfit && (
                 <div className="fee-summary" style={{ marginTop: 12 }}>
-                  <div className="fee-row"><span>Tệ khách trả trên đơn</span><span className="fee-value">{(data.tongThuNDT || 0).toLocaleString('zh-CN')}¥</span></div>
-                  <div className="fee-row"><span>Tệ MUA thực tế (giá vốn)</span><span className="fee-value">{(data.vonNDT || 0).toLocaleString('zh-CN')}¥</span></div>
-                  <div className="fee-row"><span>Ship nội địa TQ</span><span className="fee-value">{(data.shipNDTQ || 0).toLocaleString('zh-CN')}¥</span></div>
+                  <div className="fee-row"><span>Tiền hàng khách trả</span><span className="fee-value" style={{ color: '#059669' }}>+ {(data.tongThuNDT || 0).toLocaleString('zh-CN')}¥</span></div>
+                  <div className="fee-row"><span>Ship nội địa TQ khách trả</span><span className="fee-value" style={{ color: '#059669' }}>+ {(data.shipKhachNDT || 0).toLocaleString('zh-CN')}¥</span></div>
+                  <div className="fee-row"><span>Tiền hàng thực trả NCC</span><span className="fee-value" style={{ color: '#DC2626' }}>− {(data.vonNDT || 0).toLocaleString('zh-CN')}¥</span></div>
+                  <div className="fee-row"><span>Phí ship nội địa TQ thực</span><span className="fee-value" style={{ color: '#DC2626' }}>− {(data.shipNDTQ || 0).toLocaleString('zh-CN')}¥</span></div>
                   <div className="fee-row" style={{ borderTop: '1px solid #CBD5E1' }}>
                     <span><b>Lợi nhuận GDV (tệ)</b></span>
                     <span className="fee-value" style={{ color: (data.loiNhuanNDT || 0) >= 0 ? '#059669' : '#DC2626' }}>{(data.loiNhuanNDT || 0).toLocaleString('zh-CN')}¥</span>

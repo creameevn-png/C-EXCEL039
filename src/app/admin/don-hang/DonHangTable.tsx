@@ -27,7 +27,7 @@ type Row = {
   nvTao: string; maGD: string; maVD: string;
   gdvId: number | null;
   tuyen: string; lineVC: string; loaiHang: string; pctCoc: number;
-  shipND: number; dongGo: number; phuThu: number; ghiChu: string;
+  shipND: number; dongGo: number; coDongGo: boolean; phuThu: number; ghiChu: string;
 };
 
 type Gdv = { id: number; hoTen: string };
@@ -72,7 +72,7 @@ export default function DonHangTable({ orders, gdvs = [] }: { orders: Row[]; gdv
     setEdit(o);
     setForm({
       tuyen: o.tuyen, lineVC: o.lineVC, loaiHang: o.loaiHang, pctCoc: String(o.pctCoc),
-      shipND: String(o.shipND), dongGo: String(o.dongGo), phuThu: String(o.phuThu), ghiChu: o.ghiChu
+      shipND: String(o.shipND), dongGo: String(o.dongGo), coDongGo: !!o.coDongGo, phuThu: String(o.phuThu), ghiChu: o.ghiChu
     });
   }
   async function saveEdit() {
@@ -81,7 +81,7 @@ export default function DonHangTable({ orders, gdvs = [] }: { orders: Row[]; gdv
     const r = await callServer('updateOrderFields', edit.maDH, {
       tuyen: form.tuyen, lineVC: form.lineVC, loaiHang: form.loaiHang,
       pctCoc: parseFloat(form.pctCoc) || 0, shipND: parseFloat(form.shipND) || 0,
-      dongGo: parseFloat(form.dongGo) || 0, phuThu: parseFloat(form.phuThu) || 0, ghiChu: form.ghiChu
+      dongGo: parseFloat(form.dongGo) || 0, coDongGo: !!form.coDongGo, phuThu: parseFloat(form.phuThu) || 0, ghiChu: form.ghiChu
     });
     setBusy(false);
     if (r?.success) { showToast(`Đã sửa đơn ${edit.maDH}`, 'success'); reload(); }
@@ -243,8 +243,13 @@ export default function DonHangTable({ orders, gdvs = [] }: { orders: Row[]; gdv
             <div className="form-grid-3" style={{ marginTop: 10 }}>
               <div className="form-field"><label>Phí ship VN</label>
                 <input type="number" value={form.shipND} onChange={(e) => setForm({ ...form, shipND: e.target.value })} /></div>
-              <div className="form-field"><label>Phí đóng gỗ</label>
-                <input type="number" value={form.dongGo} onChange={(e) => setForm({ ...form, dongGo: e.target.value })} /></div>
+              <div className="form-field"><label>Phí đóng gỗ {form.coDongGo && <small style={{ color: 'var(--text-faint)' }}>(tự tính theo cân)</small>}</label>
+                <input type="number" value={form.dongGo} disabled={!!form.coDongGo}
+                  onChange={(e) => setForm({ ...form, dongGo: e.target.value })} />
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, fontSize: 12, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={!!form.coDongGo} onChange={(e) => setForm({ ...form, coDongGo: e.target.checked })} />
+                  <span>Đóng gỗ tự tính theo cân (bỏ tích để nhập tay)</span>
+                </label></div>
               <div className="form-field"><label>Phí phụ thu</label>
                 <input type="number" value={form.phuThu} onChange={(e) => setForm({ ...form, phuThu: e.target.value })} /></div>
             </div>

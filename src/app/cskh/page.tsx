@@ -43,6 +43,12 @@ export default async function CskhPage() {
     prisma.nhanVien.findMany({ where: { vaiTro: { in: ['GDV', 'MuaHang'] }, trangThai: 'HoatDong' }, select: { id: true, hoTen: true } })
   ]);
 
+  // Đợt 5 — đơn giá phí dịch vụ (đóng gỗ/kiểm đếm/lưu kho) cho form tạm tính.
+  const [phiDongGoKgDau, phiDongGoKgTiep, phiKiemDemSp, phiLuuKhoNgay, luuKhoFreeNgay] = await Promise.all([
+    getNumber('phi_dong_go_kg_dau', 70000), getNumber('phi_dong_go_kg_tiep', 3500),
+    getNumber('phi_kiem_dem_sp', 500), getNumber('phi_luu_kho_ngay', 1000), getNumber('luu_kho_free_ngay', 7)
+  ]);
+
   // Tỷ giá riêng theo từng sàn (PL02 #10): CSKH chọn "Nguồn" nào thì dòng đó tự lấy
   // tỷ giá của sàn đó; sàn chưa cấu hình → dùng tỷ giá chung.
   const tyGiaByWeb: Record<string, number> = {};
@@ -54,6 +60,7 @@ export default async function CskhPage() {
     tyGia,
     pctMua,
     pctBH,
+    phiDongGoKgDau, phiDongGoKgTiep, phiKiemDemSp, phiLuuKhoNgay, luuKhoFreeNgay,
     tyGiaByWeb,
     customers: customers.map((c) => ({
       maKH: c.maKH, tenKH: c.tenKH, sdt: c.sdt || '', diaChi: c.diaChi || '',

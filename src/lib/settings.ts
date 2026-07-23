@@ -6,6 +6,15 @@ const DEFAULTS: Record<string, string> = {
   phi_bh_pct: '1',
   bh_mac_dinh: '1',
   hoa_hong_pct: '8',
+  // Đợt 5 — phí dịch vụ khách chốt 21/07: đóng gỗ (70k kg đầu + 3.5k/kg tiếp),
+  // kiểm đếm (500đ/sản phẩm × số lượng), lưu kho (1.000đ × kg × ngày, miễn phí 7 ngày đầu).
+  phi_dong_go_kg_dau: '70000',
+  phi_dong_go_kg_tiep: '3500',
+  phi_kiem_dem_sp: '500',
+  // Chỉ thu phí kiểm đếm cho đơn TẠO từ ngày này trở đi (đơn cũ dùng kiểm đếm miễn phí → giữ nguyên tiền).
+  phi_kiem_dem_tu_ngay: '2026-07-21',
+  phi_luu_kho_ngay: '1000',
+  luu_kho_free_ngay: '7',
   ten_cong_ty: 'Quản Lý Ship Trung Việt',
   zalo_lien_he: '',
   gdv_chi_thay_don_minh: '0'

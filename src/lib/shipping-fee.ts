@@ -114,6 +114,13 @@ export async function computeOrderTotals(input: {
   vat?: number;
   phiKiemHoa?: number;
   phiLuuKho?: number;
+  /** Đợt 5 — bật đóng gỗ tự tính theo cân: 70.000đ kg đầu + 3.500đ/kg tiếp (đơn giá ở cài đặt).
+   *  true → tính từ kg (bỏ qua phiDongGoi); false/undefined → dùng phiDongGoi nhập tay như cũ. */
+  coDongGo?: boolean;
+  /** Đợt 5 — bật dịch vụ kiểm đếm → phí = 500đ × tổng số lượng sản phẩm. */
+  kiemDem?: boolean;
+  /** Đợt 5 — tổng số lượng sản phẩm của đơn (Σ soLuong), phục vụ phí kiểm đếm. */
+  tongSoLuong?: number;
 }) {
   const giaHang = Number(input.giaHang) || 0;
   // Z6 — % phí mua: ưu tiên override theo sàn > % riêng của khách > % chung hệ thống.
@@ -145,14 +152,26 @@ export async function computeOrderTotals(input: {
   const phiKiemHoa = Number(input.phiKiemHoa) || 0;
   const phiLuuKho = Number(input.phiLuuKho) || 0;
 
+  // Đợt 5 — đóng gỗ: bật tự tính thì = kg đầu + (kg còn lại × đơn giá kg tiếp); tắt thì dùng số nhập tay.
+  let dongGo = Number(input.phiDongGoi) || 0;
+  if (input.coDongGo) {
+    const kgDau = await getNumber('phi_dong_go_kg_dau', 70000);
+    const kgTiep = await getNumber('phi_dong_go_kg_tiep', 3500);
+    dongGo = Math.round(kgDau + Math.max(0, input.kg - 1) * kgTiep);
+  }
+  // Đợt 5 — kiểm đếm: bật dịch vụ thì phí = đơn giá/sản phẩm × tổng số lượng.
+  const phiKiemDem = input.kiemDem
+    ? Math.round((await getNumber('phi_kiem_dem_sp', 500)) * (Number(input.tongSoLuong) || 0))
+    : 0;
+
   const tongTien =
     giaHang + phiMua + phiBH + phiPhatSinh + phiKhieuNai + phiVC +
-    (input.phiShipND || 0) + (input.phiDongGoi || 0) + (input.phiPhuThu || 0) +
-    thueNK + vat + phiKiemHoa + phiLuuKho;
+    (input.phiShipND || 0) + dongGo + (input.phiPhuThu || 0) +
+    thueNK + vat + phiKiemHoa + phiLuuKho + phiKiemDem;
   // Cọc tính trên tiền hàng + phí ban đầu, KHÔNG tính phí đổi trả phát sinh sau khi
   // khách đã đặt cọc — nếu không, mỗi lần duyệt khiếu nại tiền cọc lại nhảy.
   const coc = Math.round(((tongTien - phiKhieuNai) * input.pctCoc) / 100 / 1000) * 1000;
-  return { giaHang, phiMua, phiBH, phiPhatSinh, phiKhieuNai, phiVC, thueNK, vat, phiKiemHoa, phiLuuKho, tongTien, coc };
+  return { giaHang, phiMua, phiBH, phiPhatSinh, phiKhieuNai, phiVC, thueNK, vat, phiKiemHoa, phiLuuKho, dongGo, phiKiemDem, tongTien, coc };
 }
 
 /** Góp ý NV #33 — m³ suy ra từ kích thước thực đo (cm), hệ số quy đổi do admin cài đặt. */

@@ -222,6 +222,10 @@ model DonHang {
   phiVC       Float        @default(0) @map("phi_vc")
   shipND      Float        @default(0) @map("ship_nd")
   dongGo      Float        @default(0) @map("dong_go")
+  // Đợt 5 — bật đóng gỗ tự tính theo cân (70k kg đầu + 3.5k/kg tiếp); tắt = không đóng gỗ.
+  coDongGo    Boolean      @default(false) @map("co_dong_go")
+  // Đợt 5 — phí kiểm đếm = 500đ/sản phẩm × tổng số lượng (khi bật dịch vụ kiemDem). Cột riêng để hiện tách.
+  phiKiemDem  Float        @default(0) @map("phi_kiem_dem")
   phuThu      Float        @default(0) @map("phu_thu")
   thueNK      Float        @default(0) @map("thue_nk")
   vat         Float        @default(0) @map("vat")

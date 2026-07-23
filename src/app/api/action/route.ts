@@ -63,11 +63,17 @@ async function recomputeDonHang(maDH: string) {
   const tongGiaHang = ct.reduce((s, c) => s + c.thanhTien, 0);
   const tongKg = ct.reduce((s, c) => s + c.kg * c.soLuong, 0);
   const tongM3 = ct.reduce((s, c) => s + c.m3 * c.soLuong, 0);
+  const tongSoLuong = ct.reduce((s, c) => s + c.soLuong, 0);
   // Phí mua theo từng sàn (per-web); fallback % chung khi sàn chưa cấu hình.
   const phiMuaPerWeb = await calcPhiMua(ct.map((c) => ({ webNguon: c.webNguon, thanhTien: c.thanhTien })));
   // Z6 — phí RIÊNG theo khách: đọc khách của đơn để lấy % mua/bảo hiểm riêng (nếu có).
   // Đơn lỗi không thấy khách → để undefined, hàm tính dùng % chung như cũ (không vỡ).
   const khDon = o.maKH ? await prisma.khachHang.findUnique({ where: { maKH: o.maKH } }) : null;
+
+  // Đợt 5 — phí kiểm đếm CHỈ thu cho đơn tạo từ ngày chốt trở đi. Cờ kiemDem có sẵn từ Đợt 3
+  // (trước đây miễn phí) → đơn cũ giữ nguyên tiền, không bị đội phí khi recompute.
+  const kdTuNgay = await getSetting('phi_kiem_dem_tu_ngay');
+  const thuKiemDem = o.kiemDem && (!kdTuNgay || o.ngayTao >= new Date(kdTuNgay));
 
   const totals = await computeOrderTotals({
     giaHang: tongGiaHang,
@@ -85,6 +91,8 @@ async function recomputeDonHang(maDH: string) {
     coBaoHiem: o.coBaoHiem,
     baoHiemKH: khDon?.baoHiemRieng,
     thueNK: o.thueNK, vat: o.vat, phiKiemHoa: o.phiKiemHoa, phiLuuKho: o.phiLuuKho,
+    // Đợt 5 — đóng gỗ tự tính theo cân + kiểm đếm theo số lượng (chỉ thu từ ngày chốt).
+    coDongGo: o.coDongGo, kiemDem: thuKiemDem, tongSoLuong,
     pctCoc: o.pctCoc,
     lineVC: o.lineVC, loaiHang: o.loaiHang
   });
@@ -100,6 +108,8 @@ async function recomputeDonHang(maDH: string) {
       // KHÔNG ghi đè phiPhatSinh: đó là số CSKH nhập, đang chờ duyệt hay đã duyệt
       // đều phải giữ nguyên để Kế toán còn thấy mà xét.
       phiMua: totals.phiMua, phiBH: totals.phiBH, phiVC: totals.phiVC,
+      // Đợt 5 — ghi lại đóng gỗ (tự tính khi bật) + phí kiểm đếm để hiện tách dòng + đúng tổng.
+      dongGo: totals.dongGo, phiKiemDem: totals.phiKiemDem,
       tongTien: totals.tongTien,
       tienCoc: totals.coc,
       conLai: totals.tongTien - o.daTra,
@@ -259,6 +269,8 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         pctCoc: isCustomer ? (kh.pctCoc || 70) : (Number(d.pctCoc) || kh.pctCoc || 70),
         shipND: isCustomer ? 0 : Number(d.phiShipND) || 0,
         dongGo,
+        // Đợt 5 — bật đóng gỗ tự tính theo cân (recomputeDonHang sẽ tính lại số tiền từ kg).
+        coDongGo: !!d.coDongGo,
         phuThu: isCustomer ? 0 : Number(d.phiPhuThu) || 0,
         // Góp ý NV #9: phí phát sinh vào đơn ở trạng thái CHỜ Kế toán duyệt.
         phiPhatSinh: isCustomer ? 0 : Number(d.phiPhatSinh) || 0,
@@ -1807,11 +1819,13 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         phiVC: canSeeMoney ? o.phiVC : 0,
         shipND: canSeeMoney ? o.shipND : 0,
         dongGo: canSeeMoney ? o.dongGo : 0,
+        coDongGo: o.coDongGo,
         phuThu: canSeeMoney ? o.phuThu : 0,
         thueNK: canSeeMoney ? o.thueNK : 0,
         vat: canSeeMoney ? o.vat : 0,
         phiKiemHoa: canSeeMoney ? o.phiKiemHoa : 0,
         phiLuuKho: canSeeMoney ? o.phiLuuKho : 0,
+        phiKiemDem: canSeeMoney ? o.phiKiemDem : 0,
         ngachHQ: o.ngachHQ,
         kiemDem: o.kiemDem,
         // 3B — trạng thái bật/tắt bảo hiểm cấp đơn (null = theo khách/công ty) để UI hiển thị/sửa.
@@ -2170,6 +2184,8 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         tongKg: o.tongKg, tongM3: o.tongM3,
         tongGiaHang: o.tongGiaHang, phiMua: o.phiMua, phiVC: o.phiVC, shipND: o.shipND,
         dongGo: o.dongGo, phuThu: o.phuThu, phiBH: o.phiBH,
+        // Đợt 5 — phí kiểm đếm khách tự đặt được (cộng vào tổng) → phải trả ra để trang tra cứu cộng khớp.
+        phiKiemDem: o.phiKiemDem,
         phiPhatSinh: o.phiPhatSinhDuyet ? o.phiPhatSinh : 0,
         phiKhieuNai: o.phiKhieuNai,
         thueNK: o.thueNK, vat: o.vat,
@@ -2487,6 +2503,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (patch?.phiKiemHoa !== undefined) data.phiKiemHoa = Number(patch.phiKiemHoa) || 0;
     if (patch?.phiLuuKho !== undefined) data.phiLuuKho = Number(patch.phiLuuKho) || 0;
     if (patch?.kiemDem !== undefined) data.kiemDem = !!patch.kiemDem;
+    if (patch?.coDongGo !== undefined) data.coDongGo = !!patch.coDongGo;
     // 3B — Admin đè bật/tắt bảo hiểm cho đơn đã tạo (tri-state; null = theo khách/công ty).
     if (patch?.coBaoHiem !== undefined) {
       data.coBaoHiem = patch.coBaoHiem === true ? true : patch.coBaoHiem === false ? false : null;
@@ -2499,7 +2516,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     await recomputeDonHang(maDH);
     // So sánh giá trị đã chuẩn hoá (data) với bản ghi cũ (o) → log "trước → sau" chuẩn.
     await logActivity(user.email, 'SUA_DON', maDH, diffFields(o, data, [
-      'tuyen', 'lineVC', 'loaiHang', 'pctCoc', 'shipND', 'dongGo', 'phuThu',
+      'tuyen', 'lineVC', 'loaiHang', 'pctCoc', 'shipND', 'dongGo', 'coDongGo', 'phuThu',
       'ngachHQ', 'thueNK', 'vat', 'phiKiemHoa', 'phiLuuKho', 'kiemDem', 'coBaoHiem',
       'nguoiNhan', 'sdtNhan', 'diaChiNhan', 'ghiChu'
     ]));

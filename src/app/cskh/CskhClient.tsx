@@ -58,6 +58,12 @@ type Props = {
     /** % phí mua & % bảo hiểm lấy từ Cài đặt — không hard-code, để đổi ở Cài đặt là ăn ngay. */
     pctMua?: number;
     pctBH?: number;
+    /** Đợt 5 — đơn giá phí dịch vụ (đóng gỗ / kiểm đếm / lưu kho) lấy từ Cài đặt. */
+    phiDongGoKgDau?: number;
+    phiDongGoKgTiep?: number;
+    phiKiemDemSp?: number;
+    phiLuuKhoNgay?: number;
+    luuKhoFreeNgay?: number;
     tyGiaByWeb?: Record<string, number>;
     customers: Customer[];
     products: Product[];
@@ -82,6 +88,12 @@ export default function CskhClient({ initial }: Props) {
   const { user, customers: customersInit, products: productsInit, myOrders, kpi, tyGia } = initial;
   const pctMua = initial.pctMua ?? 2;
   const pctBH = initial.pctBH ?? 1;
+  // Đợt 5 — đơn giá phí dịch vụ (khách chốt 21/07), đổi được ở Cài đặt.
+  const dgKgDau = initial.phiDongGoKgDau ?? 70000;
+  const dgKgTiep = initial.phiDongGoKgTiep ?? 3500;
+  const kdSp = initial.phiKiemDemSp ?? 500;
+  const luuKhoNgay = initial.phiLuuKhoNgay ?? 1000;
+  const luuKhoFree = initial.luuKhoFreeNgay ?? 7;
   const gdvs = initial.gdvs || [];
   // Góp ý NV #10: chỉ Kế toán được nạp ví — CSKH chỉ xem số dư.
   const canTopup = user.vaiTro === 'KeToan' || user.vaiTro === 'Admin';
@@ -100,7 +112,7 @@ export default function CskhClient({ initial }: Props) {
   const [lineVC, setLineVC] = useState<'LineNhanh' | 'LineThuong' | 'LineRe'>('LineThuong');
   const [loaiHang, setLoaiHang] = useState('Thường');
   const [shipND, setShipND] = useState(0);
-  const [dongGoi, setDongGoi] = useState(0);
+  const [coDongGo, setCoDongGo] = useState(false);
   const [phuThu, setPhuThu] = useState(0);
   const [phiPhatSinh, setPhiPhatSinh] = useState(0);
   const [ngachHQ, setNgachHQ] = useState('Tiểu ngạch');
@@ -108,6 +120,8 @@ export default function CskhClient({ initial }: Props) {
   const [vat, setVat] = useState(0);
   const [phiKiemHoa, setPhiKiemHoa] = useState(0);
   const [phiLuuKho, setPhiLuuKho] = useState(0);
+  // Đợt 5 — số ngày lưu kho (chỉ để tính gợi ý phí, không lưu vào đơn).
+  const [luuKhoSoNgay, setLuuKhoSoNgay] = useState(0);
   const [kiemDem, setKiemDem] = useState(false);
   const [nguoiNhan, setNguoiNhan] = useState('');
   const [sdtNhan, setSdtNhan] = useState('');
@@ -258,15 +272,18 @@ export default function CskhClient({ initial }: Props) {
     const phiPS = Math.round(Number(phiPhatSinh) || 0);
     const phiVC = calcPhiVCPanama(totalKg, totalM3, tuyen);
     const phiThue = (Number(thueNK) || 0) + (Number(vat) || 0) + (Number(phiKiemHoa) || 0) + (Number(phiLuuKho) || 0);
-    const tong = tongGiaHang + phiMua + phiBH + phiVC + (Number(shipND) || 0) + (Number(dongGoi) || 0) + (Number(phuThu) || 0) + phiThue;
+    // Đợt 5 — đóng gỗ tự tính theo cân (70k kg đầu + 3.5k/kg tiếp) khi bật; kiểm đếm = đơn giá × Σ SL.
+    const dongGo = coDongGo ? Math.round(dgKgDau + Math.max(0, totalKg - 1) * dgKgTiep) : 0;
+    const phiKiemDem = kiemDem ? Math.round(kdSp * tongSL) : 0;
+    const tong = tongGiaHang + phiMua + phiBH + phiVC + (Number(shipND) || 0) + dongGo + (Number(phuThu) || 0) + phiThue + phiKiemDem;
     const coc = Math.round((tong * pctCoc) / 100 / 1000) * 1000;
-    return { tongGiaHang, tongNDT, tongSL, totalKg, totalM3, phiMua, phiBH, phiPS, phiVC, phiThue, tong, coc };
-  }, [items, tuyen, shipND, dongGoi, phuThu, phiPhatSinh, thueNK, vat, phiKiemHoa, phiLuuKho, pctCoc, pctMua, pctBH]);
+    return { tongGiaHang, tongNDT, tongSL, totalKg, totalM3, phiMua, phiBH, phiPS, phiVC, phiThue, dongGo, phiKiemDem, tong, coc };
+  }, [items, tuyen, shipND, coDongGo, phuThu, phiPhatSinh, thueNK, vat, phiKiemHoa, phiLuuKho, kiemDem, pctCoc, pctMua, pctBH, dgKgDau, dgKgTiep, kdSp]);
 
   function resetCreateForm() {
     setMaKH(''); setTuyen('HaNoi'); setLineVC('LineThuong'); setLoaiHang('Thường');
-    setShipND(0); setDongGoi(0); setPhuThu(0); setPctCoc(70); setCoBaoHiemDon(''); setGdvId(''); setGhiChu('');
-    setPhiPhatSinh(0); setNgachHQ('Tiểu ngạch'); setThueNK(0); setVat(0); setPhiKiemHoa(0); setPhiLuuKho(0);
+    setShipND(0); setCoDongGo(false); setPhuThu(0); setPctCoc(70); setCoBaoHiemDon(''); setGdvId(''); setGhiChu('');
+    setPhiPhatSinh(0); setNgachHQ('Tiểu ngạch'); setThueNK(0); setVat(0); setPhiKiemHoa(0); setPhiLuuKho(0); setLuuKhoSoNgay(0);
     setKiemDem(false); setNguoiNhan(''); setSdtNhan(''); setDiaChiNhan('');
     setItems([mkLine({}, tyGia)]);
   }
@@ -283,7 +300,7 @@ export default function CskhClient({ initial }: Props) {
       // Bảo hiểm đè riêng đơn: '' → undefined (theo khách/công ty) · '1' → true · '0' → false.
       coBaoHiem: coBaoHiemDon === '' ? undefined : (coBaoHiemDon === '1'),
       gdvId: gdvId ? Number(gdvId) : null,
-      phiShipND: shipND, phiDongGoi: dongGoi, phiPhuThu: phuThu,
+      phiShipND: shipND, coDongGo, phiPhuThu: phuThu,
       phiPhatSinh, ngachHQ, thueNK, vat, phiKiemHoa, phiLuuKho,
       kiemDem, nguoiNhan, sdtNhan, diaChiNhan,
       ghiChu,
@@ -571,7 +588,7 @@ export default function CskhClient({ initial }: Props) {
             </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, cursor: 'pointer' }}>
               <input type="checkbox" checked={kiemDem} onChange={(e) => setKiemDem(e.target.checked)} style={{ width: 16, height: 16 }} />
-              <span>Dịch vụ <b>kiểm đếm (GTGT)</b> — kho TQ mở kiểm tra số lượng/chất lượng từng link hàng</span>
+              <span>Dịch vụ <b>kiểm đếm (GTGT)</b> — kho TQ mở kiểm tra số lượng/chất lượng từng link hàng · {fmtVND(kdSp)}đ/sản phẩm{kiemDem && totals.phiKiemDem > 0 && <b style={{ color: 'var(--primary)' }}> → {fmtVND(totals.phiKiemDem)}đ</b>}</span>
             </label>
           </ErpSection>
 
@@ -698,10 +715,12 @@ export default function CskhClient({ initial }: Props) {
             <div className="erp-fields">
               <div className="erp-field"><label>Phí ship VN (VNĐ)</label>
                 <input type="number" value={shipND} onChange={(e) => setShipND(parseFloat(e.target.value) || 0)} /></div>
-              <div className="erp-field"><label>Phí đóng gỗ / bọt khí</label>
-                <select value={dongGoi} onChange={(e) => setDongGoi(parseFloat(e.target.value) || 0)}>
-                  <option value={0}>Không</option><option value={5000}>5.000đ</option><option value={10000}>10.000đ</option>
-                </select></div>
+              <div className="erp-field"><label>Đóng gỗ / bọt khí</label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', height: 38 }}>
+                  <input type="checkbox" checked={coDongGo} onChange={(e) => setCoDongGo(e.target.checked)} style={{ width: 16, height: 16 }} />
+                  <span>Có đóng gỗ {coDongGo && <b style={{ color: 'var(--primary)' }}>→ {fmtVND(totals.dongGo)}đ</b>}</span>
+                </label>
+                <div className="hint" style={{ marginTop: 2 }}>Tự tính: {fmtVND(dgKgDau)}đ kg đầu + {fmtVND(dgKgTiep)}đ/kg tiếp (theo cân thực tế)</div></div>
               <div className="erp-field"><label>Phí phụ thu khác (VNĐ)</label>
                 <input type="number" value={phuThu} onChange={(e) => setPhuThu(parseFloat(e.target.value) || 0)} /></div>
               <div className="erp-field"><label>Phí phát sinh khác (VNĐ)</label>
@@ -721,7 +740,16 @@ export default function CskhClient({ initial }: Props) {
               <div className="erp-field"><label>Phí kiểm hóa (VNĐ)</label>
                 <input type="number" value={phiKiemHoa} onChange={(e) => setPhiKiemHoa(parseFloat(e.target.value) || 0)} /></div>
               <div className="erp-field"><label>Phí lưu kho (VNĐ)</label>
-                <input type="number" value={phiLuuKho} onChange={(e) => setPhiLuuKho(parseFloat(e.target.value) || 0)} /></div>
+                <input type="number" value={phiLuuKho} onChange={(e) => setPhiLuuKho(parseFloat(e.target.value) || 0)} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                  <input type="number" min={0} value={luuKhoSoNgay || ''} placeholder="số ngày lưu"
+                    onChange={(e) => setLuuKhoSoNgay(parseFloat(e.target.value) || 0)} style={{ width: 90 }} />
+                  <button type="button" className="btn btn-secondary btn-sm"
+                    onClick={() => setPhiLuuKho(Math.round(Math.max(0, luuKhoSoNgay - luuKhoFree) * totals.totalKg * luuKhoNgay))}>
+                    Tính gợi ý
+                  </button>
+                </div>
+                <div className="hint" style={{ marginTop: 2 }}>Miễn phí {luuKhoFree} ngày đầu, sau đó (số ngày − {luuKhoFree}) × kg × {fmtVND(luuKhoNgay)}đ. Sửa tay được.</div></div>
             </div>
             <div style={{ marginTop: 14 }}>
               <div className="erp-fee-row"><span className="lbl">Tổng giá hàng</span><span className="v">{fmtVND(totals.tongGiaHang)}đ <small style={{ color: 'var(--text-faint)', fontWeight: 500 }}>≈ {formatNDT(totals.tongNDT)}</small></span></div>
@@ -729,6 +757,8 @@ export default function CskhClient({ initial }: Props) {
               <div className="erp-fee-row"><span className="lbl">Phí mua (tạm tính {pctMua}%)</span><span className="v">{fmtVND(totals.phiMua)}đ</span></div>
               {pctBH > 0 && <div className="erp-fee-row"><span className="lbl">Phí bảo hiểm ({pctBH}%)</span><span className="v">{fmtVND(totals.phiBH)}đ</span></div>}
               <div className="erp-fee-row"><span className="lbl">Phí vận chuyển (Panama)</span><span className="v">{fmtVND(totals.phiVC)}đ</span></div>
+              {totals.dongGo > 0 && <div className="erp-fee-row"><span className="lbl">Phí đóng gỗ ({totals.totalKg.toFixed(1)} kg)</span><span className="v">{fmtVND(totals.dongGo)}đ</span></div>}
+              {totals.phiKiemDem > 0 && <div className="erp-fee-row"><span className="lbl">Phí kiểm đếm ({totals.tongSL} SP)</span><span className="v">{fmtVND(totals.phiKiemDem)}đ</span></div>}
               {totals.phiPS > 0 && <div className="erp-fee-row"><span className="lbl">Phí phát sinh khác <small style={{ color: 'var(--warning-dark, #92400e)', fontWeight: 600 }}>(chờ Kế toán duyệt — chưa cộng vào tổng)</small></span><span className="v">{fmtVND(totals.phiPS)}đ</span></div>}
               {totals.phiThue > 0 && <div className="erp-fee-row"><span className="lbl">Thuế / VAT / kiểm hóa / lưu kho ({ngachHQ})</span><span className="v">{fmtVND(totals.phiThue)}đ</span></div>}
               <div className="erp-fee-row total"><span className="lbl">Tổng tiền</span><span className="v">{fmtVND(totals.tong)}đ</span></div>

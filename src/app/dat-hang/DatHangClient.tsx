@@ -23,8 +23,8 @@ const mk = (): Item => ({ tempId: SEQ++, tenSP: '', soLuong: 1, donGiaNDT: 0, ty
 type KH = { maKH: string; tenKH: string; pctCoc: number; tuyen: string; sdt: string; diaChi: string };
 
 export default function DatHangClient(
-  { kh, isCustomer, pctMua = 2, pctBH = 1 }:
-  { kh: KH | null; isCustomer: boolean; pctMua?: number; pctBH?: number }
+  { kh, isCustomer, pctMua = 2, pctBH = 1, phiDongGoKgDau = 70000, phiDongGoKgTiep = 3500, phiKiemDemSp = 500 }:
+  { kh: KH | null; isCustomer: boolean; pctMua?: number; pctBH?: number; phiDongGoKgDau?: number; phiDongGoKgTiep?: number; phiKiemDemSp?: number }
 ) {
   const [items, setItems] = useState<Item[]>([mk()]);
   const [tuyen, setTuyen] = useState<'HaNoi' | 'HCM'>((kh?.tuyen as any) || 'HaNoi');
@@ -36,7 +36,7 @@ export default function DatHangClient(
   const [sdtNhan, setSdtNhan] = useState(kh?.sdt || '');
   const [diaChiNhan, setDiaChiNhan] = useState(kh?.diaChi || '');
   const [kiemDem, setKiemDem] = useState(false);
-  const [dongGoi, setDongGoi] = useState(0);
+  const [coDongGo, setCoDongGo] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [today, setToday] = useState('');
@@ -58,10 +58,13 @@ export default function DatHangClient(
     const phiMua = Math.round(giaHang * pctMua / 100 / 1000) * 1000;
     const phiBH = Math.round(giaHang * pctBH / 100 / 1000) * 1000;
     const phiVC = calcPhiVCPanama(kg, m3, tuyen);
-    const tong = giaHang + phiMua + phiBH + phiVC + dongGoi;
+    // Đợt 5 — đóng gỗ tự tính theo cân; kiểm đếm = đơn giá × Σ số lượng (khớp công thức server).
+    const dongGo = coDongGo ? Math.round(phiDongGoKgDau + Math.max(0, kg - 1) * phiDongGoKgTiep) : 0;
+    const phiKiemDem = kiemDem ? Math.round(phiKiemDemSp * sl) : 0;
+    const tong = giaHang + phiMua + phiBH + phiVC + dongGo + phiKiemDem;
     const coc = Math.round(tong * pctCoc / 100 / 1000) * 1000;
-    return { giaHang, sl, kg, m3, phiMua, phiBH, phiVC, tong, coc };
-  }, [items, tuyen, pctCoc, dongGoi, pctMua, pctBH]);
+    return { giaHang, sl, kg, m3, phiMua, phiBH, phiVC, dongGo, phiKiemDem, tong, coc };
+  }, [items, tuyen, pctCoc, coDongGo, kiemDem, pctMua, pctBH, phiDongGoKgDau, phiDongGoKgTiep, phiKiemDemSp]);
 
   async function submit() {
     if (!kh) return showToast('Cần chọn KH', 'error');
@@ -70,7 +73,7 @@ export default function DatHangClient(
     setBusy(true);
     const r = await callServer('createOrder', {
       maKH: kh.maKH, tuyen, pctCoc, ghiChu,
-      lineVC, kiemDem, phiDongGoi: dongGoi,
+      lineVC, kiemDem, coDongGo,
       nguoiNhan, sdtNhan, diaChiNhan,
       chiTiet: valid.map((it) => ({
         tenSP: it.tenSP, soLuong: it.soLuong,
@@ -173,7 +176,7 @@ export default function DatHangClient(
             </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, cursor: 'pointer' }}>
               <input type="checkbox" checked={kiemDem} onChange={(e) => setKiemDem(e.target.checked)} style={{ width: 16, height: 16 }} />
-              <span>Dịch vụ <b>kiểm đếm (GTGT)</b> — kho TQ mở kiểm tra số lượng/chất lượng từng link hàng</span>
+              <span>Dịch vụ <b>kiểm đếm (GTGT)</b> — kho TQ mở kiểm tra số lượng/chất lượng từng link hàng · {fmtVND(phiKiemDemSp)}đ/sản phẩm{kiemDem && tot.phiKiemDem > 0 && <b style={{ color: 'var(--primary)' }}> → {fmtVND(tot.phiKiemDem)}đ</b>}</span>
             </label>
           </ErpSection>
 
@@ -280,16 +283,19 @@ export default function DatHangClient(
           {/* FEES */}
           <ErpSection icon={<FiDollarSign />} title="Chi phí & thanh toán">
             <div className="erp-fields" style={{ marginBottom: 10 }}>
-              <div className="erp-field"><label>Phí đóng gỗ / bọt khí</label>
-                <select value={dongGoi} onChange={(e) => setDongGoi(parseFloat(e.target.value) || 0)}>
-                  <option value={0}>Không</option><option value={5000}>5.000đ</option><option value={10000}>10.000đ</option>
-                </select></div>
+              <div className="erp-field"><label>Đóng gỗ / bọt khí</label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', height: 38 }}>
+                  <input type="checkbox" checked={coDongGo} onChange={(e) => setCoDongGo(e.target.checked)} style={{ width: 16, height: 16 }} />
+                  <span>Có đóng gỗ {coDongGo && <b style={{ color: 'var(--primary)' }}>→ {fmtVND(tot.dongGo)}đ</b>}</span>
+                </label>
+                <div className="hint" style={{ marginTop: 2 }}>{fmtVND(phiDongGoKgDau)}đ kg đầu + {fmtVND(phiDongGoKgTiep)}đ/kg tiếp (theo cân thực tế)</div></div>
             </div>
             <div className="erp-fee-row"><span className="lbl">Tiền hàng</span><span className="v">{fmtVND(tot.giaHang)}đ</span></div>
             <div className="erp-fee-row"><span className="lbl">Phí mua hàng ({pctMua}%)</span><span className="v">{fmtVND(tot.phiMua)}đ</span></div>
             {pctBH > 0 && <div className="erp-fee-row"><span className="lbl">Phí bảo hiểm ({pctBH}%)</span><span className="v">{fmtVND(tot.phiBH)}đ</span></div>}
             <div className="erp-fee-row"><span className="lbl">Phí vận chuyển ({tot.kg.toFixed(2)} kg / {tot.m3.toFixed(4)} m³)</span><span className="v">{fmtVND(tot.phiVC)}đ</span></div>
-            {dongGoi > 0 && <div className="erp-fee-row"><span className="lbl">Phí đóng gỗ / bọt khí</span><span className="v">{fmtVND(dongGoi)}đ</span></div>}
+            {tot.dongGo > 0 && <div className="erp-fee-row"><span className="lbl">Phí đóng gỗ ({tot.kg.toFixed(1)} kg)</span><span className="v">{fmtVND(tot.dongGo)}đ</span></div>}
+            {tot.phiKiemDem > 0 && <div className="erp-fee-row"><span className="lbl">Phí kiểm đếm ({tot.sl} SP)</span><span className="v">{fmtVND(tot.phiKiemDem)}đ</span></div>}
             <div className="erp-fee-row total"><span className="lbl">Tổng tiền (ước tính)</span><span className="v">{fmtVND(tot.tong)}đ</span></div>
             <div className="erp-fee-row coc"><span className="lbl">Cọc ({pctCoc}%)</span><span className="v">{fmtVND(tot.coc)}đ</span></div>
           </ErpSection>

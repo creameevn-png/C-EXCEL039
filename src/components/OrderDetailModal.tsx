@@ -47,6 +47,7 @@ type OrderDetail = {
   vat: number;
   phiKiemHoa: number;
   phiLuuKho: number;
+  phiKiemDem?: number;
   ngachHQ: string;
   tongTien: number;
   tienCoc: number;
@@ -166,7 +167,7 @@ export default function OrderDetailModalHost({ canSeeMoney, canSeeProfit = false
                   <div className="fee-row"><span>Phí mua hàng</span><span className="fee-value">{fmtVND(data.phiMua)}đ</span></div>
                   <div className="fee-row"><span>Phí vận chuyển</span><span className="fee-value">{fmtVND(data.phiVC)}đ</span></div>
                   <div className="fee-row"><span>Phí ship VN</span><span className="fee-value">{fmtVND(data.shipND)}đ</span></div>
-                  {data.dongGo > 0 && <div className="fee-row"><span>Phí đóng gói</span><span className="fee-value">{fmtVND(data.dongGo)}đ</span></div>}
+                  {data.dongGo > 0 && <div className="fee-row"><span>Phí đóng gỗ</span><span className="fee-value">{fmtVND(data.dongGo)}đ</span></div>}
                   {data.phuThu > 0 && <div className="fee-row"><span>Phí phụ thu</span><span className="fee-value">{fmtVND(data.phuThu)}đ</span></div>}
                   {data.phiBH > 0 && <div className="fee-row"><span>Phí bảo hiểm</span><span className="fee-value">{fmtVND(data.phiBH)}đ</span></div>}
                   {data.phiPhatSinh > 0 && (
@@ -188,6 +189,7 @@ export default function OrderDetailModalHost({ canSeeMoney, canSeeProfit = false
                   {data.vat > 0 && <div className="fee-row"><span>VAT</span><span className="fee-value">{fmtVND(data.vat)}đ</span></div>}
                   {data.phiKiemHoa > 0 && <div className="fee-row"><span>Phí kiểm hóa</span><span className="fee-value">{fmtVND(data.phiKiemHoa)}đ</span></div>}
                   {data.phiLuuKho > 0 && <div className="fee-row"><span>Phí lưu kho</span><span className="fee-value">{fmtVND(data.phiLuuKho)}đ</span></div>}
+                  {(data.phiKiemDem || 0) > 0 && <div className="fee-row"><span>Phí kiểm đếm</span><span className="fee-value">{fmtVND(data.phiKiemDem || 0)}đ</span></div>}
                   <div className="fee-row" style={{ borderTop: '1px solid #CBD5E1' }}>
                     <span><b>Tổng tiền</b></span>
                     <span className="fee-value" style={{ color: '#1E3A8A' }}>{fmtVND(data.tongTien)}đ</span>

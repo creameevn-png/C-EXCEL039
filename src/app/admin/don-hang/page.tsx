@@ -49,7 +49,7 @@ export default async function AdminDonHangPage({ searchParams }: { searchParams:
           nvTao: o.nvTao || '', maGD: o.maGD || '', maVD: o.maVD || '',
           gdvId: o.gdvId,
           tuyen: o.tuyen, lineVC: o.lineVC, loaiHang: o.loaiHang, pctCoc: o.pctCoc,
-          shipND: o.shipND, dongGo: o.dongGo, phuThu: o.phuThu, ghiChu: o.ghiChu || ''
+          shipND: o.shipND, dongGo: o.dongGo, coDongGo: o.coDongGo, phuThu: o.phuThu, ghiChu: o.ghiChu || ''
         }))} />
       </div>
       <CustomerDetailModalHost canSeeMoney />

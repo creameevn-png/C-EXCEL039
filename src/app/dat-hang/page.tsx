@@ -21,9 +21,12 @@ export default async function DatHangPage({ searchParams }: { searchParams: Prom
 
   // Tạm tính phía khách phải dùng ĐÚNG % của Cài đặt, nếu không tổng khách nhìn
   // thấy sẽ lệch với tổng server tính lại (shipping-fee.ts).
-  const [pctMua, pctBH] = await Promise.all([
+  const [pctMua, pctBH, phiDongGoKgDau, phiDongGoKgTiep, phiKiemDemSp] = await Promise.all([
     getNumber('phi_mua_pct', 2),
-    getNumber('phi_bh_pct', 1)
+    getNumber('phi_bh_pct', 1),
+    getNumber('phi_dong_go_kg_dau', 70000),
+    getNumber('phi_dong_go_kg_tiep', 3500),
+    getNumber('phi_kiem_dem_sp', 500)
   ]);
 
   return (
@@ -37,6 +40,9 @@ export default async function DatHangPage({ searchParams }: { searchParams: Prom
           isCustomer={user.vaiTro === 'Customer'}
           pctMua={pctMua}
           pctBH={pctBH}
+          phiDongGoKgDau={phiDongGoKgDau}
+          phiDongGoKgTiep={phiDongGoKgTiep}
+          phiKiemDemSp={phiKiemDemSp}
           kh={kh ? {
             maKH: kh.maKH, tenKH: kh.tenKH, pctCoc: kh.pctCoc, tuyen: kh.tuyen,
             sdt: kh.sdt || '', diaChi: kh.diaChi || ''

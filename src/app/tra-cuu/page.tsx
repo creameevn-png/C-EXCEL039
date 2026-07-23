@@ -216,7 +216,8 @@ export default function TraCuuPage() {
                     <div className="fee-row"><span>Phí mua hàng</span><span className="fee-value">{formatCurrency(detail.phiMua)}</span></div>
                     <div className="fee-row"><span>Phí vận chuyển</span><span className="fee-value">{formatCurrency(detail.phiVC)}</span></div>
                     {detail.shipND > 0 && <div className="fee-row"><span>Phí ship VN</span><span className="fee-value">{formatCurrency(detail.shipND)}</span></div>}
-                    {detail.dongGo > 0 && <div className="fee-row"><span>Phí đóng gói</span><span className="fee-value">{formatCurrency(detail.dongGo)}</span></div>}
+                    {detail.dongGo > 0 && <div className="fee-row"><span>Phí đóng gỗ</span><span className="fee-value">{formatCurrency(detail.dongGo)}</span></div>}
+                    {(detail.phiKiemDem || 0) > 0 && <div className="fee-row"><span>Phí kiểm đếm</span><span className="fee-value">{formatCurrency(detail.phiKiemDem || 0)}</span></div>}
                     {detail.phuThu > 0 && <div className="fee-row"><span>Phụ thu</span><span className="fee-value">{formatCurrency(detail.phuThu)}</span></div>}
                     {detail.phiBH > 0 && <div className="fee-row"><span>Bảo hiểm</span><span className="fee-value">{formatCurrency(detail.phiBH)}</span></div>}
                     {detail.phiPhatSinh > 0 && <div className="fee-row"><span>Phí phát sinh</span><span className="fee-value">{formatCurrency(detail.phiPhatSinh)}</span></div>}

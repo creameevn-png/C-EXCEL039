@@ -15,7 +15,7 @@ export default async function GdvPage() {
   const scopeFilter = locTheoNguoi
     ? { OR: [{ gdvId: user.id }, { khachHang: { gdvPhuTrachId: user.id } }] }
     : {};
-  const [pending, khieuNai, allRaw] = await Promise.all([
+  const [pending, khieuNai, allRaw, nccList] = await Promise.all([
     prisma.donHang.findMany({
       where: { trangThai: { in: ['DatCoc', 'DaMuaHang'] }, ...scopeFilter },
       include: { khachHang: true, gdv: true, chiTiet: { orderBy: { stt: 'asc' } } },
@@ -36,7 +36,9 @@ export default async function GdvPage() {
         tongTien: true, ngayTao: true,
         khachHang: { select: { tenKH: true } }
       }
-    })
+    }),
+    // #14 — danh mục shop/NCC để GDV chọn khi nhập giá vốn (gợi ý, vẫn gõ tay được).
+    prisma.nCC.findMany({ orderBy: { tenNCC: 'asc' }, select: { tenNCC: true } })
   ]);
   return <>
     {/* GDV/Mua hàng KHÔNG được xem tiền khách → canSeeMoney=false. Đặt trước GdvClient
@@ -54,6 +56,7 @@ export default async function GdvPage() {
       gdvId: o.gdvId, gdvTen: o.gdv?.hoTen || '',
       vonNDT: o.vonNDT, shipNDTQ: o.shipNDTQ, loiNhuanNDT: o.loiNhuanNDT,
       teKhachNDT: o.teKhachNDT, shipKhachNDT: o.shipKhachNDT,
+      nccDoiTac: o.nccDoiTac || '',
       ghiChuGDV: o.ghiChuGDV || '',
       // Tiền hàng khách trả: GDV nhập tay (teKhachNDT) ưu tiên, else Σ đơn giá NDT × SL.
       tongThuNDT: o.teKhachNDT != null ? o.teKhachNDT : o.chiTiet.reduce((s, c) => s + c.donGiaNDT * c.soLuong, 0),
@@ -62,6 +65,7 @@ export default async function GdvPage() {
         donGiaNDT: c.donGiaNDT, vonNDT: c.vonNDT, linkTaobao: c.linkTaobao || ''
       }))
     }))}
+    nccOptions={nccList.map((n) => n.tenNCC).filter(Boolean)}
     allOrders={allRaw.map((o) => ({
       maDH: o.maDH, maKH: o.maKH, tenKH: o.khachHang?.tenKH || '',
       maVD: o.maVD || '', trangThai: o.trangThai,

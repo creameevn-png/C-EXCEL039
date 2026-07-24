@@ -133,12 +133,55 @@ async function recomputeVonGDV(maDH: string) {
   const o = await prisma.donHang.findUnique({ where: { maDH }, include: { chiTiet: true } });
   if (!o) return;
   const vonTheoDong = o.chiTiet.reduce((s, c) => s + (c.vonNDT || 0), 0);
-  if (vonTheoDong <= 0) return; // GDV chưa nhập theo dòng → giữ số tổng nhập tay.
-  const teKhach = teKhachDon(o.teKhachNDT, o.chiTiet);
-  await prisma.donHang.update({
-    where: { maDH },
-    data: { vonNDT: vonTheoDong, loiNhuanNDT: lnNDT(teKhach, o.shipKhachNDT, vonTheoDong, o.shipNDTQ) }
-  });
+  // GDV chưa nhập theo dòng → giữ số tổng nhập tay, nhưng công nợ vẫn phải soi lại.
+  if (vonTheoDong > 0) {
+    const teKhach = teKhachDon(o.teKhachNDT, o.chiTiet);
+    await prisma.donHang.update({
+      where: { maDH },
+      data: { vonNDT: vonTheoDong, loiNhuanNDT: lnNDT(teKhach, o.shipKhachNDT, vonTheoDong, o.shipNDTQ) }
+    });
+  }
+  await syncCongNoGiaVon(maDH);
+}
+
+/** #14 — GDV nhập giá vốn → TỰ sinh 1 bút toán công nợ shop của đơn (loại PhatSinh).
+ *  Quy tắc (đã soát kỹ vì đụng tiền):
+ *   · Chưa chọn shop / giá vốn = 0 / đơn đã HỦY → GỠ bút toán tự động (không treo nợ oan cho shop).
+ *   · Đơn đã có bút toán PHÁT SINH NHẬP TAY → NHƯỜNG chứng từ tay, không tự sinh (tránh ghi nợ 2 lần).
+ *   · Shop + số tệ không đổi → GIỮ NGUYÊN, không đụng vào ngày ghi sổ lẫn tỷ giá đã chốt.
+ *   · Có thay đổi thật → ghi lại trong MỘT giao dịch, nhưng vẫn kế thừa ngày + tỷ giá của bút toán gốc
+ *     (sửa số liệu là sửa lại chính khoản nợ cũ, không phải phát sinh mới của hôm nay). */
+async function syncCongNoGiaVon(maDH: string) {
+  const o = await prisma.donHang.findUnique({ where: { maDH } });
+  if (!o) return;
+  const shop = (o.nccDoiTac || '').trim();
+  const von = o.vonNDT || 0;
+
+  const butToanCuaDon = await prisma.congNoNCC.findMany({ where: { maDH } });
+  const tuDong = butToanCuaDon.filter((r) => r.nguon === 'GiaVonGDV');
+  // Bút toán tay (kể cả sổ cũ chưa có cột nguồn) của CHÍNH đơn này = kế toán đã ghi chứng từ thật.
+  const daGhiTay = butToanCuaDon.some((r) => r.nguon !== 'GiaVonGDV' && r.loai === 'PhatSinh');
+
+  if (!shop || von <= 0 || o.trangThai === 'Huy' || daGhiTay) {
+    if (tuDong.length) await prisma.congNoNCC.deleteMany({ where: { maDH, nguon: 'GiaVonGDV' } });
+    return;
+  }
+
+  // Bút toán gốc = cái sớm nhất → giữ ngày ghi sổ và tỷ giá tại thời điểm ghi nợ lần đầu.
+  const goc = tuDong.length ? tuDong.reduce((a, b) => (a.ngay <= b.ngay ? a : b)) : null;
+  if (tuDong.length === 1 && goc && goc.doiTac === shop && goc.soTienNDT === von) return;
+
+  const tyGia = goc?.tyGia || (await getNumber('ty_gia_ndt_vnd', 3650));
+  await prisma.$transaction([
+    prisma.congNoNCC.deleteMany({ where: { maDH, nguon: 'GiaVonGDV' } }),
+    prisma.congNoNCC.create({
+      data: {
+        doiTac: shop, maDH, loai: 'PhatSinh', ...(goc && { ngay: goc.ngay }),
+        soTienNDT: von, tyGia, soTien: Math.round(von * tyGia),
+        nguon: 'GiaVonGDV', ghiChu: `Tự động từ giá vốn đơn ${maDH}`, nguoiTao: 'auto'
+      }
+    })
+  ]);
 }
 
 /** Tách ô "mã vận đơn" (nhiều mã, cách nhau dấu phẩy) thành danh sách mã sạch. */
@@ -271,6 +314,8 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         dongGo,
         // Đợt 5 — bật đóng gỗ tự tính theo cân (recomputeDonHang sẽ tính lại số tiền từ kg).
         coDongGo: !!d.coDongGo,
+        // #14 — shop/NCC của đơn (khách tự đặt thì để trống, GDV chọn sau khi mua).
+        nccDoiTac: isCustomer ? null : (String(d.nccDoiTac || '').trim() || null),
         phuThu: isCustomer ? 0 : Number(d.phiPhuThu) || 0,
         // Góp ý NV #9: phí phát sinh vào đơn ở trạng thái CHỜ Kế toán duyệt.
         phiPhatSinh: isCustomer ? 0 : Number(d.phiPhatSinh) || 0,
@@ -522,12 +567,17 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     const loiNhuanNDT = lnNDT(tongThuNDT, shipKhachNDT, vonNDT, shipNDTQ);
     // Góp ý NV #14: ghi chú riêng của GDV cho đơn hàng.
     const ghiChuGDV = patch?.ghiChuGDV !== undefined ? (String(patch.ghiChuGDV).trim() || null) : undefined;
-    await prisma.donHang.update({ where: { maDH }, data: { vonNDT, shipNDTQ, shipKhachNDT, teKhachNDT, loiNhuanNDT, ...(ghiChuGDV !== undefined && { ghiChuGDV }) } });
+    // #14 — shop/NCC của đơn: gửi '' → xoá gán (null); gửi tên → gán. Không gửi → giữ nguyên.
+    const nccDoiTac = patch?.nccDoiTac !== undefined ? (String(patch.nccDoiTac).trim() || null) : undefined;
+    await prisma.donHang.update({ where: { maDH }, data: { vonNDT, shipNDTQ, shipKhachNDT, teKhachNDT, loiNhuanNDT, ...(ghiChuGDV !== undefined && { ghiChuGDV }), ...(nccDoiTac !== undefined && { nccDoiTac }) } });
+    // #14 — cập nhật công nợ shop theo giá vốn mới (idempotent).
+    await syncCongNoGiaVon(maDH);
     await logActivity(user.email, 'UPDATE_VON_GDV', maDH, {
       vonNDT: { truoc: o.vonNDT, sau: vonNDT },
       shipNDTQ: { truoc: o.shipNDTQ, sau: shipNDTQ },
       shipKhachNDT: { truoc: o.shipKhachNDT, sau: shipKhachNDT },
       teKhachNDT: { truoc: o.teKhachNDT, sau: teKhachNDT },
+      ...(nccDoiTac !== undefined && { nccDoiTac: { truoc: o.nccDoiTac, sau: nccDoiTac } }),
       loiNhuanNDT
     });
     return ok({ vonNDT, shipNDTQ, shipKhachNDT, teKhachNDT, tongThuNDT, loiNhuanNDT });
@@ -766,12 +816,41 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
   },
 
   // ============== KHO VN ==============
+  // Kho bấm "Xác nhận đã nhận" → soi trước xem đơn còn kiện chưa về không, để HỎI TRƯỚC
+  // khi mở khung chụp ảnh (hỏi sau khi chụp mà kho bấm Hủy là mất ảnh, phải chụp lại).
+  async kiemKienTruocNhan(args, user) {
+    if (!allow(user.vaiTro, ['KhoVN'])) return err('Không có quyền');
+    const [maDH] = args;
+    const o = await prisma.donHang.findUnique({ where: { maDH } });
+    if (!o) return err('Đơn không tồn tại');
+    if (o.maVD) {
+      const dem = await prisma.kienHang.count({ where: { maDH } });
+      if (dem === 0) await syncKienTheoMaVD(maDH, o.maVD);
+    }
+    const tongKien = await prisma.kienHang.count({ where: { maDH } });
+    const soKienChuaVe = await prisma.kienHang.count({ where: { maDH, trangThai: 'ChuaVe' } });
+    return ok({ canhBaoThieuKien: tongKien > 1 && soKienChuaVe > 0, soKienChuaVe, tongKien });
+  },
+
   async confirmKhoVN(args, user) {
     if (!allow(user.vaiTro, ['KhoVN'])) return err('Không có quyền');
-    const [maDH, imageBase64] = args;
+    const [maDH, imageBase64, opt] = args;
     const o = await prisma.donHang.findUnique({ where: { maDH } });
     if (!o) return err('Đơn không tồn tại');
     if (o.trangThai !== 'DangVanChuyen') return err('Đơn không đang vận chuyển');
+    // Đảm bảo danh sách kiện đã đồng bộ để đếm chính xác trước khi cảnh báo.
+    if (o.maVD) {
+      const dem = await prisma.kienHang.count({ where: { maDH } });
+      if (dem === 0) await syncKienTheoMaVD(maDH, o.maVD);
+    }
+    // Nút "nhận nhanh": nếu đơn tách NHIỀU kiện mà còn kiện chưa xác nhận về → cảnh báo,
+    // buộc kho xác nhận lại (tránh đánh dấu đủ nhầm khi hàng về thiếu). Đơn 1 kiện thì bỏ qua.
+    const tongKien = await prisma.kienHang.count({ where: { maDH } });
+    const kienChuaVe = await prisma.kienHang.count({ where: { maDH, trangThai: 'ChuaVe' } });
+    if (tongKien > 1 && kienChuaVe > 0 && !opt?.xacNhanThieu) {
+      return { success: false, canhBaoThieuKien: true, soKienChuaVe: kienChuaVe, tongKien,
+        message: `Đơn còn ${kienChuaVe}/${tongKien} kiện CHƯA xác nhận về. Nhận cả đơn = coi như mọi kiện đã về.` };
+    }
     // Hàng về kho VN: trả đủ → sẵn sàng giao (KhoVnNhan); còn nợ → chờ thanh toán.
     const newStatus: TrangThaiDon = o.conLai <= 0.5 ? 'KhoVnNhan' : 'ChoThanhToan';
     // 3B — Kho VN xác nhận nhận hàng = mốc CHỐT CÂN: sau đây chỉ Admin sửa được cân.
@@ -783,16 +862,20 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         ...(o.canDaChot ? {} : { canDaChot: true, canChotBy: user.hoTen || user.email, canChotAt: new Date() })
       }
     });
-    // Xác nhận cả đơn = mọi kiện của đơn đã về. Không đồng bộ ở đây thì khối
-    // "Giao khách theo kiện" (#37) sẽ chặn với lý do "kiện chưa về kho VN".
-    if (o.maVD) {
-      const dem = await prisma.kienHang.count({ where: { maDH } });
-      if (dem === 0) await syncKienTheoMaVD(maDH, o.maVD);
-    }
+    // Xác nhận cả đơn = mọi kiện còn lại của đơn coi như đã về (kiện đã đồng bộ ở trên).
+    const kienSeNhan = await prisma.kienHang.findMany({ where: { maDH, trangThai: 'ChuaVe' }, select: { maBao: true } });
     await prisma.kienHang.updateMany({
       where: { maDH, trangThai: 'ChuaVe' },
       data: { trangThai: 'DaVeVN', ngayVeVN: new Date(), nguoiNhan: user.hoTen || user.email }
     });
+    // #29 — nhận cả đơn cũng phải đóng bao nếu bao đó đã hết kiện chưa về,
+    // nếu không bao sẽ kẹt mãi ở tab "Nhận bao" dù hàng đã nhận xong.
+    for (const maBao of [...new Set(kienSeNhan.map((k) => k.maBao).filter(Boolean) as string[])]) {
+      const conThieu = await prisma.kienHang.count({ where: { maBao, trangThai: 'ChuaVe' } });
+      if (conThieu === 0) {
+        await prisma.baoTong.update({ where: { maBao }, data: { trangThai: 'HoanThanh' } }).catch(() => {});
+      }
+    }
     await logActivity(user.email, 'KHO_VN_NHAN', maDH, {
       trangThai: { truoc: o.trangThai, sau: newStatus },
       ...(o.canDaChot ? {} : { canDaChot: { truoc: false, sau: true } })
@@ -1536,6 +1619,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
             data: {
               doiTac: kn.doiTacNCC, maDH: kn.maDH || null, loai: 'ThanhToan',
               soTien: boiThuong,
+              nguon: 'KhieuNai',
               ghiChu: `NCC bồi thường khiếu nại ${maKN} (cấn trừ công nợ)`,
               nguoiTao: user.email
             }
@@ -1745,6 +1829,8 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       }
     });
     await recomputePhieuGiao(o.maPhieuGiao);
+    // #14 — đơn hủy thì gỡ khoản nợ shop tự sinh theo giá vốn, không để shop bị treo nợ oan.
+    await syncCongNoGiaVon(maDH);
     await logActivity(user.email, 'CANCEL_ORDER', maDH, { trangThai: { truoc: o.trangThai, sau: 'Huy' }, lyDo, hoanTien });
     await pushNotify({
       vaiTro: ['CSKH', 'KeToan', 'Admin'], loai: 'danger', maDH,
@@ -1845,6 +1931,8 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
         ghiChuGDV: o.ghiChuGDV || '',
         lineNoiDia: o.lineNoiDia || '',
         canSeeProfit,
+        // #14 — shop/NCC của đơn: thông tin nội bộ, chỉ vai xem được giá vốn mới thấy.
+        nccDoiTac: canSeeProfit ? (o.nccDoiTac || '') : '',
         vonNDT: canSeeProfit ? o.vonNDT : 0,
         shipNDTQ: canSeeProfit ? o.shipNDTQ : 0,
         shipKhachNDT: canSeeProfit ? o.shipKhachNDT : 0,
@@ -2354,11 +2442,21 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
       data: {
         doiTac, web: d.web || null, maDH: d.maDH || null, loai,
         soTien, soTienNDT: ndt, tyGia,
+        // #14 — mã giao dịch khi shop hoàn tiền (chuyển khoản/hoàn về ví shop).
+        maGiaoDich: String(d.maGiaoDich || '').trim() || null,
+        nguon: 'Tay',
         ghiChu: d.ghiChu || null, nguoiTao: user.email
       }
     });
     await logActivity(user.email, loai === 'ThanhToan' ? 'NCC_THANH_TOAN' : 'NCC_PHAT_SINH', doiTac, { soTien, maDH: d.maDH });
-    return ok();
+    // #14 — kế toán ghi tay khoản phát sinh của đơn nào thì chứng từ tay là bản chính:
+    // gỡ bút toán tự sinh của đơn đó để công nợ shop không bị cộng 2 lần.
+    let dagoTuDong = false;
+    if (loai === 'PhatSinh' && d.maDH) {
+      const truoc = await prisma.congNoNCC.count({ where: { maDH: String(d.maDH), nguon: 'GiaVonGDV' } });
+      if (truoc > 0) { await syncCongNoGiaVon(String(d.maDH)); dagoTuDong = true; }
+    }
+    return ok({ dagoTuDong });
   },
 
   async deleteCongNoNCC(args, user) {
@@ -2372,9 +2470,11 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (row.ghiChu?.startsWith('NCC bồi thường khiếu nại ')) {
       return err('Bút toán này sinh từ duyệt khiếu nại — không xoá được');
     }
+    // #14 — bút toán tự sinh từ giá vốn: CHO xoá (nếu không sẽ thành ngõ cụt khi đơn đã qua
+    // bước GDV mà số vốn nhập sai), nhưng phải nhắc rằng lưu lại giá vốn là nó sinh lại.
     await prisma.congNoNCC.delete({ where: { id: row.id } });
-    await logActivity(user.email, 'NCC_XOA_BUT_TOAN', String(id));
-    return ok();
+    await logActivity(user.email, 'NCC_XOA_BUT_TOAN', String(id), { maDH: row.maDH, nguon: row.nguon });
+    return ok({ laTuDong: row.nguon === 'GiaVonGDV' });
   },
 
   // ============== KE TOAN: VI / DINH KHOAN QUY ==============
@@ -2504,6 +2604,7 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (patch?.phiLuuKho !== undefined) data.phiLuuKho = Number(patch.phiLuuKho) || 0;
     if (patch?.kiemDem !== undefined) data.kiemDem = !!patch.kiemDem;
     if (patch?.coDongGo !== undefined) data.coDongGo = !!patch.coDongGo;
+    if (patch?.nccDoiTac !== undefined) data.nccDoiTac = String(patch.nccDoiTac).trim() || null;
     // 3B — Admin đè bật/tắt bảo hiểm cho đơn đã tạo (tri-state; null = theo khách/công ty).
     if (patch?.coBaoHiem !== undefined) {
       data.coBaoHiem = patch.coBaoHiem === true ? true : patch.coBaoHiem === false ? false : null;
@@ -2514,10 +2615,12 @@ const handlers: Record<string, (args: any[], user: NonNullable<Awaited<ReturnTyp
     if (patch?.ghiChu !== undefined) data.ghiChu = patch.ghiChu || null;
     if (Object.keys(data).length) await prisma.donHang.update({ where: { maDH }, data });
     await recomputeDonHang(maDH);
+    // #14 — đổi shop trên đơn thì công nợ phải chuyển theo shop mới.
+    if (patch?.nccDoiTac !== undefined) await syncCongNoGiaVon(maDH);
     // So sánh giá trị đã chuẩn hoá (data) với bản ghi cũ (o) → log "trước → sau" chuẩn.
     await logActivity(user.email, 'SUA_DON', maDH, diffFields(o, data, [
       'tuyen', 'lineVC', 'loaiHang', 'pctCoc', 'shipND', 'dongGo', 'coDongGo', 'phuThu',
-      'ngachHQ', 'thueNK', 'vat', 'phiKiemHoa', 'phiLuuKho', 'kiemDem', 'coBaoHiem',
+      'ngachHQ', 'thueNK', 'vat', 'phiKiemHoa', 'phiLuuKho', 'kiemDem', 'coBaoHiem', 'nccDoiTac',
       'nguoiNhan', 'sdtNhan', 'diaChiNhan', 'ghiChu'
     ]));
     return ok();

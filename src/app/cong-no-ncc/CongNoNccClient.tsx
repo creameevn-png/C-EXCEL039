@@ -14,12 +14,15 @@ import { exportToCSV } from '@/lib/export';
 type Entry = {
   id: number; ngay: string; doiTac: string; web: string; maDH: string;
   loai: string; soTien: number; soTienNDT: number; tyGia: number; ghiChu: string; nguoiTao: string;
+  nguon?: string; maGiaoDich?: string;
 };
 
-const blank = { doiTac: '', web: '', maDH: '', loai: 'PhatSinh', soTienNDT: 0, tyGia: 3650, soTien: 0, ghiChu: '' };
+type Tong = { doiTac: string; phatSinh: number; thanhToan: number; n: number; conNo: number };
 
-export default function CongNoNccClient({ ledger, partners, webs }:
-  { ledger: Entry[]; partners: string[]; webs: string[] }) {
+const blank = { doiTac: '', web: '', maDH: '', loai: 'PhatSinh', soTienNDT: 0, tyGia: 3650, soTien: 0, ghiChu: '', maGiaoDich: '' };
+
+export default function CongNoNccClient({ ledger, partners, webs, summary, tongDong, canDelete }:
+  { ledger: Entry[]; partners: string[]; webs: string[]; summary: Tong[]; tongDong: number; canDelete: boolean }) {
 
   const [form, setForm] = useState({ ...blank });
   const [busy, setBusy] = useState(false);
@@ -28,20 +31,7 @@ export default function CongNoNccClient({ ledger, partners, webs }:
   // tính công nợ đã có ngay trong client — không cần backend, không nối fuzzy.
   const [nccView, setNccView] = useState<string | null>(null);
 
-  // Tổng hợp công nợ theo đối tác: phát sinh − đã trả = còn nợ.
-  const summary = useMemo(() => {
-    const m = new Map<string, { phatSinh: number; thanhToan: number; n: number }>();
-    for (const e of ledger) {
-      const s = m.get(e.doiTac) || { phatSinh: 0, thanhToan: 0, n: 0 };
-      if (e.loai === 'ThanhToan') s.thanhToan += e.soTien; else s.phatSinh += e.soTien;
-      s.n++;
-      m.set(e.doiTac, s);
-    }
-    return [...m.entries()]
-      .map(([doiTac, s]) => ({ doiTac, ...s, conNo: s.phatSinh - s.thanhToan }))
-      .sort((a, b) => b.conNo - a.conNo);
-  }, [ledger]);
-
+  // Tổng hợp công nợ do máy chủ tính trên TOÀN BỘ sổ (không phải chỉ 500 dòng đang hiển thị).
   const tongConNo = summary.reduce((s, r) => s + r.conNo, 0);
   const tongPhatSinh = summary.reduce((s, r) => s + r.phatSinh, 0);
   const tongThanhToan = summary.reduce((s, r) => s + r.thanhToan, 0);
@@ -49,7 +39,7 @@ export default function CongNoNccClient({ ledger, partners, webs }:
   const filteredLedger = useMemo(() => {
     const s = q.trim().toLowerCase();
     if (!s) return ledger;
-    return ledger.filter((e) => [e.doiTac, e.web, e.maDH, e.ghiChu].some((v) => (v || '').toLowerCase().includes(s)));
+    return ledger.filter((e) => [e.doiTac, e.web, e.maDH, e.ghiChu, e.maGiaoDich].some((v) => (v || '').toLowerCase().includes(s)));
   }, [ledger, q]);
 
   const previewVND = (!form.soTien && form.soTienNDT && form.tyGia) ? Math.round(form.soTienNDT * form.tyGia) : form.soTien;
@@ -60,15 +50,26 @@ export default function CongNoNccClient({ ledger, partners, webs }:
     setBusy(true);
     const r = await callServer('addCongNoNCC', form);
     setBusy(false);
-    if (r?.success) { showToast('Đã ghi sổ công nợ', 'success'); reload(); }
-    else showToast(r?.message || 'Lỗi', 'error');
+    if (r?.success) {
+      // Ghi tay khoản phát sinh của đơn đã có bút toán tự động → hệ thống gỡ cái tự động,
+      // lấy chứng từ tay làm bản chính, tránh cộng nợ 2 lần.
+      showToast(r.dagoTuDong
+        ? 'Đã ghi sổ. Bút toán TỰ ĐỘNG của đơn này đã được gỡ để không tính nợ 2 lần.'
+        : 'Đã ghi sổ công nợ', 'success');
+      reload();
+    } else showToast(r?.message || 'Lỗi', 'error');
   }
 
   async function del(id: number) {
     if (!confirm('Xoá bút toán này?')) return;
     const r = await callServer('deleteCongNoNCC', id);
-    if (r?.success) { showToast('Đã xoá', 'success'); reload(); }
-    else showToast(r?.message || 'Lỗi', 'error');
+    if (r?.success) {
+      // Bút toán tự động sẽ được ghi lại nếu sau đó có người lưu lại giá vốn của đơn.
+      showToast(r.laTuDong
+        ? 'Đã xoá. Lưu ý: bút toán tự động sẽ sinh lại nếu có người lưu lại giá vốn đơn này.'
+        : 'Đã xoá', 'success');
+      reload();
+    } else showToast(r?.message || 'Lỗi', 'error');
   }
 
   // ===== In báo cáo (mở cửa sổ in) =====
@@ -114,21 +115,27 @@ export default function CongNoNccClient({ ledger, partners, webs }:
       filteredLedger.map((e) => ({
         ngay: formatDate(e.ngay), doiTac: e.doiTac, web: e.web, maDH: e.maDH,
         loai: e.loai === 'ThanhToan' ? 'Trả NCC' : 'Phát sinh',
-        soTienNDT: e.soTienNDT || '', soTien: e.soTien, ghiChu: e.ghiChu
+        soTienNDT: e.soTienNDT || '', soTien: e.soTien,
+        nguon: e.nguon === 'GiaVonGDV' ? 'Tự động' : 'Nhập tay',
+        maGiaoDich: e.maGiaoDich || '', ghiChu: e.ghiChu
       })),
       'cong-no-ncc-so-chi-tiet.csv',
-      { ngay: 'Ngày', doiTac: 'Shop / NCC', web: 'Web', maDH: 'Đơn', loai: 'Loại', soTienNDT: 'Tệ', soTien: 'Số tiền', ghiChu: 'Ghi chú' }
+      {
+        ngay: 'Ngày', doiTac: 'Shop / NCC', web: 'Web', maDH: 'Đơn', loai: 'Loại', soTienNDT: 'Tệ',
+        soTien: 'Số tiền', nguon: 'Nguồn', maGiaoDich: 'Mã giao dịch', ghiChu: 'Ghi chú'
+      }
     );
     if (!ok) showToast('Không có bút toán.', 'error');
   }
   function printLedger() {
     printTable(
       'Sổ chi tiết công nợ NCC / shop',
-      ['Ngày', 'Shop / NCC', 'Web', 'Đơn', 'Loại', 'Tệ', 'Số tiền', 'Ghi chú'],
+      ['Ngày', 'Shop / NCC', 'Web', 'Đơn', 'Loại', 'Tệ', 'Số tiền', 'Nguồn', 'Mã GD', 'Ghi chú'],
       filteredLedger.map((e) => [
         formatDate(e.ngay), e.doiTac, e.web, e.maDH,
         e.loai === 'ThanhToan' ? 'Trả NCC' : 'Phát sinh',
-        e.soTienNDT ? e.soTienNDT.toLocaleString() : '', fmtVND(e.soTien) + 'đ', e.ghiChu
+        e.soTienNDT ? e.soTienNDT.toLocaleString() : '', fmtVND(e.soTien) + 'đ',
+        e.nguon === 'GiaVonGDV' ? 'Tự động' : 'Nhập tay', e.maGiaoDich || '', e.ghiChu
       ])
     );
   }
@@ -155,8 +162,13 @@ export default function CongNoNccClient({ ledger, partners, webs }:
           <label>Loại bút toán</label>
           <select value={form.loai} onChange={(e) => setForm({ ...form, loai: e.target.value })}>
             <option value="PhatSinh">Phát sinh nợ (mua hàng)</option>
-            <option value="ThanhToan">Thanh toán NCC (trả nợ)</option>
+            <option value="ThanhToan">Thanh toán NCC / Shop hoàn tiền (giảm nợ)</option>
           </select>
+        </div>
+        {/* #14 — shop hoàn tiền thì ghi kèm mã giao dịch để đối chiếu. */}
+        <div className="form-field">
+          <label>Mã giao dịch (shop hoàn tiền)</label>
+          <input value={form.maGiaoDich} onChange={(e) => setForm({ ...form, maGiaoDich: e.target.value })} placeholder="Mã GD chuyển khoản / hoàn tiền" />
         </div>
       </div>
       <div className="form-grid" style={{ marginTop: 10 }}>
@@ -226,7 +238,14 @@ export default function CongNoNccClient({ ledger, partners, webs }:
 
   const tabLedger = (
     <div className="form-section">
-      <div className="section-title"><FiInbox /> Sổ chi tiết ({filteredLedger.length})</div>
+      <div className="section-title">
+        <FiInbox /> Sổ chi tiết ({filteredLedger.length}{tongDong > ledger.length ? ` / ${tongDong}` : ''})
+      </div>
+      {tongDong > ledger.length && (
+        <div style={{ fontSize: 12, color: 'var(--text-faint)', marginBottom: 8 }}>
+          Trang này liệt kê {ledger.length} bút toán mới nhất. Số liệu ở tab <b>Tổng hợp công nợ</b> vẫn tính trên đủ {tongDong} bút toán.
+        </div>
+      )}
       <div className="btn-row" style={{ justifyContent: 'flex-end', marginBottom: 10 }}>
         <button className="btn btn-secondary btn-sm" onClick={exportLedger} disabled={!filteredLedger.length}><FiDownload /> Xuất Excel (CSV)</button>
         <button className="btn btn-secondary btn-sm" onClick={printLedger} disabled={!filteredLedger.length}><FiPrinter /> In</button>
@@ -255,8 +274,13 @@ export default function CongNoNccClient({ ledger, partners, webs }:
                   : <span className="icon-inline" style={{ color: '#DC2626' }}><FiArrowUpCircle /> Phát sinh</span>}</td>
                 <td className="number">{e.soTienNDT ? e.soTienNDT.toLocaleString() : ''}</td>
                 <td className="number"><b>{fmtVND(e.soTien)}đ</b></td>
-                <td style={{ fontSize: 12 }}>{e.ghiChu}</td>
-                <td><button className="btn btn-danger btn-sm" onClick={() => del(e.id)}><FiTrash2 /></button></td>
+                <td style={{ fontSize: 12 }}>
+                  {e.nguon === 'GiaVonGDV' && <span style={{ background: '#DBEAFE', color: '#1E3A8A', borderRadius: 4, padding: '1px 5px', marginRight: 4, fontSize: 10, fontWeight: 700 }}>TỰ ĐỘNG</span>}
+                  {e.ghiChu}
+                  {e.maGiaoDich && <div style={{ color: 'var(--text-faint)' }}>Mã GD: <b>{e.maGiaoDich}</b></div>}
+                </td>
+                {/* Chỉ Kế toán / Quản trị mới xoá được bút toán — không hiện nút cho vai khác. */}
+                <td>{canDelete && <button className="btn btn-danger btn-sm" onClick={() => del(e.id)}><FiTrash2 /></button>}</td>
               </tr>
             ))}
           </tbody>
@@ -278,8 +302,10 @@ export default function CongNoNccClient({ ledger, partners, webs }:
 
       {/* Chi tiết công nợ 1 đối tác — tái dùng ledger + summary đã tính ở client */}
       {nccView && (() => {
-        const entries = ledger.filter((e) => e.doiTac === nccView);
-        const s = summary.find((x) => x.doiTac === nccView);
+        // So tên không phân biệt hoa/thường + khoảng trắng thừa (giống cách gộp ở tổng hợp).
+        const key = nccView.trim().toLowerCase();
+        const entries = ledger.filter((e) => (e.doiTac || '').trim().toLowerCase() === key);
+        const s = summary.find((x) => x.doiTac.trim().toLowerCase() === key);
         return (
           <div className="modal-overlay show" onClick={(e) => { if (e.target === e.currentTarget) setNccView(null); }}>
             <div className="modal-content" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
@@ -292,7 +318,14 @@ export default function CongNoNccClient({ ledger, partners, webs }:
                     <div className="fee-row" style={{ fontWeight: 700 }}><span>CÒN NỢ</span><span className="fee-value" style={{ color: s.conNo > 0.5 ? '#DC2626' : '#059669' }}>{fmtVND(s.conNo)}đ</span></div>
                   </div>
                 )}
-                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>Bút toán ({entries.length})</div>
+                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>
+                  Bút toán ({entries.length}{s && s.n > entries.length ? ` / ${s.n}` : ''})
+                </div>
+                {s && s.n > entries.length && (
+                  <div style={{ fontSize: 11, color: 'var(--text-faint)', marginBottom: 6 }}>
+                    Số tổng phía trên tính trên đủ {s.n} bút toán; bảng dưới chỉ liệt kê {entries.length} bút toán mới nhất.
+                  </div>
+                )}
                 <table className="data-table" style={{ fontSize: 12 }}>
                   <thead><tr><th>Ngày</th><th>Đơn</th><th>Loại</th><th className="number">Tệ</th><th className="number">Số tiền</th><th>Ghi chú</th></tr></thead>
                   <tbody>
@@ -303,7 +336,11 @@ export default function CongNoNccClient({ ledger, partners, webs }:
                         <td>{e.loai === 'ThanhToan' ? 'Trả NCC' : 'Phát sinh'}</td>
                         <td className="number">{e.soTienNDT ? e.soTienNDT.toLocaleString() : ''}</td>
                         <td className="number">{fmtVND(e.soTien)}đ</td>
-                        <td>{e.ghiChu}</td>
+                        <td>
+                          {e.nguon === 'GiaVonGDV' && <span style={{ background: '#DBEAFE', color: '#1E3A8A', borderRadius: 4, padding: '1px 5px', marginRight: 4, fontSize: 10, fontWeight: 700 }}>TỰ ĐỘNG</span>}
+                          {e.ghiChu}
+                          {e.maGiaoDich && <div style={{ color: 'var(--text-faint)' }}>Mã GD: <b>{e.maGiaoDich}</b></div>}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

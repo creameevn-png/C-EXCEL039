@@ -110,12 +110,33 @@ export default function KhoVnClient({ user, incomingShipments, atWarehouse, read
     else showToast(r?.message || 'Lỗi', 'error');
   }
 
+  // Lời cảnh báo khi đơn tách nhiều kiện mà còn kiện chưa xác nhận về.
+  function loiCanhBaoThieuKien(chuaVe: number, tong: number) {
+    return `Đơn còn ${chuaVe}/${tong} kiện CHƯA xác nhận về.\n\n`
+      + 'Bấm OK = nhận cả đơn, mọi kiện coi như đã về.\n'
+      + 'Bấm Hủy = dừng lại để kiểm đủ kiện rồi nhận sau.';
+  }
+
   function confirmKhoVN(maDH: string) {
-    (window as any).openImageUploadModal?.('Xác nhận nhận hàng tại Kho VN', maDH, async (img: string | null) => {
-      const r = await callServer('confirmKhoVN', maDH, img);
-      if (r?.success) { showToast(img ? 'Đã xác nhận + lưu ảnh' : 'Đã xác nhận', 'success'); reload(); }
-      else showToast(r?.message || 'Lỗi', 'error');
-    });
+    // Hỏi chuyện thiếu kiện TRƯỚC khi mở khung chụp ảnh, để kho không phải chụp lại.
+    (async () => {
+      const chk = await callServer('kiemKienTruocNhan', maDH);
+      let xacNhanThieu = false;
+      if (chk?.canhBaoThieuKien) {
+        if (!confirm(loiCanhBaoThieuKien(chk.soKienChuaVe, chk.tongKien))) return;
+        xacNhanThieu = true;
+      }
+      (window as any).openImageUploadModal?.('Xác nhận nhận hàng tại Kho VN', maDH, async (img: string | null) => {
+        let r = await callServer('confirmKhoVN', maDH, img, { xacNhanThieu });
+        // Chốt chặn phía máy chủ: kiện thay đổi giữa chừng (người khác vừa quét) thì vẫn hỏi lại.
+        if (r && r.success === false && r.canhBaoThieuKien) {
+          if (!confirm(loiCanhBaoThieuKien(r.soKienChuaVe, r.tongKien))) return;
+          r = await callServer('confirmKhoVN', maDH, img, { xacNhanThieu: true });
+        }
+        if (r?.success) { showToast(img ? 'Đã xác nhận + lưu ảnh' : 'Đã xác nhận', 'success'); reload(); }
+        else showToast(r?.message || 'Lỗi', 'error');
+      });
+    })();
   }
 
   function confirmDelivered(maDH: string) {

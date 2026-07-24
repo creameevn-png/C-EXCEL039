@@ -60,6 +60,7 @@ type OrderDetail = {
   sdtNhan?: string;
   diaChiNhan?: string;
   canSeeProfit?: boolean;
+  nccDoiTac?: string;
   vonNDT?: number;
   shipNDTQ?: number;
   shipKhachNDT?: number;
@@ -204,6 +205,7 @@ export default function OrderDetailModalHost({ canSeeMoney, canSeeProfit = false
 
               {canSeeProfit && (
                 <div className="fee-summary" style={{ marginTop: 12 }}>
+                  {data.nccDoiTac && <div className="fee-row"><span>Shop / NCC</span><span className="fee-value">{data.nccDoiTac}</span></div>}
                   <div className="fee-row"><span>Tiền hàng khách trả</span><span className="fee-value" style={{ color: '#059669' }}>+ {(data.tongThuNDT || 0).toLocaleString('zh-CN')}¥</span></div>
                   <div className="fee-row"><span>Ship nội địa TQ khách trả</span><span className="fee-value" style={{ color: '#059669' }}>+ {(data.shipKhachNDT || 0).toLocaleString('zh-CN')}¥</span></div>
                   <div className="fee-row"><span>Tiền hàng thực trả NCC</span><span className="fee-value" style={{ color: '#DC2626' }}>− {(data.vonNDT || 0).toLocaleString('zh-CN')}¥</span></div>

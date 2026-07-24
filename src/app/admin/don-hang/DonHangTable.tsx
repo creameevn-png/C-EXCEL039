@@ -28,6 +28,7 @@ type Row = {
   gdvId: number | null;
   tuyen: string; lineVC: string; loaiHang: string; pctCoc: number;
   shipND: number; dongGo: number; coDongGo: boolean; phuThu: number; ghiChu: string;
+  nccDoiTac: string;
 };
 
 type Gdv = { id: number; hoTen: string };
@@ -72,7 +73,8 @@ export default function DonHangTable({ orders, gdvs = [] }: { orders: Row[]; gdv
     setEdit(o);
     setForm({
       tuyen: o.tuyen, lineVC: o.lineVC, loaiHang: o.loaiHang, pctCoc: String(o.pctCoc),
-      shipND: String(o.shipND), dongGo: String(o.dongGo), coDongGo: !!o.coDongGo, phuThu: String(o.phuThu), ghiChu: o.ghiChu
+      shipND: String(o.shipND), dongGo: String(o.dongGo), coDongGo: !!o.coDongGo, phuThu: String(o.phuThu), ghiChu: o.ghiChu,
+      nccDoiTac: o.nccDoiTac || ''
     });
   }
   async function saveEdit() {
@@ -81,7 +83,9 @@ export default function DonHangTable({ orders, gdvs = [] }: { orders: Row[]; gdv
     const r = await callServer('updateOrderFields', edit.maDH, {
       tuyen: form.tuyen, lineVC: form.lineVC, loaiHang: form.loaiHang,
       pctCoc: parseFloat(form.pctCoc) || 0, shipND: parseFloat(form.shipND) || 0,
-      dongGo: parseFloat(form.dongGo) || 0, coDongGo: !!form.coDongGo, phuThu: parseFloat(form.phuThu) || 0, ghiChu: form.ghiChu
+      dongGo: parseFloat(form.dongGo) || 0, coDongGo: !!form.coDongGo, phuThu: parseFloat(form.phuThu) || 0, ghiChu: form.ghiChu,
+      // #14 — chỉ gửi shop khi thực sự sửa ô này, tránh đè mất shop GDV vừa gán ở màn khác.
+      ...((form.nccDoiTac ?? '').trim() !== (edit.nccDoiTac || '').trim() && { nccDoiTac: (form.nccDoiTac ?? '').trim() })
     });
     setBusy(false);
     if (r?.success) { showToast(`Đã sửa đơn ${edit.maDH}`, 'success'); reload(); }
@@ -252,6 +256,10 @@ export default function DonHangTable({ orders, gdvs = [] }: { orders: Row[]; gdv
                 </label></div>
               <div className="form-field"><label>Phí phụ thu</label>
                 <input type="number" value={form.phuThu} onChange={(e) => setForm({ ...form, phuThu: e.target.value })} /></div>
+              <div className="form-field"><label>Shop / NCC</label>
+                <input value={form.nccDoiTac ?? ''} placeholder="Tên shop mua hàng"
+                  onChange={(e) => setForm({ ...form, nccDoiTac: e.target.value })} />
+                <div className="hint" style={{ marginTop: 2 }}>Đổi shop thì công nợ của đơn chuyển sang shop mới.</div></div>
             </div>
             <div className="form-field" style={{ marginTop: 10 }}><label>Ghi chú</label>
               <input value={form.ghiChu} onChange={(e) => setForm({ ...form, ghiChu: e.target.value })} /></div>

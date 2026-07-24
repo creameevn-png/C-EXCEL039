@@ -203,6 +203,8 @@ model DonHang {
   // shipKhachNDT: ship nội địa TQ KHÁCH trả (¥) — khoản doanh thu bị thiếu khiến LN luôn âm.
   shipKhachNDT Float       @default(0) @map("ship_khach_ndt")
   loiNhuanNDT Float        @default(0) @map("loi_nhuan_ndt")
+  // #14 — shop/NCC của đơn (nối bằng TÊN, chưa FK). GDV nhập giá vốn → tự sinh công nợ shop này.
+  nccDoiTac   String?      @map("ncc_doi_tac")
 
   tongKg      Float        @default(0) @map("tong_kg")
   tongM3      Float        @default(0) @map("tong_m3")
@@ -590,6 +592,10 @@ model CongNoNCC {
   soTienNDT Float    @default(0) @map("so_tien_ndt")
   tyGia     Float    @default(0) @map("ty_gia")
   ghiChu    String?  @map("ghi_chu") @db.Text
+  // #14 — nguồn bút toán: null/"Tay" = nhập tay · "GiaVonGDV" = tự sinh khi GDV nhập giá vốn
+  //        · "KhieuNai" = NCC bồi thường. maGiaoDich = mã GD khi shop hoàn tiền.
+  nguon      String?  @map("nguon")
+  maGiaoDich String?  @map("ma_giao_dich")
   nguoiTao  String?  @map("nguoi_tao")
   createdAt DateTime @default(now()) @map("created_at")
 

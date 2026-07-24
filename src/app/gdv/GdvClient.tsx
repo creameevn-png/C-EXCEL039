@@ -24,6 +24,7 @@ type Pending = {
   gdvId: number | null; gdvTen: string;
   vonNDT: number; shipNDTQ: number; loiNhuanNDT: number; tongThuNDT: number;
   teKhachNDT: number | null; shipKhachNDT: number;
+  nccDoiTac: string;
   ghiChuGDV: string; chiTiet: ChiTiet[];
 };
 type AllOrder = {
@@ -41,7 +42,7 @@ const KN_LOAI: Record<string, string> = {
 const PHUONG_AN = ['Hoàn tiền', 'Đổi/trả hàng', 'Bồi thường', 'Giảm giá đơn sau', 'Hỗ trợ trao đổi NCC', 'Từ chối'];
 const KN_STATUS = ['ChoXuLy', 'DangXuLy', 'DaXuLy', 'TuChoi'];
 
-export default function GdvClient({ user, pendingOrders, allOrders, khieuNai }: { user: SessionUser; pendingOrders: Pending[]; allOrders: AllOrder[]; khieuNai: KhieuNai[] }) {
+export default function GdvClient({ user, pendingOrders, allOrders, khieuNai, nccOptions = [] }: { user: SessionUser; pendingOrders: Pending[]; allOrders: AllOrder[]; khieuNai: KhieuNai[]; nccOptions?: string[] }) {
   const ordersDeposit = pendingOrders.filter((o) => o.trangThai === 'DatCoc');
   const ordersBought = pendingOrders.filter((o) => o.trangThai === 'DaMuaHang');
   const myOrders = pendingOrders.filter((o) => o.gdvId === user.id);
@@ -59,6 +60,9 @@ export default function GdvClient({ user, pendingOrders, allOrders, khieuNai }: 
     Object.fromEntries(pendingOrders.map((o) => [o.maDH, o.teKhachNDT != null ? String(o.teKhachNDT) : ''])));
   const [shipKhachInputs, setShipKhachInputs] = useState<Record<string, string>>(() =>
     Object.fromEntries(pendingOrders.map((o) => [o.maDH, o.shipKhachNDT ? String(o.shipKhachNDT) : ''])));
+  // #14 — shop/NCC của đơn: nhập giá vốn xong là tự ghi công nợ cho shop này.
+  const [nccInputs, setNccInputs] = useState<Record<string, string>>(() =>
+    Object.fromEntries(pendingOrders.map((o) => [o.maDH, o.nccDoiTac || ''])));
   // Góp ý NV #14: ghi chú riêng của GDV cho từng đơn.
   const [noteInputs, setNoteInputs] = useState<Record<string, string>>(() =>
     Object.fromEntries(pendingOrders.map((o) => [o.maDH, o.ghiChuGDV || ''])));
@@ -87,6 +91,10 @@ export default function GdvClient({ user, pendingOrders, allOrders, khieuNai }: 
     const shipKhachNDT = parseFloat(shipKhachInputs[maDH] || '0') || 0;
     // Tiền hàng khách trả (¥): để trống → gửi '' để server về tự tính theo dòng; có số → override.
     const teRaw = (teKhachInputs[maDH] ?? '').trim();
+    // #14 — chỉ gửi shop khi GDV thực sự SỬA ô này. Tab mở lâu mà bấm "Lưu ghi chú" thì
+    // không được ghi đè shop do người khác vừa gán (gửi rỗng = xoá luôn cả công nợ đơn).
+    const nccMoi = (nccInputs[maDH] ?? '').trim();
+    const nccGoc = (o?.nccDoiTac || '').trim();
     // Chưa mua hàng thì GDV vẫn phải ghi chú được (#14) — không chặn ở đây; server giữ
     // nguyên giá vốn cũ khi client không gửi lên.
     setBusy((p) => ({ ...p, [maDH]: true }));
@@ -95,6 +103,7 @@ export default function GdvClient({ user, pendingOrders, allOrders, khieuNai }: 
       shipNDTQ,
       shipKhachNDT,
       teKhachNDT: teRaw === '' ? '' : (parseFloat(teRaw) || 0),
+      ...(nccMoi !== nccGoc && { nccDoiTac: nccMoi }),
       ghiChuGDV: noteInputs[maDH] ?? ''
     });
     setBusy((p) => ({ ...p, [maDH]: false }));
@@ -231,6 +240,18 @@ export default function GdvClient({ user, pendingOrders, allOrders, khieuNai }: 
             <input type="number" step="0.01" value={shipTqInputs[o.maDH] ?? ''}
               onChange={(e) => setShipTqInputs((p) => ({ ...p, [o.maDH]: e.target.value }))}
               placeholder="VD: 30" disabled={busy[o.maDH]} />
+          </div>
+        </div>
+        <div className="form-field" style={{ marginTop: 8 }}>
+          <label>Shop / NCC mua hàng</label>
+          <input list="gdv-ncc-list" value={nccInputs[o.maDH] ?? ''}
+            onChange={(e) => setNccInputs((p) => ({ ...p, [o.maDH]: e.target.value }))}
+            placeholder="Chọn hoặc gõ tên shop…" disabled={busy[o.maDH]} />
+          <datalist id="gdv-ncc-list">{nccOptions.map((n) => <option key={n} value={n} />)}</datalist>
+          <div className="hint" style={{ marginTop: 2 }}>
+            {(nccInputs[o.maDH] ?? '').trim()
+              ? <>Lưu xong sẽ tự ghi <b>công nợ shop</b> = tiền hàng thực trả NCC.</>
+              : <>Chưa chọn shop → <b>chưa ghi công nợ</b>. Chọn shop để hệ thống tự ghi nợ.</>}
           </div>
         </div>
         <div className="form-field" style={{ marginTop: 8 }}>

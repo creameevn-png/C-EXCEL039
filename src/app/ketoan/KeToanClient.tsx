@@ -530,7 +530,8 @@ export default function KeToanClient({ user, pendingPayments, customers, walletT
       ]} />
 
       <CustomerDetailModalHost canSeeMoney={true} />
-      <OrderDetailModalHost canSeeMoney={true} />
+      {/* Kế toán được xem lãi/lỗ + shop của đơn (máy chủ vẫn tự che nếu vai không đủ quyền). */}
+      <OrderDetailModalHost canSeeMoney={true} canSeeProfit={true} />
     </AppShell>
   );
 }
